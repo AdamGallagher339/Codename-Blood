@@ -1,9 +1,28 @@
 {
-  "name": "blood-bike-web",
-  "short_name": "blood-bike-web",
+  "name": "Blood Bike - Real-time Delivery Coordination",
+  "short_name": "Blood Bike",
+  "description": "Real-time blood delivery coordination and logistics platform for riders and coordinators",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",
+  "orientation": "portrait-primary",
+  "theme_color": "#dc143c",
+  "background_color": "#ffffff",
+  "categories": ["business", "delivery", "logistics"],
+  "screenshots": [
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
   "icons": [
     {
       "src": "icons/icon-72x72.png",
