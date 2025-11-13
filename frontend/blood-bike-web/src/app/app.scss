@@ -348,6 +348,9 @@
   }
 }
 
+// ======= LOGO ======
+.logo-img { height: 36px; width: auto; }
+
 // ===== FOOTER =====
 .app-footer {
   background-color: var(--color-black);
@@ -355,8 +358,15 @@
   padding: var(--spacing-lg) var(--spacing-md);
   text-align: center;
   border-top: var(--border-width) solid var(--color-red);
-  margin-top: auto;
-  
+  margin-top: 0;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 1000;
+  box-shadow: 0 -6px 18px rgba(0,0,0,0.18);
+
   p {
     margin: 0;
     font-size: var(--font-size-sm);
@@ -364,6 +374,9 @@
   }
 }
 
+.app-main {
+  padding-bottom: 88px; /* footer height + spacing buffer */
+}
 // ===== RESPONSIVE DESIGN =====
 @media (max-width: 768px) {
   .app-header {
