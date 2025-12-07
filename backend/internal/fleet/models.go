@@ -39,3 +39,36 @@ type IssueReport struct {
     Timestamp   time.Time `json:"timestamp"`
     Resolved    bool      `json:"resolved"`
 }
+
+// User represents a rider/team member in the system.
+// For now this is an in-memory representation keyed by RiderID.
+type User struct {
+    RiderID   string    `json:"riderId"`
+    Name      string    `json:"name,omitempty"`
+    Tags      []string  `json:"tags"`
+    UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// AddTag adds a tag to the user if it doesn't already exist.
+func (u *User) AddTag(tag string) {
+    for _, t := range u.Tags {
+        if t == tag {
+            return
+        }
+    }
+    u.Tags = append(u.Tags, tag)
+    u.UpdatedAt = time.Now()
+}
+
+// RemoveTag removes a tag from the user if present.
+func (u *User) RemoveTag(tag string) {
+    out := u.Tags[:0]
+    for _, t := range u.Tags {
+        if t == tag {
+            continue
+        }
+        out = append(out, t)
+    }
+    u.Tags = out
+    u.UpdatedAt = time.Now()
+}
