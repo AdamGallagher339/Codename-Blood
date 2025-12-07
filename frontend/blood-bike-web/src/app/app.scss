@@ -374,9 +374,11 @@
   }
 }
 
+/* Make room for the fixed footer so content isn't hidden */
 .app-main {
   padding-bottom: 88px; /* footer height + spacing buffer */
 }
+
 // ===== RESPONSIVE DESIGN =====
 @media (max-width: 768px) {
   .app-header {
