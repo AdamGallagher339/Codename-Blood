@@ -47,17 +47,41 @@ export class InfraStack extends Stack {
 
     motorcyclesTable.grantReadData(getBikesLambda);
 
+    const registerBikeLambda = new golambda.GoFunction(this, 'RegisterBikeLambda', {
+      entry: '../backend/lambda/registerBike',
+      functionName: 'RegisterBike',
+      architecture: lambda.Architecture.X86_64,
+      environment: {
+        MOTORCYCLES_TABLE: motorcyclesTable.tableName,
+      },
+    });
+    motorcyclesTable.grantWriteData(registerBikeLambda);
+
+
+
     // ------------------------------
     //      API GATEWAY
     // ------------------------------
 
     const api = new apigw.RestApi(this, 'FleetApi', {
-      restApiName: 'BloodBike Fleet API',
-    });
+        restApiName: 'BloodBike Fleet API',
+      });
 
-    api.root.addResource('bikes').addMethod(
-      'GET',
-      new apigw.LambdaIntegration(getBikesLambda)
-    );
+      // Create /bikes resource
+      const bikesResource = api.root.addResource('bikes');
+
+      // GET /bikes → GetBikesLambda
+      bikesResource.addMethod(
+        'GET',
+        new apigw.LambdaIntegration(getBikesLambda)
+      );
+
+      // POST /bikes → RegisterBikeLambda
+      bikesResource.addMethod(
+        'POST',
+        new apigw.LambdaIntegration(registerBikeLambda)
+      );
+
+
   }
 }
