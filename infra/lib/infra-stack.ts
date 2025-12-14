@@ -1,9 +1,10 @@
-import { Stack, StackProps } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';   
 import * as golambda from '@aws-cdk/aws-lambda-go-alpha';
 import * as apigw from 'aws-cdk-lib/aws-apigateway';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 
 
 export class InfraStack extends Stack {
@@ -62,9 +63,29 @@ export class InfraStack extends Stack {
     // ------------------------------
     //      API GATEWAY
     // ------------------------------
+    // ------------------------------
+    //      COGNITO (User Pool + Client)
+    // ------------------------------
+
+    const userPool = new cognito.UserPool(this, 'UserPool', {
+      userPoolName: 'BloodBikeUserPool',
+      selfSignUpEnabled: true,
+      signInAliases: { email: true },
+    });
+
+    const userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
+      userPool,
+      userPoolClientName: 'BloodBikeWebClient',
+      generateSecret: false,
+    });
 
     const api = new apigw.RestApi(this, 'FleetApi', {
         restApiName: 'BloodBike Fleet API',
+      });
+
+      // Cognito authorizer for API Gateway
+      const authorizer = new apigw.CognitoUserPoolsAuthorizer(this, 'CognitoAuthorizer', {
+        cognitoUserPools: [userPool],
       });
 
       // Create /bikes resource
@@ -76,11 +97,19 @@ export class InfraStack extends Stack {
         new apigw.LambdaIntegration(getBikesLambda)
       );
 
-      // POST /bikes → RegisterBikeLambda
+      // POST /bikes → RegisterBikeLambda (protected by Cognito)
       bikesResource.addMethod(
         'POST',
-        new apigw.LambdaIntegration(registerBikeLambda)
+        new apigw.LambdaIntegration(registerBikeLambda),
+        {
+          authorizer,
+          authorizationType: apigw.AuthorizationType.COGNITO,
+        }
       );
+
+      // CloudFormation outputs for frontend integration
+      new CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
+      new CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
 
 
   }
