@@ -47,4 +47,5 @@ export interface CreateEventDto {
   type: EventType;
   priority: EventPriority;
   assignedRiders?: string[];
+
 }
