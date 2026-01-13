@@ -1,0 +1,99 @@
+.calendar-container {
+  background: var(--color-white);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.month-year {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-dark);
+}
+
+.nav-btn {
+  background: var(--color-light-gray);
+  border: none;
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  
+  &:hover {
+    background: var(--color-red);
+    color: var(--color-white);
+    transform: scale(1.05);
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--spacing-xs);
+}
+
+.weekday-header {
+  text-align: center;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-dark-gray);
+  padding: var(--spacing-sm);
+  border-bottom: 2px solid var(--color-light-gray);
+  margin-bottom: var(--spacing-sm);
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  
+  &:not(.empty):hover {
+    background: var(--color-light-gray);
+    transform: scale(1.05);
+  }
+  
+  &.empty {
+    cursor: default;
+  }
+  
+  &.today {
+    background: rgba(220, 20, 60, 0.1);
+    border: 2px solid var(--color-red);
+    
+    .day-number {
+      font-weight: 700;
+      color: var(--color-red);
+    }
+  }
+  
+  &.selected {
+    background: var(--color-red);
+    
+    .day-number {
+      color: var(--color-white);
+      font-weight: 700;
+    }
+  }
+}
+
+.day-number {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dark);
+}

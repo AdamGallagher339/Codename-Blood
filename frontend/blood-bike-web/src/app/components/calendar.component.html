@@ -1,0 +1,28 @@
+<div class="calendar-container">
+  <div class="calendar-header">
+    <button class="nav-btn" (click)="previousMonth()" aria-label="Previous month">
+      ←
+    </button>
+    <h3 class="month-year">{{ monthYear() }}</h3>
+    <button class="nav-btn" (click)="nextMonth()" aria-label="Next month">
+      →
+    </button>
+  </div>
+  
+  <div class="calendar-grid">
+    <div class="weekday-header" *ngFor="let day of weekDays">
+      {{ day }}
+    </div>
+    
+    <div
+      *ngFor="let date of calendarDays()"
+      class="calendar-day"
+      [class.empty]="!date"
+      [class.today]="isToday(date)"
+      [class.selected]="isSelected(date)"
+      (click)="selectDate(date)"
+    >
+      <span *ngIf="date" class="day-number">{{ date.getDate() }}</span>
+    </div>
+  </div>
+</div>
