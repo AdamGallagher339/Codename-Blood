@@ -1,0 +1,129 @@
+<div class="events-page">
+  <div class="page-header">
+    <div class="header-title">
+      <h2>📅 Events</h2>
+      <p>Manage your events and schedule</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-view-toggle" (click)="toggleViewMode()">
+        {{ viewMode() === 'calendar' ? '📋 List View' : '📅 Calendar View' }}
+      </button>
+      <button class="btn-create" (click)="openCreateEventModal()">
+        ➕ Create Event
+      </button>
+    </div>
+  </div>
+  
+  <div class="events-content">
+    <!-- Calendar View -->
+    <div *ngIf="viewMode() === 'calendar'" class="calendar-section">
+      <app-calendar (dateSelected)="onDateSelected($event)"></app-calendar>
+      
+      <div class="selected-date-events" *ngIf="selectedDate()">
+        <h3>Events on {{ formatDate(selectedDate()!) }}</h3>
+        
+        <div *ngIf="selectedDateEvents().length === 0" class="no-events">
+          <p>No events scheduled for this day</p>
+          <button class="btn-small" (click)="openCreateEventModal()">
+            Create Event
+          </button>
+        </div>
+        
+        <div class="events-list" *ngIf="selectedDateEvents().length > 0">
+          <div *ngFor="let event of selectedDateEvents()" class="event-card" [class]="getPriorityClass(event.priority)">
+            <div class="event-header">
+              <span class="event-icon">{{ getEventTypeIcon(event.type) }}</span>
+              <div class="event-info">
+                <h4>{{ event.title }}</h4>
+                <p class="event-time">
+                  {{ formatTime(event.startTime) }} - {{ formatTime(event.endTime) }}
+                </p>
+              </div>
+              <button class="btn-delete" (click)="deleteEvent(event.id)" title="Delete event">
+                🗑️
+              </button>
+            </div>
+            
+            <div class="event-body">
+              <p *ngIf="event.description" class="event-description">
+                {{ event.description }}
+              </p>
+              <p class="event-location">
+                📍 {{ event.location }}
+              </p>
+              <div class="event-meta">
+                <span class="event-badge priority-badge">
+                  {{ event.priority }}
+                </span>
+                <span class="event-badge type-badge">
+                  {{ event.type }}
+                </span>
+                <span class="event-badge status-badge">
+                  {{ event.status }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- List View -->
+    <div *ngIf="viewMode() === 'list'" class="list-section">
+      <div class="upcoming-events">
+        <h3>Upcoming Events</h3>
+        
+        <div *ngIf="upcomingEvents().length === 0" class="no-events">
+          <p>No upcoming events</p>
+          <button class="btn-small" (click)="openCreateEventModal()">
+            Create Your First Event
+          </button>
+        </div>
+        
+        <div class="events-list" *ngIf="upcomingEvents().length > 0">
+          <div *ngFor="let event of upcomingEvents()" class="event-card" [class]="getPriorityClass(event.priority)">
+            <div class="event-date-label">
+              {{ formatDate(event.date) }}
+            </div>
+            
+            <div class="event-header">
+              <span class="event-icon">{{ getEventTypeIcon(event.type) }}</span>
+              <div class="event-info">
+                <h4>{{ event.title }}</h4>
+                <p class="event-time">
+                  {{ formatTime(event.startTime) }} - {{ formatTime(event.endTime) }}
+                </p>
+              </div>
+              <button class="btn-delete" (click)="deleteEvent(event.id)" title="Delete event">
+                🗑️
+              </button>
+            </div>
+            
+            <div class="event-body">
+              <p *ngIf="event.description" class="event-description">
+                {{ event.description }}
+              </p>
+              <p class="event-location">
+                📍 {{ event.location }}
+              </p>
+              <div class="event-meta">
+                <span class="event-badge priority-badge">
+                  {{ event.priority }}
+                </span>
+                <span class="event-badge type-badge">
+                  {{ event.type }}
+                </span>
+                <span class="event-badge status-badge">
+                  {{ event.status }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Event Form Modal -->
+  <app-event-form (eventCreated)="createEvent($event)"></app-event-form>
+</div>
