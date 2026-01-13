@@ -20,9 +20,11 @@
       [class.empty]="!date"
       [class.today]="isToday(date)"
       [class.selected]="isSelected(date)"
+      [class.has-events]="hasEvents(date)"
       (click)="selectDate(date)"
     >
       <span *ngIf="date" class="day-number">{{ date.getDate() }}</span>
+      <span *ngIf="date && hasEvents(date)" class="event-indicator"></span>
     </div>
   </div>
 </div>

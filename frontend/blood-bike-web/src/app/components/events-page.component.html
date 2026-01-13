@@ -17,7 +17,7 @@
   <div class="events-content">
     <!-- Calendar View -->
     <div *ngIf="viewMode() === 'calendar'" class="calendar-section">
-      <app-calendar (dateSelected)="onDateSelected($event)"></app-calendar>
+      <app-calendar [events]="events()" (dateSelected)="onDateSelected($event)"></app-calendar>
       
       <div class="selected-date-events" *ngIf="selectedDate()">
         <h3>Events on {{ formatDate(selectedDate()!) }}</h3>

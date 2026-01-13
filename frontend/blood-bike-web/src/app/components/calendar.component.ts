@@ -1,5 +1,6 @@
-import { Component, signal, computed, output } from '@angular/core';
+import { Component, signal, computed, output, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Event } from '../models/event.model';
 
 @Component({
   selector: 'app-calendar',
@@ -9,6 +10,8 @@ import { CommonModule } from '@angular/common';
   styleUrl: './calendar.component.scss'
 })
 export class CalendarComponent {
+  events = input<Event[]>([]);
+  
   currentDate = signal(new Date());
   selectedDate = signal<Date | null>(null);
   
@@ -78,5 +81,15 @@ export class CalendarComponent {
     return date.getDate() === selected.getDate() &&
            date.getMonth() === selected.getMonth() &&
            date.getFullYear() === selected.getFullYear();
+  }
+  
+  hasEvents(date: Date | null): boolean {
+    if (!date) return false;
+    return this.events().some(event => {
+      const eventDate = new Date(event.date);
+      return eventDate.getDate() === date.getDate() &&
+             eventDate.getMonth() === date.getMonth() &&
+             eventDate.getFullYear() === date.getFullYear();
+    });
   }
 }

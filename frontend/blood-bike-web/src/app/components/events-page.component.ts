@@ -1,4 +1,4 @@
-import { Component, signal, computed, viewChild } from '@angular/core';
+import { Component, signal, computed, viewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CalendarComponent } from './calendar.component';
 import { EventFormComponent } from './event-form.component';
@@ -13,6 +13,8 @@ import { Event, CreateEventDto } from '../models/event.model';
   styleUrl: './events-page.component.scss'
 })
 export class EventsPageComponent {
+  private eventService = inject(EventService);
+  
   eventForm = viewChild.required(EventFormComponent);
   
   selectedDate = signal<Date | null>(null);
@@ -35,8 +37,6 @@ export class EventsPageComponent {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 10);
   });
-  
-  constructor(private eventService: EventService) {}
   
   onDateSelected(date: Date): void {
     this.selectedDate.set(date);

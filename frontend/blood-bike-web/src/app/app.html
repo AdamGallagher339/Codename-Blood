@@ -104,16 +104,8 @@
     </div>
 
     <!-- Events Page -->
-    <div *ngIf="currentPage === 'events'" class="page events-page">
-      <div class="page-header">
-        <h2>📅 Events</h2>
-      </div>
-      <div class="page-content">
-        <div class="placeholder-section">
-          <p>Upcoming events</p>
-          <p class="secondary-text">View scheduled deliveries and events</p>
-        </div>
-      </div>
+    <div *ngIf="currentPage === 'events'" class="page events-page-container">
+      <app-events-page></app-events-page>
     </div>
 
     <!-- Real-time Communications Page -->
