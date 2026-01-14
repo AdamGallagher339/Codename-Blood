@@ -1,4 +1,4 @@
-import { Component, signal, ViewChild, ElementRef, OnDestroy, Output, EventEmitter, Input } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, OnDestroy, Output, EventEmitter, Input, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
@@ -22,7 +22,7 @@ export class QrScannerComponent implements OnDestroy {
   private lastScanTime = 0;
   private debounceInterval = 500; // ms
 
-  constructor(private router: Router) {}
+  constructor(private router: Router, private cdr: ChangeDetectorRef) {}
 
   startScan(): void {
     this.isScanning.set(true);
@@ -37,20 +37,25 @@ export class QrScannerComponent implements OnDestroy {
       return;
     }
 
-    // Initialize scanner with correct types
-    const config = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-      remoteServerLogLevel: 'ERROR' as const,
-      supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-    };
+    // Wait for DOM to update before initializing scanner
+    this.cdr.detectChanges();
+    
+    setTimeout(() => {
+      // Initialize scanner with correct types
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        remoteServerLogLevel: 'ERROR' as const,
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+      };
 
-    this.scanner = new Html5QrcodeScanner('qr-reader', config, false);
+      this.scanner = new Html5QrcodeScanner('qr-reader', config, false);
 
-    this.scanner.render(
-      (decodedText: string) => this.onScanSuccess(decodedText),
-      (error: string) => this.onScanError(error)
-    );
+      this.scanner.render(
+        (decodedText: string) => this.onScanSuccess(decodedText),
+        (error: string) => this.onScanError(error)
+      );
+    }, 0);
   }
 
   private onScanSuccess(decodedText: string): void {
