@@ -2,32 +2,42 @@
   <!-- Header -->
   <header class="app-header">
     <div class="header-content">
-        <div class="logo">
+        <div class="logo" (click)="goHomeOrWelcome()">
         <span class="logo-icon"><img src="icons/logo.jpg" alt="Blood Bike" class="logo-img"></span>
         <h1>Blood Bike</h1>
       </div>
       <div class="header-actions">
+        <div class="user-pill" *ngIf="auth.user() as me">
+          <span class="user-name">{{ me.username || me.email || me.sub }}</span>
+          <span class="user-roles" *ngIf="me.roles?.length">{{ me.roles.join(', ') }}</span>
+        </div>
         <div class="settings-container">
           <button class="btn-settings" (click)="toggleSettings()" title="Settings">
             ⚙️
           </button>
           <div *ngIf="showSettings" class="settings-dropdown">
-            <button class="settings-item" (click)="navigateTo('settings')">
-              <span>Settings</span>
+            <button class="settings-item" *ngIf="!auth.isLoggedIn()" (click)="navigateAuth('login')">
+              <span>Login</span>
             </button>
-            <button class="settings-item" (click)="navigateTo('profile')">
-              <span>Profile</span>
-            </button>
-            <button class="settings-item" (click)="navigateTo('help')">
-              <span>Help & Support</span>
-            </button>
+
+            <ng-container *ngIf="auth.isLoggedIn()">
+              <button class="settings-item" (click)="navigateTo('settings')">
+                <span>Settings</span>
+              </button>
+              <button class="settings-item" (click)="navigateTo('profile')">
+                <span>Profile</span>
+              </button>
+              <button class="settings-item" (click)="navigateTo('help')">
+                <span>Help & Support</span>
+              </button>
+            </ng-container>
             <hr class="settings-divider">
-            <button class="settings-item logout" (click)="closeSettings()">
+            <button class="settings-item logout" *ngIf="auth.isLoggedIn()" (click)="logout()">
               <span>Logout</span>
             </button>
           </div>
         </div>
-        <div *ngIf="currentPage !== 'home'" class="header-actions">
+        <div *ngIf="currentPage !== 'home' && currentPage !== 'welcome'" class="header-actions">
           <button class="btn-back" (click)="goBack()" title="Go back">
             ←
           </button>
@@ -45,8 +55,104 @@
 
     <!-- Inline Pages -->
     <div *ngIf="currentPage !== 'scanner'">
-      <!-- Home Page -->
-      <div *ngIf="currentPage === 'home'" class="page home-page">
+    <!-- Welcome / Auth Landing -->
+    <div *ngIf="currentPage === 'welcome'" class="page auth-page">
+      <div class="page-content">
+        <div class="hero-section">
+          <h2>Welcome</h2>
+          <p>Sign in to coordinate blood deliveries</p>
+        </div>
+
+        <div class="auth-card">
+          <p class="auth-hint">New here? Create an account and confirm your email.</p>
+          <div class="auth-actions">
+            <button class="primary" (click)="navigateAuth('login')">Login</button>
+            <button class="secondary" (click)="navigateAuth('signup')">Sign up</button>
+          </div>
+          <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Login Page -->
+    <div *ngIf="currentPage === 'login'" class="page auth-page">
+      <div class="page-header">
+        <h2>Login</h2>
+      </div>
+      <div class="page-content">
+        <div class="auth-card">
+          <label>
+            <span>Username</span>
+            <input [(ngModel)]="loginUsername" placeholder="your username" autocomplete="username" />
+          </label>
+          <label>
+            <span>Password</span>
+            <input [(ngModel)]="loginPassword" type="password" placeholder="your password" autocomplete="current-password" />
+          </label>
+          <div class="auth-actions">
+            <button class="primary" [disabled]="busy" (click)="signIn()">{{ busy ? 'Signing in…' : 'Sign in' }}</button>
+            <button class="secondary" [disabled]="busy" (click)="navigateAuth('signup')">Create account</button>
+          </div>
+          <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signup Page -->
+    <div *ngIf="currentPage === 'signup'" class="page auth-page">
+      <div class="page-header">
+        <h2>Sign up</h2>
+      </div>
+      <div class="page-content">
+        <div class="auth-card">
+          <label>
+            <span>Email</span>
+            <input [(ngModel)]="signupEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+          </label>
+          <label>
+            <span>Username</span>
+            <input [(ngModel)]="signupUsername" placeholder="choose a username" autocomplete="username" />
+          </label>
+          <label>
+            <span>Password</span>
+            <input [(ngModel)]="signupPassword" type="password" placeholder="choose a password" autocomplete="new-password" />
+          </label>
+          <div class="auth-actions">
+            <button class="primary" [disabled]="busy" (click)="signUp()">{{ busy ? 'Creating…' : 'Create account' }}</button>
+            <button class="secondary" [disabled]="busy" (click)="navigateAuth('login')">Back to login</button>
+          </div>
+          <p class="auth-hint">You’ll get an email verification code from Cognito.</p>
+          <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Email Page -->
+    <div *ngIf="currentPage === 'confirm'" class="page auth-page">
+      <div class="page-header">
+        <h2>Confirm email</h2>
+      </div>
+      <div class="page-content">
+        <div class="auth-card">
+          <label>
+            <span>Username</span>
+            <input [(ngModel)]="confirmUsername" placeholder="username" autocomplete="username" />
+          </label>
+          <label>
+            <span>Verification code</span>
+            <input [(ngModel)]="confirmCode" placeholder="123456" inputmode="numeric" />
+          </label>
+          <div class="auth-actions">
+            <button class="primary" [disabled]="busy" (click)="confirmSignUp()">{{ busy ? 'Confirming…' : 'Confirm' }}</button>
+            <button class="secondary" [disabled]="busy" (click)="navigateAuth('login')">Back to login</button>
+          </div>
+          <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Home Page -->
+    <div *ngIf="currentPage === 'home'" class="page home-page">
       <div class="page-content">
         <div class="hero-section">
           <h2>Blood Bike</h2>
@@ -97,7 +203,31 @@
       </div>
     </div>
 
-    <!-- QR Scanner Page - Removed (now routed component) -->
+    <!-- Fleet Manager Page (placeholder) -->
+    <div *ngIf="currentPage === 'fleet-maintenance'" class="page fleet-page">
+      <div class="page-header">
+        <h2>🛠️ Fleet</h2>
+      </div>
+      <div class="page-content">
+        <div class="placeholder-section">
+          <p>Fleet manager tools</p>
+          <p class="secondary-text">Service scheduling, maintenance logs, inspections (coming next)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Roles Page (placeholder) -->
+    <div *ngIf="currentPage === 'admin-roles'" class="page admin-page">
+      <div class="page-header">
+        <h2>🧑‍💼 Admin: Roles</h2>
+      </div>
+      <div class="page-content">
+        <div class="placeholder-section">
+          <p>Role management</p>
+          <p class="secondary-text">This will manage Cognito group membership (admin only)</p>
+        </div>
+      </div>
+    </div>
 
     <!-- Events Page -->
     <div *ngIf="currentPage === 'events'" class="page events-page-container">

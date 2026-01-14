@@ -73,10 +73,12 @@ func main() {
 
 		// Example: protect register bike route with Cognito
 		http.HandleFunc("/api/bike/register", withCORS(authClient.RequireAuth(fleet.RegisterBike)))
+		http.HandleFunc("/api/me", withCORS(authClient.RequireAuth(authClient.MeHandler)))
 	} else {
 		http.HandleFunc("/api/auth/signup", withCORS(notConfigured("auth")))
 		http.HandleFunc("/api/auth/confirm", withCORS(notConfigured("auth")))
 		http.HandleFunc("/api/auth/signin", withCORS(notConfigured("auth")))
+		http.HandleFunc("/api/me", withCORS(notConfigured("auth")))
 	}
 
 	log.Println("Backend running on :8080")

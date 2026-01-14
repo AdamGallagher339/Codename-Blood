@@ -156,6 +156,29 @@
   border-top: 1px solid var(--color-light-gray);
 }
 
+// ===== USER PILL =====
+.user-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: var(--border-radius-md);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+
+  .user-name {
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+    line-height: 1.1;
+  }
+
+  .user-roles {
+    font-size: var(--font-size-xs);
+    opacity: 0.85;
+  }
+}
+
 // ===== BACK BUTTON =====
 .btn-back {
   background-color: var(--color-red);
@@ -224,6 +247,101 @@
 
 .page-content {
   padding: var(--spacing-lg) 0;
+}
+
+// ===== AUTH PAGES =====
+.auth-page {
+  .auth-card {
+    max-width: 520px;
+    margin: 0 auto;
+    background: var(--color-white);
+    border: var(--border-width) solid var(--color-light-gray);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: var(--spacing-xl);
+
+    label {
+      display: block;
+      margin-bottom: var(--spacing-md);
+
+      span {
+        display: block;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: var(--color-dark-gray);
+      }
+
+      input {
+        width: 100%;
+        padding: var(--spacing-md);
+        border-radius: var(--border-radius-md);
+        border: var(--border-width) solid var(--color-light-gray);
+        font-size: var(--font-size-base);
+        outline: none;
+
+        &:focus {
+          border-color: var(--color-red);
+          box-shadow: 0 0 0 3px rgba(220, 20, 60, 0.15);
+        }
+      }
+    }
+  }
+
+  .auth-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+
+    button {
+      flex: 1;
+      border: none;
+      border-radius: var(--border-radius-md);
+      padding: var(--spacing-md);
+      font-weight: 800;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+
+    .primary {
+      background: var(--color-red);
+      color: var(--color-white);
+
+      &:hover:not(:disabled) {
+        background: var(--color-dark-red);
+        box-shadow: var(--shadow-md);
+      }
+    }
+
+    .secondary {
+      background: rgba(0, 0, 0, 0.06);
+      color: var(--color-black);
+
+      &:hover:not(:disabled) {
+        background: rgba(0, 0, 0, 0.1);
+      }
+    }
+  }
+
+  .auth-hint {
+    margin-top: var(--spacing-md);
+    margin-bottom: 0;
+    color: var(--color-dark-gray);
+  }
+
+  .auth-error {
+    margin-top: var(--spacing-md);
+    margin-bottom: 0;
+    color: var(--color-dark-red);
+    background: rgba(220, 20, 60, 0.08);
+    border: 1px solid rgba(220, 20, 60, 0.2);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius-md);
+  }
 }
 
 // ===== HOME PAGE =====

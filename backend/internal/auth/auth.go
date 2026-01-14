@@ -17,6 +17,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type contextKey string
+
+const (
+	authSubKey    contextKey = "auth_sub"
+	authClaimsKey contextKey = "auth_claims"
+)
+
 type AuthClient struct {
 	client     *cognito.Client
 	region     string
@@ -41,6 +48,12 @@ func NewAuthClient(ctx context.Context) (*AuthClient, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load aws config: %w", err)
+	}
+	if region == "" {
+		region = cfg.Region
+	}
+	if region == "" {
+		return nil, errors.New("AWS region not configured (set AWS_REGION)")
 	}
 
 	return &AuthClient{
@@ -147,18 +160,21 @@ func (a *AuthClient) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "missing or invalid authorization header", http.StatusUnauthorized)
 			return
 		}
-		claims, err := a.parseAndVerifyToken(r.Context(), token)
+		claims, err := a.VerifyToken(r.Context(), token)
 		if err != nil {
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
-		// attach subject to context for downstream handlers
-		ctx := context.WithValue(r.Context(), "auth_sub", claims.Subject)
+		// attach subject + claims to context for downstream handlers
+		sub, _ := claims["sub"].(string)
+		ctx := context.WithValue(r.Context(), authSubKey, sub)
+		ctx = context.WithValue(ctx, authClaimsKey, claims)
 		next(w, r.WithContext(ctx))
 	}
 }
 
-func (a *AuthClient) parseAndVerifyToken(ctx context.Context, tokenString string) (*jwt.RegisteredClaims, error) {
+
+func (a *AuthClient) VerifyToken(ctx context.Context, tokenString string) (jwt.MapClaims, error) {
 	// lazy init JWKS
 	a.jwksOnce.Do(func() {
 		jwksURL := fmt.Sprintf(
@@ -176,13 +192,64 @@ func (a *AuthClient) parseAndVerifyToken(ctx context.Context, tokenString string
 		return nil, a.jwksErr
 	}
 
-	var claims jwt.RegisteredClaims
-	_, err := jwt.ParseWithClaims(tokenString, &claims, a.jwks.Keyfunc)
+	claims := jwt.MapClaims{}
+	parsed, err := jwt.ParseWithClaims(tokenString, claims, a.jwks.Keyfunc)
 	if err != nil {
 		return nil, err
 	}
+	if parsed == nil || !parsed.Valid {
+		return nil, errors.New("invalid token")
+	}
+	return claims, nil
+}
 
-	return &claims, nil
+func (a *AuthClient) MeHandler(w http.ResponseWriter, r *http.Request) {
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "no auth claims", http.StatusUnauthorized)
+		return
+	}
+
+	roles := []string{}
+	if raw, ok := claims["cognito:groups"]; ok {
+		switch v := raw.(type) {
+		case []any:
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					roles = append(roles, s)
+				}
+			}
+		case []string:
+			roles = append(roles, v...)
+		}
+	}
+
+	username, _ := claims["cognito:username"].(string)
+	email, _ := claims["email"].(string)
+	sub, _ := claims["sub"].(string)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"sub":      sub,
+		"username": username,
+		"email":    email,
+		"roles":    roles,
+	})
+}
+
+func ClaimsFromContext(ctx context.Context) jwt.MapClaims {
+	if ctx == nil {
+		return nil
+	}
+	claims, _ := ctx.Value(authClaimsKey).(jwt.MapClaims)
+	return claims
+}
+
+func SubFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	sub, _ := ctx.Value(authSubKey).(string)
+	return sub
 }
 
 func extractBearer(r *http.Request) (string, error) {
@@ -199,3 +266,9 @@ func extractBearer(r *http.Request) (string, error) {
 }
 
 func awsString(s string) *string { return &s }
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
