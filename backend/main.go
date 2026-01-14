@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"context"
+
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/fleet"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file if it exists
+	_ = godotenv.Load()
 	// initialize Cognito auth client (reads COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID env vars)
 	authClient, err := auth.NewAuthClient(context.Background())
 	if err != nil {

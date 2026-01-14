@@ -3,12 +3,13 @@ module github.com/AdamGallagher339/Codename-Blood/backend
 go 1.25.4
 
 require (
+	github.com/MicahParks/keyfunc/v2 v2.1.0
 	github.com/aws/aws-lambda-go v1.51.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.4
-	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.53.4
 	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.15.0
+	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.53.4
 	github.com/golang-jwt/jwt/v5 v5.1.0
-	github.com/MicahParks/keyfunc v0.6.0
+	github.com/joho/godotenv v1.5.1
 )
 
 require (
