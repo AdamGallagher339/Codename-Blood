@@ -38,8 +38,15 @@
 
   <!-- Main Content -->
   <main class="app-main" (click)="showSettings = false">
-    <!-- Home Page -->
-    <div *ngIf="currentPage === 'home'" class="page home-page">
+    <!-- Routed Components (Scanner only) -->
+    <div *ngIf="currentPage === 'scanner'">
+      <router-outlet></router-outlet>
+    </div>
+
+    <!-- Inline Pages -->
+    <div *ngIf="currentPage !== 'scanner'">
+      <!-- Home Page -->
+      <div *ngIf="currentPage === 'home'" class="page home-page">
       <div class="page-content">
         <div class="hero-section">
           <h2>Blood Bike</h2>
@@ -90,18 +97,7 @@
       </div>
     </div>
 
-    <!-- QR Scanner Page -->
-    <div *ngIf="currentPage === 'scanner'" class="page scanner-page">
-      <div class="page-header">
-        <h2>📱 QR Scanner</h2>
-      </div>
-      <div class="page-content">
-        <div class="placeholder-section">
-          <p>Scan delivery codes</p>
-          <p class="secondary-text">Use your camera to scan QR codes for delivery items</p>
-        </div>
-      </div>
-    </div>
+    <!-- QR Scanner Page - Removed (now routed component) -->
 
     <!-- Events Page -->
     <div *ngIf="currentPage === 'events'" class="page events-page-container">
@@ -159,6 +155,8 @@
         </div>
       </div>
     </div>
+    </div>
+
   </main>
 
   <!-- Footer -->
@@ -167,4 +165,3 @@
   </footer>
 </div>
 
-<router-outlet />

@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet, RouterLink } from '@angular/router';
+import { RouterOutlet, RouterLink, Router } from '@angular/router';
 import { EventsPageComponent } from './components/events-page.component';
 
 @Component({
@@ -21,8 +21,15 @@ export class App {
     { id: 'communications', title: 'Messages', icon: '💬' }
   ];
 
+  constructor(private router: Router) {}
+
   navigateTo(pageId: string): void {
-    this.currentPage = pageId;
+    if (pageId === 'scanner') {
+      this.currentPage = 'scanner';
+      this.router.navigate(['/scan']);
+    } else {
+      this.currentPage = pageId;
+    }
     this.showSettings = false;
   }
 
