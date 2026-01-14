@@ -1,0 +1,93 @@
+<div class="tracking-map-container">
+  <!-- Map Container -->
+  <div id="map" class="map-view"></div>
+
+  <!-- Connection Status Banner -->
+  <div class="status-banner" [class.connected]="connectionStatus === 'connected'" 
+       [class.connecting]="connectionStatus === 'connecting'"
+       [class.disconnected]="connectionStatus === 'disconnected'">
+    <span *ngIf="connectionStatus === 'connected'">🟢 Connected</span>
+    <span *ngIf="connectionStatus === 'connecting'">🟡 Connecting...</span>
+    <span *ngIf="connectionStatus === 'disconnected'">
+      🔴 Disconnected
+      <button (click)="reconnect()" class="reconnect-btn">Reconnect</button>
+    </span>
+  </div>
+
+  <!-- Info Panel -->
+  <div class="info-panel" [class.collapsed]="!showInfo">
+    <div class="panel-header">
+      <h3>Live Tracking</h3>
+      <button (click)="toggleInfo()" class="toggle-btn">
+        {{ showInfo ? '−' : '+' }}
+      </button>
+    </div>
+
+    <div class="panel-content" *ngIf="showInfo">
+      <!-- Controls -->
+      <div class="controls">
+        <button (click)="fitToAllMarkers()" class="control-btn">
+          📍 Fit All
+        </button>
+        <button (click)="clearSelection()" class="control-btn" *ngIf="selectedLocation">
+          ✕ Clear Selection
+        </button>
+      </div>
+
+      <!-- Active Entities List -->
+      <div class="entities-section">
+        <h4>Active Entities ({{ locations.length }})</h4>
+        <div class="entities-list">
+          <div *ngFor="let location of locations" 
+               class="entity-item"
+               [class.selected]="selectedEntityId === location.entityId"
+               [class.stale]="locationService.isLocationStale(location)"
+               (click)="selectEntity(location.entityId)">
+            <div class="entity-header">
+              <span class="entity-type">{{ location.entityType }}</span>
+              <span class="entity-id">{{ location.entityId }}</span>
+            </div>
+            <div class="entity-details">
+              <small>{{ getTimeAgo(location.updatedAt) }}</small>
+              <small *ngIf="location.speed !== undefined">{{ location.speed.toFixed(1) }} km/h</small>
+            </div>
+          </div>
+          <div *ngIf="locations.length === 0" class="no-entities">
+            No active tracking data
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected Entity Details -->
+      <div class="selected-details" *ngIf="selectedLocation">
+        <h4>Selected: {{ selectedLocation.entityType }} {{ selectedLocation.entityId }}</h4>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Coordinates</label>
+            <span>{{ selectedLocation.latitude.toFixed(6) }}, {{ selectedLocation.longitude.toFixed(6) }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedLocation.speed !== undefined">
+            <label>Speed</label>
+            <span>{{ selectedLocation.speed.toFixed(1) }} km/h</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedLocation.heading !== undefined">
+            <label>Heading</label>
+            <span>{{ selectedLocation.heading.toFixed(0) }}°</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedLocation.altitude !== undefined">
+            <label>Altitude</label>
+            <span>{{ selectedLocation.altitude.toFixed(0) }}m</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedLocation.accuracy !== undefined">
+            <label>Accuracy</label>
+            <span>{{ selectedLocation.accuracy.toFixed(0) }}m</span>
+          </div>
+          <div class="detail-item">
+            <label>Last Update</label>
+            <span>{{ selectedLocation.updatedAt | date:'medium' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
