@@ -41,7 +41,7 @@ const REFRESH_TOKEN_KEY = 'bb_refresh_token';
 export class AuthService {
   readonly user = signal<MeResponse | null>(null);
   readonly roles = computed(() => this.user()?.roles ?? []);
-  readonly isLoggedIn = computed(() => !!this.getAccessToken());
+  readonly isLoggedIn = computed(() => !!(this.getIdToken() || this.getAccessToken()));
 
   readonly lastAuthError = signal<string | null>(null);
 
@@ -98,7 +98,7 @@ export class AuthService {
 
   fetchMe() {
     this.lastAuthError.set(null);
-    if (!this.getAccessToken()) {
+    if (!this.getIdToken() && !this.getAccessToken()) {
       this.user.set(null);
       return of(null);
     }

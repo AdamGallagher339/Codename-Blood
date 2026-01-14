@@ -35,6 +35,14 @@ type AuthClient struct {
 	jwksErr  error
 }
 
+type TokensResponse struct {
+	AccessToken  string `json:"accessToken,omitempty"`
+	IdToken      string `json:"idToken,omitempty"`
+	RefreshToken string `json:"refreshToken,omitempty"`
+	ExpiresIn    int32  `json:"expiresIn,omitempty"`
+	TokenType    string `json:"tokenType,omitempty"`
+}
+
 // NewAuthClient initializes an AuthClient using environment variables:
 // COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, AWS_REGION (optional)
 func NewAuthClient(ctx context.Context) (*AuthClient, error) {
@@ -109,6 +117,10 @@ func (a *AuthClient) ConfirmSignUpHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+	if body.Username == "" || body.Code == "" {
+		http.Error(w, "username and code required", http.StatusBadRequest)
+		return
+	}
 	input := &cognito.ConfirmSignUpInput{
 		ClientId:         &a.clientID,
 		Username:         &body.Username,
@@ -133,6 +145,10 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+	if body.Username == "" || body.Password == "" {
+		http.Error(w, "username and password required", http.StatusBadRequest)
+		return
+	}
 
 	input := &cognito.InitiateAuthInput{
 		AuthFlow: types.AuthFlowTypeUserPasswordAuth,
@@ -148,8 +164,28 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("signin failed: %v", err), http.StatusUnauthorized)
 		return
 	}
+	if resp.AuthenticationResult == nil {
+		http.Error(w, "signin requires additional steps", http.StatusConflict)
+		return
+	}
 
-	json.NewEncoder(w).Encode(resp.AuthenticationResult)
+	result := resp.AuthenticationResult
+	out := TokensResponse{}
+	if result.AccessToken != nil {
+		out.AccessToken = *result.AccessToken
+	}
+	if result.IdToken != nil {
+		out.IdToken = *result.IdToken
+	}
+	if result.RefreshToken != nil {
+		out.RefreshToken = *result.RefreshToken
+	}
+	out.ExpiresIn = result.ExpiresIn
+	if result.TokenType != nil {
+		out.TokenType = *result.TokenType
+	}
+
+	writeJSON(w, http.StatusOK, out)
 }
 
 // RequireAuth wraps handlers to verify Bearer JWTs (access or id token).
@@ -172,7 +208,6 @@ func (a *AuthClient) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r.WithContext(ctx))
 	}
 }
-
 
 func (a *AuthClient) VerifyToken(ctx context.Context, tokenString string) (jwt.MapClaims, error) {
 	// lazy init JWKS

@@ -1,7 +1,7 @@
 import { Component, signal, ViewChild, ElementRef, OnDestroy, Output, EventEmitter, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { Html5Qrcode, Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
+import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 
 @Component({
   selector: 'app-qr-scanner',
@@ -48,8 +48,8 @@ export class QrScannerComponent implements OnDestroy {
     this.scanner = new Html5QrcodeScanner('qr-reader', config, false);
 
     this.scanner.render(
-      (decodedText) => this.onScanSuccess(decodedText),
-      (error) => this.onScanError(error)
+      (decodedText: string) => this.onScanSuccess(decodedText),
+      (error: string) => this.onScanError(error)
     );
   }
 
@@ -87,7 +87,7 @@ export class QrScannerComponent implements OnDestroy {
 
   stopScan(): void {
     if (this.scanner) {
-      this.scanner.clear().catch((err) => {
+      this.scanner.clear().catch((err: unknown) => {
         console.log('Error stopping scanner:', err);
       });
       this.scanner = null;
