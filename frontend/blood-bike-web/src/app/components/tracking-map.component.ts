@@ -13,12 +13,12 @@ import { Subscription } from 'rxjs';
   styleUrls: ['./tracking-map.component.scss']
 })
 export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
-  private locationService = inject(LocationTrackingService);
+  locationService = inject(LocationTrackingService);
   
   // Map and markers
   private map: L.Map | null = null;
   private markers: Map<string, L.Marker> = new Map();
-  private selectedEntityId: string | null = null;
+  selectedEntityId: string | null = null;
   
   // Subscriptions
   private subscriptions: Subscription[] = [];
