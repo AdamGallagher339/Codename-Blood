@@ -97,6 +97,8 @@ export class App implements OnInit {
 
     if (pageId === 'scanner') {
       this.router.navigate(['/scan']);
+    } else if (pageId === 'map') {
+      this.router.navigate(['/tracking']);
     } else {
       this.router.navigate(['/']);
     }
