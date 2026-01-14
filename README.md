@@ -1,6 +1,15 @@
 # Codename Blood
 
-Blood Bike fleet + events tooling.
+Blood Bike fleet + events tooling with live GPS tracking.
+
+## Features
+
+- 🗺️ **Live Tracking Map**: Real-time GPS location tracking for bikes and riders
+- 📅 **Event Management**: Schedule and coordinate blood delivery events
+- 🚲 **Fleet Management**: Track bikes, riders, and assignments
+- 📱 **QR Scanner**: Quick bike registration and ride management
+- 🔒 **Authentication**: Secure user authentication with AWS Cognito
+- 📡 **WebSocket Support**: Real-time updates via WebSocket connections
 
 ## Prerequisites
 
@@ -55,6 +64,23 @@ Proxy check (frontend → backend):
 curl http://localhost:4200/api/health
 ```
 
+### 3) Test the Live Tracking Map
+
+The tracking map is accessible at `http://localhost:4200/tracking` (or click "Map" in the navigation).
+
+To simulate location updates, use the provided script:
+
+```bash
+# In a third terminal
+cd scripts
+./simulate-tracking.sh
+
+# Or with custom entity ID
+ENTITY_ID=bike-002 ENTITY_TYPE=bike ./simulate-tracking.sh
+```
+
+See [docs/TRACKING_MAP.md](docs/TRACKING_MAP.md) for detailed documentation.
+
 ## Environment Variables
 
 ### Backend (optional Cognito auth)
@@ -80,4 +106,36 @@ Infrastructure code is in `infra/` (AWS CDK). This is not required to run the ap
 ```bash
 cd infra
 npm install
+```
+
+## API Documentation
+
+### Tracking Endpoints
+
+- `POST /api/tracking/update` - Submit location update
+- `GET /api/tracking/locations` - Get all active locations
+- `GET /api/tracking/entities` - Get all tracked entities
+- `WS /api/tracking/ws` - WebSocket for real-time updates
+
+For complete API documentation, see [docs/TRACKING_MAP.md](docs/TRACKING_MAP.md).
+
+## Project Structure
+
+```
+├── backend/              # Go backend API
+│   ├── internal/
+│   │   ├── auth/        # Authentication (Cognito)
+│   │   ├── events/      # Event management
+│   │   ├── fleet/       # Fleet/bike management
+│   │   └── tracking/    # Location tracking (WebSocket + HTTP)
+│   └── main.go
+├── frontend/            # Angular frontend
+│   └── blood-bike-web/
+│       └── src/app/
+│           ├── components/  # UI components
+│           ├── models/      # TypeScript models
+│           └── services/    # API services
+├── infra/               # AWS CDK infrastructure
+├── scripts/             # Utility scripts
+└── docs/                # Documentation
 ```
