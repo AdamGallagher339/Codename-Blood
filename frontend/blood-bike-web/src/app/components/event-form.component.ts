@@ -1,17 +1,20 @@
 import { Component, signal, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { CreateEventDto, EventType, EventPriority } from '../models/event.model';
+import { QrScannerComponent } from './qr-scanner.component';
 
 @Component({
   selector: 'app-event-form',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, QrScannerComponent],
   templateUrl: './event-form.component.html',
   styleUrl: './event-form.component.scss'
 })
 export class EventFormComponent {
   showModal = signal(false);
+  showScanner = signal(false);
   
   eventCreated = output<CreateEventDto>();
   modalClosed = output<void>();
@@ -42,14 +45,24 @@ export class EventFormComponent {
     { value: EventPriority.URGENT, label: 'Urgent', color: '#9c27b0' }
   ];
   
-  open(): void {
+  constructor(private router: Router) {}
     this.resetForm();
     this.showModal.set(true);
   }
   
   close(): void {
     this.showModal.set(false);
+    this.showScanner.set(false);
     this.modalClosed.emit();
+  }
+
+  openScanner(): void {
+    this.showScanner.set(true);
+  }
+
+  onScanComplete(scannedValue: string): void {
+    this.location.set(scannedValue);
+    this.showScanner.set(false);
   }
   
   submitEvent(): void {

@@ -1,121 +1,141 @@
 <div *ngIf="showModal()" class="modal-overlay" (click)="close()">
   <div class="modal-content" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h2>Create New Event</h2>
-      <button class="close-btn" (click)="close()" aria-label="Close modal">
-        ✕
-      </button>
-    </div>
-    
-    <form class="event-form" (ngSubmit)="submitEvent()">
-      <div class="form-group">
-        <label for="title">Event Title *</label>
-        <input
-          id="title"
-          type="text"
-          [(ngModel)]="title"
-          name="title"
-          placeholder="Enter event title"
-          required
-        />
-      </div>
-      
-      <div class="form-group">
-        <label for="description">Description</label>
-        <textarea
-          id="description"
-          [(ngModel)]="description"
-          name="description"
-          placeholder="Enter event description"
-          rows="3"
-        ></textarea>
-      </div>
-      
-      <div class="form-row">
-        <div class="form-group">
-          <label for="date">Date *</label>
-          <input
-            id="date"
-            type="date"
-            [(ngModel)]="date"
-            name="date"
-            required
-          />
-        </div>
-        
-        <div class="form-group">
-          <label for="startTime">Start Time *</label>
-          <input
-            id="startTime"
-            type="time"
-            [(ngModel)]="startTime"
-            name="startTime"
-            required
-          />
-        </div>
-        
-        <div class="form-group">
-          <label for="endTime">End Time *</label>
-          <input
-            id="endTime"
-            type="time"
-            [(ngModel)]="endTime"
-            name="endTime"
-            required
-          />
-        </div>
-      </div>
-      
-      <div class="form-group">
-        <label for="location">Location *</label>
-        <input
-          id="location"
-          type="text"
-          [(ngModel)]="location"
-          name="location"
-          placeholder="Enter location"
-          required
-        />
-      </div>
-      
-      <div class="form-row">
-        <div class="form-group">
-          <label for="type">Event Type *</label>
-          <select
-            id="type"
-            [(ngModel)]="type"
-            name="type"
-            required
-          >
-            <option *ngFor="let eventType of eventTypes" [value]="eventType.value">
-              {{ eventType.icon }} {{ eventType.label }}
-            </option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label for="priority">Priority *</label>
-          <select
-            id="priority"
-            [(ngModel)]="priority"
-            name="priority"
-            required
-          >
-            <option *ngFor="let p of priorities" [value]="p.value">
-              {{ p.label }}
-            </option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" (click)="close()">
-          Cancel
-        </button>
-        <button type="submit" class="btn btn-primary" [disabled]="!isFormValid()">
-          Create Event
+    <!-- QR Scanner Modal -->
+    <app-qr-scanner 
+      *ngIf="showScanner()" 
+      (scanComplete)="onScanComplete($event)"
+      [returnUrl]="'/'">
+    </app-qr-scanner>
+
+    <!-- Event Form -->
+    <ng-container *ngIf="!showScanner()">
+      <div class="modal-header">
+        <h2>Create New Event</h2>
+        <button class="close-btn" (click)="close()" aria-label="Close modal">
+          ✕
         </button>
       </div>
-    </form>
+      
+      <form class="event-form" (ngSubmit)="submitEvent()">
+        <div class="form-group">
+          <label for="title">Event Title *</label>
+          <input
+            id="title"
+            type="text"
+            [(ngModel)]="title"
+            name="title"
+            placeholder="Enter event title"
+            required
+          />
+        </div>
+        
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea
+            id="description"
+            [(ngModel)]="description"
+            name="description"
+            placeholder="Enter event description"
+            rows="3"
+          ></textarea>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="date">Date *</label>
+            <input
+              id="date"
+              type="date"
+              [(ngModel)]="date"
+              name="date"
+              required
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="startTime">Start Time *</label>
+            <input
+              id="startTime"
+              type="time"
+              [(ngModel)]="startTime"
+              name="startTime"
+              required
+            />
+          </div>
+          
+          <div class="form-group">
+            <label for="endTime">End Time *</label>
+            <input
+              id="endTime"
+              type="time"
+              [(ngModel)]="endTime"
+              name="endTime"
+              required
+            />
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="location">Location *</label>
+          <div class="location-input-group">
+            <input
+              id="location"
+              type="text"
+              [(ngModel)]="location"
+              name="location"
+              placeholder="Enter location or scan QR code"
+              required
+            />
+            <button 
+              type="button" 
+              class="btn-icon-secondary" 
+              (click)="openScanner()"
+              title="Scan QR code for location"
+            >
+              📷
+            </button>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="type">Event Type *</label>
+            <select
+              id="type"
+              [(ngModel)]="type"
+              name="type"
+              required
+            >
+              <option *ngFor="let eventType of eventTypes" [value]="eventType.value">
+                {{ eventType.icon }} {{ eventType.label }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="priority">Priority *</label>
+            <select
+              id="priority"
+              [(ngModel)]="priority"
+              name="priority"
+              required
+            >
+              <option *ngFor="let p of priorities" [value]="p.value">
+                {{ p.label }}
+              </option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" (click)="close()">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="!isFormValid()">
+            Create Event
+          </button>
+        </div>
+      </form>
+    </ng-container>
   </div>
 </div>
