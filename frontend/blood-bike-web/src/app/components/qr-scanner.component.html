@@ -1,0 +1,45 @@
+<div class="page scanner-page">
+  <div class="page-header">
+    <h2>📱 QR Scanner</h2>
+  </div>
+
+  <div class="page-content">
+    @if (!isScanning()) {
+      <div class="placeholder-section">
+        <p>Scan delivery codes</p>
+        <p class="secondary-text">Use your camera to scan QR codes for delivery items</p>
+        <button class="btn-primary" (click)="startScan()">
+          <span class="btn-icon">📷</span>
+          Start Scan
+        </button>
+      </div>
+    } @else {
+      <div class="scanner-active">
+        <div class="camera-container" #qrReader></div>
+        <button class="btn-secondary" (click)="stopScan()">
+          Cancel Scan
+        </button>
+      </div>
+    }
+
+    @if (error()) {
+      <div class="error-box">
+        <span class="error-icon">⚠️</span>
+        <span>{{ error() }}</span>
+      </div>
+    }
+
+    @if (scanResult()) {
+      <div class="success-box">
+        <span class="success-icon">✓</span>
+        <div>
+          <h4>QR Code Scanned Successfully</h4>
+          <p class="result-value">{{ scanResult() }}</p>
+          <button class="btn-primary" (click)="returnWithResult()">
+            Use This Code
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
