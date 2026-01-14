@@ -1,17 +1,28 @@
 import { Injectable, signal } from '@angular/core';
-import { Event, CreateEventDto, EventStatus } from '../models/event.model';
+import { HttpClient } from '@angular/common/http';
+import { catchError, map, of } from 'rxjs';
+import { Event, CreateEventDto } from '../models/event.model';
+
+type ApiEvent = Omit<Event, 'date' | 'createdAt' | 'updatedAt'> & {
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 @Injectable({
   providedIn: 'root'
 })
 export class EventService {
   private events = signal<Event[]>([]);
+  private loaded = false;
   
-  constructor() {
-    this.loadMockEvents();
-  }
+  constructor(private http: HttpClient) {}
 
   getEvents() {
+    if (!this.loaded) {
+      this.loaded = true;
+      this.loadEvents();
+    }
     return this.events.asReadonly();
   }
 
@@ -28,35 +39,53 @@ export class EventService {
     });
   }
 
-  createEvent(eventDto: CreateEventDto): Event {
-    const newEvent: Event = {
-      ...eventDto,
-      id: this.generateId(),
-      status: EventStatus.SCHEDULED,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    this.events.update(events => [...events, newEvent]);
-    return newEvent;
+  createEvent(eventDto: CreateEventDto): void {
+    this.http
+      .post<ApiEvent>('/api/events', eventDto)
+      .pipe(
+        map((e) => this.fromApiEvent(e)),
+        catchError((err) => {
+          console.error('Failed to create event', err);
+          return of(null);
+        })
+      )
+      .subscribe((created) => {
+        if (!created) return;
+        this.events.update((events) => [...events, created]);
+      });
   }
 
   updateEvent(id: string, updates: Partial<Event>): void {
-    this.events.update(events => 
-      events.map(event => 
-        event.id === id 
-          ? { ...event, ...updates, updatedAt: new Date() }
-          : event
+    // backend expects PATCH-like semantics
+    this.http
+      .patch<ApiEvent>(`/api/events/${id}`, updates)
+      .pipe(
+        map((e) => this.fromApiEvent(e)),
+        catchError((err) => {
+          console.error('Failed to update event', err);
+          return of(null);
+        })
       )
-    );
+      .subscribe((updated) => {
+        if (!updated) return;
+        this.events.update((events) =>
+          events.map((event) => (event.id === id ? updated : event))
+        );
+      });
   }
 
   deleteEvent(id: string): void {
-    this.events.update(events => events.filter(event => event.id !== id));
-  }
-
-  private generateId(): string {
-    return `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    this.http
+      .delete(`/api/events/${id}`)
+      .pipe(
+        catchError((err) => {
+          console.error('Failed to delete event', err);
+          return of(null);
+        })
+      )
+      .subscribe(() => {
+        this.events.update((events) => events.filter((event) => event.id !== id));
+      });
   }
 
   private isSameDay(date1: Date, date2: Date): boolean {
@@ -65,54 +94,25 @@ export class EventService {
            date1.getDate() === date2.getDate();
   }
 
-  private loadMockEvents(): void {
-    const today = new Date();
-    const mockEvents: Event[] = [
-      {
-        id: '1',
-        title: 'Blood Delivery to City Hospital',
-        description: 'Urgent O-negative blood delivery',
-        date: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-        startTime: '09:00',
-        endTime: '10:00',
-        location: 'City Hospital, Ward 3',
-        type: 'delivery' as any,
-        priority: 'urgent' as any,
-        assignedRiders: ['Rider #42'],
-        status: EventStatus.SCHEDULED,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: '2',
-        title: 'Weekly Team Meeting',
-        description: 'Coordination meeting for all riders',
-        date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2),
-        startTime: '14:00',
-        endTime: '15:00',
-        location: 'Main Office',
-        type: 'meeting' as any,
-        priority: 'medium' as any,
-        status: EventStatus.SCHEDULED,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: '3',
-        title: 'Bike Maintenance',
-        description: 'Scheduled maintenance for bike fleet',
-        date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5),
-        startTime: '10:00',
-        endTime: '12:00',
-        location: 'Garage',
-        type: 'maintenance' as any,
-        priority: 'high' as any,
-        status: EventStatus.SCHEDULED,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    ];
+  private loadEvents(): void {
+    this.http
+      .get<ApiEvent[]>('/api/events')
+      .pipe(
+        map((events) => events.map((e) => this.fromApiEvent(e))),
+        catchError((err) => {
+          console.error('Failed to load events', err);
+          return of([] as Event[]);
+        })
+      )
+      .subscribe((events) => this.events.set(events));
+  }
 
-    this.events.set(mockEvents);
+  private fromApiEvent(e: ApiEvent): Event {
+    return {
+      ...e,
+      date: new Date(e.date),
+      createdAt: new Date(e.createdAt),
+      updatedAt: new Date(e.updatedAt)
+    };
   }
 }
