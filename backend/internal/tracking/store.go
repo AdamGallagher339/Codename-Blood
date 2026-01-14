@@ -1,6 +1,7 @@
 package tracking
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 )
@@ -181,14 +182,22 @@ func (s *Store) handleLocationUpdate(update *LocationUpdate) {
 }
 
 func (s *Store) broadcastUpdate(update *LocationUpdate) {
+	// Marshal update to JSON
+	data, err := json.Marshal(map[string]interface{}{
+		"type":     "update",
+		"location": update,
+	})
+	if err != nil {
+		return
+	}
+	
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	
-	// Marshal update to JSON would happen in the WebSocket handler
-	// Here we just send to all client channels
+	// Send to all client channels
 	for client := range s.clients {
 		select {
-		case client.send <- nil: // Will be replaced with actual JSON in WebSocket handler
+		case client.send <- data:
 			// Message sent successfully
 		default:
 			// Client buffer is full, skip this client
