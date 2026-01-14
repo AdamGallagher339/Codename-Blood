@@ -11,6 +11,10 @@
           <span class="user-name">{{ me.username || me.email || me.sub }}</span>
           <span class="user-roles" *ngIf="me.roles?.length">{{ me.roles.join(', ') }}</span>
         </div>
+        <div class="user-pill" *ngIf="!auth.user() && isGuest">
+          <span class="user-name">Guest</span>
+          <span class="user-roles">Limited access</span>
+        </div>
         <div class="settings-container">
           <button class="btn-settings" (click)="toggleSettings()" title="Settings">
             ⚙️
@@ -69,6 +73,9 @@
             <button class="primary" (click)="navigateAuth('login')">Login</button>
             <button class="secondary" (click)="navigateAuth('signup')">Sign up</button>
           </div>
+          <div class="auth-actions" style="margin-top: 12px;">
+            <button class="secondary" (click)="continueAsGuest()">Skip for now</button>
+          </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
       </div>
@@ -92,6 +99,9 @@
           <div class="auth-actions">
             <button class="primary" [disabled]="busy" (click)="signIn()">{{ busy ? 'Signing in…' : 'Sign in' }}</button>
             <button class="secondary" [disabled]="busy" (click)="navigateAuth('signup')">Create account</button>
+          </div>
+          <div class="auth-actions" style="margin-top: 12px;">
+            <button class="secondary" [disabled]="busy" (click)="continueAsGuest()">Skip for now</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
@@ -120,6 +130,9 @@
           <div class="auth-actions">
             <button class="primary" [disabled]="busy" (click)="signUp()">{{ busy ? 'Creating…' : 'Create account' }}</button>
             <button class="secondary" [disabled]="busy" (click)="navigateAuth('login')">Back to login</button>
+          </div>
+          <div class="auth-actions" style="margin-top: 12px;">
+            <button class="secondary" [disabled]="busy" (click)="continueAsGuest()">Skip for now</button>
           </div>
           <p class="auth-hint">You’ll get an email verification code from Cognito.</p>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>

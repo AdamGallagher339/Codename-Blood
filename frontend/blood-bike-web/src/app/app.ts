@@ -16,6 +16,8 @@ export class App implements OnInit {
   currentPage: string = 'welcome';
   showSettings = false;
 
+  guestMode = false;
+
   busy = false;
 
   // Auth form state
@@ -46,7 +48,12 @@ export class App implements OnInit {
   ngOnInit(): void {
     this.auth.fetchMe().subscribe(() => {
       this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
+      this.guestMode = false;
     });
+  }
+
+  get isGuest(): boolean {
+    return this.guestMode && !this.auth.isLoggedIn();
   }
 
   get pages(): Array<{ id: string; title: string; icon: string }> {
@@ -71,8 +78,16 @@ export class App implements OnInit {
     this.router.navigate(['/']);
   }
 
+  continueAsGuest(): void {
+    this.guestMode = true;
+    this.currentPage = 'home';
+    this.showSettings = false;
+    this.router.navigate(['/']);
+  }
+
   navigateTo(pageId: string): void {
-    if (!this.auth.isLoggedIn()) {
+    // Allow navigation in guest mode, but keep role-only sections hidden by `pages`.
+    if (!this.auth.isLoggedIn() && !this.guestMode) {
       this.currentPage = 'welcome';
       this.showSettings = false;
       this.router.navigate(['/']);
@@ -99,6 +114,7 @@ export class App implements OnInit {
   logout(): void {
     this.auth.logout();
     this.currentPage = 'welcome';
+    this.guestMode = false;
     this.showSettings = false;
     this.router.navigate(['/']);
   }
