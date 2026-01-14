@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/events"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/fleet"
 	"github.com/joho/godotenv"
 )
@@ -19,32 +20,63 @@ func main() {
 	if err != nil {
 		log.Println("auth client not initialized:", err)
 	}
+
+	withCORS := func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			h(w, r)
+		}
+	}
+
+	notConfigured := func(feature string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			http.Error(
+				w,
+				feature+" not configured (set AWS_REGION, COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID)",
+				http.StatusNotImplemented,
+			)
+		}
+	}
 	// --- Health Check ---
-	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/health", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "OK")
-	})
+	}))
 
 	// --- Fleet Management Routes ---
-	http.HandleFunc("/api/bikes", fleet.GetAllBikes)
-	http.HandleFunc("/api/bike/register", fleet.RegisterBike)
-	http.HandleFunc("/api/ride/start", fleet.StartRide)
-	http.HandleFunc("/api/ride/end", fleet.EndRide)
+	http.HandleFunc("/api/bikes", withCORS(fleet.GetAllBikes))
+	http.HandleFunc("/api/bike/register", withCORS(fleet.RegisterBike))
+	http.HandleFunc("/api/ride/start", withCORS(fleet.StartRide))
+	http.HandleFunc("/api/ride/end", withCORS(fleet.EndRide))
 
 	// --- User / Tag Routes ---
-	http.HandleFunc("/api/users", fleet.GetAllUsers)
-	http.HandleFunc("/api/user/register", fleet.RegisterUser)
-	http.HandleFunc("/api/user", fleet.GetUser) // GET ?riderId=...
-	http.HandleFunc("/api/user/tags/add", fleet.AddTagToUser)
-	http.HandleFunc("/api/user/tags/remove", fleet.RemoveTagFromUser)
+	http.HandleFunc("/api/users", withCORS(fleet.GetAllUsers))
+	http.HandleFunc("/api/user/register", withCORS(fleet.RegisterUser))
+	http.HandleFunc("/api/user", withCORS(fleet.GetUser)) // GET ?riderId=...
+	http.HandleFunc("/api/user/tags/add", withCORS(fleet.AddTagToUser))
+	http.HandleFunc("/api/user/tags/remove", withCORS(fleet.RemoveTagFromUser))
+
+	// --- Events Routes ---
+	http.HandleFunc("/api/events", withCORS(events.ListOrCreate))
+	http.HandleFunc("/api/events/", withCORS(events.GetUpdateOrDelete))
 
 	// --- Auth routes (Cognito) ---
 	if authClient != nil {
-		http.HandleFunc("/api/auth/signup", authClient.SignUpHandler)
-		http.HandleFunc("/api/auth/confirm", authClient.ConfirmSignUpHandler)
-		http.HandleFunc("/api/auth/signin", authClient.SignInHandler)
+		http.HandleFunc("/api/auth/signup", withCORS(authClient.SignUpHandler))
+		http.HandleFunc("/api/auth/confirm", withCORS(authClient.ConfirmSignUpHandler))
+		http.HandleFunc("/api/auth/signin", withCORS(authClient.SignInHandler))
 
 		// Example: protect register bike route with Cognito
-		http.HandleFunc("/api/bike/register", authClient.RequireAuth(fleet.RegisterBike))
+		http.HandleFunc("/api/bike/register", withCORS(authClient.RequireAuth(fleet.RegisterBike)))
+	} else {
+		http.HandleFunc("/api/auth/signup", withCORS(notConfigured("auth")))
+		http.HandleFunc("/api/auth/confirm", withCORS(notConfigured("auth")))
+		http.HandleFunc("/api/auth/signin", withCORS(notConfigured("auth")))
 	}
 
 	log.Println("Backend running on :8080")
