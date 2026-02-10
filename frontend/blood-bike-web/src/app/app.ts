@@ -41,6 +41,12 @@ export class App implements OnInit {
   adminEmail = '';
   adminPassword = '';
   adminRole = 'BloodBikeAdmin';
+  adminRoles: string[] = ['BloodBikeAdmin'];
+
+  // Manage users (admin)
+  users: Array<any> = [];
+
+  loadUsersBusy = false;
   adminBusy = false;
   adminMessage: string | null = null;
 
@@ -56,7 +62,7 @@ export class App implements OnInit {
   constructor(
     public readonly auth: AuthService,
     private readonly router: Router,
-    private readonly http: HttpClient
+    public readonly http: HttpClient
   ) {}
 
   ngOnInit(): void {
@@ -72,6 +78,53 @@ export class App implements OnInit {
       } else {
         this.selectedRole = null;
       }
+      if (this.auth.hasRole && this.auth.hasRole('BloodBikeAdmin')) {
+        // preload users for admin
+        this.loadUsers();
+      }
+    });
+  }
+
+  loadUsers(): void {
+    if (!this.auth.hasRole || !this.auth.hasRole('BloodBikeAdmin')) return;
+    this.loadUsersBusy = true;
+    this.http.get('/api/users').subscribe({
+      next: (res: any) => {
+        this.users = (res || []).map((u: any) => ({
+          riderId: u.riderId,
+          name: u.name,
+          tags: u.tags || [],
+          editTags: [...(u.tags || [])],
+        }));
+        this.loadUsersBusy = false;
+      },
+      error: () => {
+        this.users = [];
+        this.loadUsersBusy = false;
+      }
+    });
+  }
+
+  toggleEditTag(user: any, role: string): void {
+    const idx = (user.editTags || []).indexOf(role);
+    if (idx === -1) user.editTags.push(role);
+    else user.editTags.splice(idx, 1);
+  }
+
+  saveUserRoles(user: any): void {
+    const orig = user.tags || [];
+    const updated = user.editTags || [];
+    const toAdd = updated.filter((r: string) => !orig.includes(r));
+    const toRemove = orig.filter((r: string) => !updated.includes(r));
+
+    const calls: any[] = [];
+    toAdd.forEach((r: string) => calls.push(this.http.post('/api/user/tags/add', { riderId: user.riderId, tag: r }).toPromise()));
+    toRemove.forEach((r: string) => calls.push(this.http.post('/api/user/tags/remove', { riderId: user.riderId, tag: r }).toPromise()));
+
+    Promise.all(calls).then(() => {
+      user.tags = [...user.editTags];
+    }).catch(() => {
+      // ignore errors for now
     });
   }
 
@@ -234,7 +287,7 @@ export class App implements OnInit {
       username: this.adminUsername.trim(),
       password: this.adminPassword,
       email: this.adminEmail.trim(),
-      roles: [this.adminRole]
+      roles: this.adminRoles
     };
     // Create auth user (Cognito or local)
     this.http.post('/api/auth/signup', payload).subscribe({
@@ -251,6 +304,7 @@ export class App implements OnInit {
                 this.adminUsername = '';
                 this.adminEmail = '';
                 this.adminPassword = '';
+                this.loadUsers();
               },
               error: (err) => {
                 this.adminMessage = 'Created auth user but failed to tag user';

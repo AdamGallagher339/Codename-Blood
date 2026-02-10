@@ -231,35 +231,60 @@
     <!-- Admin Roles Page -->
     <div *ngIf="currentPage === 'admin-roles'" class="page admin-page">
       <div class="page-header">
-        <h2>🧑‍💼 Admin: Create Account</h2>
+        <h2>🧑‍💼 Admin: Users</h2>
       </div>
       <div class="page-content">
-        <div class="auth-card">
-          <label>
-            <span>Username</span>
-            <input [(ngModel)]="adminUsername" placeholder="username" />
-          </label>
-          <label>
-            <span>Email</span>
-            <input [(ngModel)]="adminEmail" type="email" placeholder="you@example.com" />
-          </label>
-          <label>
-            <span>Password</span>
-            <input [(ngModel)]="adminPassword" type="password" placeholder="temporary password" />
-          </label>
-          <label>
-            <span>Role</span>
-            <select [(ngModel)]="adminRole">
-              <option value="BloodBikeAdmin">BloodBikeAdmin</option>
-              <option value="rider">Rider</option>
-              <option value="fleet_manager">Fleet Manager</option>
-              <option value="dispatcher">Dispatcher</option>
-            </select>
-          </label>
-          <div class="auth-actions">
-            <button class="primary" [disabled]="adminBusy" (click)="createAccountByAdmin()">{{ adminBusy ? 'Creating…' : 'Create account' }}</button>
+        <div class="admin-grid">
+          <div class="auth-card">
+            <h3>Create account</h3>
+            <label>
+              <span>Username</span>
+              <input [(ngModel)]="adminUsername" placeholder="username" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input [(ngModel)]="adminEmail" type="email" placeholder="you@example.com" />
+            </label>
+            <label>
+              <span>Password</span>
+              <input [(ngModel)]="adminPassword" type="password" placeholder="temporary password" />
+            </label>
+            <label>
+              <span>Roles</span>
+              <div class="roles-checkboxes">
+                <label><input type="checkbox" [(ngModel)]="adminRoles[0]" [ngModelOptions]="{standalone:true}" (change)="adminRoles = adminRoles.includes('BloodBikeAdmin') ? adminRoles : ['BloodBikeAdmin']"> BloodBikeAdmin</label>
+                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'rider'"> Rider</label>
+                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'fleet_manager'"> Fleet Manager</label>
+                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'dispatcher'"> Dispatcher</label>
+              </div>
+            </label>
+            <div class="auth-actions">
+              <button class="primary" [disabled]="adminBusy" (click)="createAccountByAdmin()">{{ adminBusy ? 'Creating…' : 'Create account' }}</button>
+            </div>
+            <p *ngIf="adminMessage" class="auth-hint">{{ adminMessage }}</p>
           </div>
-          <p *ngIf="adminMessage" class="auth-hint">{{ adminMessage }}</p>
+
+          <div class="users-card">
+            <h3>Manage accounts</h3>
+            <div *ngIf="loadUsersBusy">Loading…</div>
+            <table *ngIf="!loadUsersBusy">
+              <thead>
+                <tr><th>Username</th><th>Name</th><th>Roles</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let u of users">
+                  <td>{{ u.riderId }}</td>
+                  <td><input [(ngModel)]="u.name" (blur)="http.post('/api/user/register',{ riderId: u.riderId, name: u.name }).subscribe()" /></td>
+                  <td>
+                    <label *ngFor="let r of ['BloodBikeAdmin','rider','fleet_manager','dispatcher']" style="display:inline-block;margin-right:8px;">
+                      <input type="checkbox" [checked]="(u.editTags||[]).includes(r)" (change)="toggleEditTag(u,r)" /> {{ r }}
+                    </label>
+                  </td>
+                  <td><button (click)="saveUserRoles(u)">Save</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
