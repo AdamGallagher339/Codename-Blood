@@ -38,7 +38,7 @@ export const routes: Routes = [
   // Access Denied page
   { path: 'access-denied', component: AccessDeniedComponent },
   
-  // Default redirect
-  { path: '', redirectTo: 'tracking', pathMatch: 'full' },
+  // Default redirect to settings (accessible to all authenticated users)
+  { path: '', redirectTo: 'settings', pathMatch: 'full' },
   { path: '**', redirectTo: 'access-denied' }
 ];

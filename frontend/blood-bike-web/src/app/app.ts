@@ -76,9 +76,9 @@ export class App implements OnInit {
       if (saved && roles.includes(saved)) {
         this.selectedRole = saved;
       } else if (roles.length > 0) {
-        this.selectedRole = roles[0];
+        this.setRole(roles[0]); // Use setRole to persist to localStorage
       } else {
-        this.selectedRole = null;
+        this.setRole(null);
       }
       if (this.auth.hasRole && this.auth.hasRole('BloodBikeAdmin')) {
         // preload users for admin

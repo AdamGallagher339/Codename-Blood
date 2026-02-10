@@ -1,5 +1,7 @@
 nohup: ignoring input
-2026/02/10 18:36:06 Location tracking store initialized
-2026/02/10 18:36:06 auth client not initialized: COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID must be set - falling back to local dev auth
-2026/02/10 18:36:06 Local auth enabled: default user 'BloodBikeAdmin' with password 'password'
-2026/02/10 18:36:06 Backend running on :8080
+2026/02/10 19:16:01 Location tracking store initialized
+2026/02/10 19:16:01 auth client not initialized: COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID must be set - falling back to local dev auth
+2026/02/10 19:16:01 Local auth enabled: default user 'BloodBikeAdmin' with password 'password'
+2026/02/10 19:16:01 Backend running on :8080
+2026/02/10 19:16:01 listen tcp :8080: bind: address already in use
+exit status 1
