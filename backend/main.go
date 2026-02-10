@@ -64,11 +64,11 @@ func main() {
 	http.HandleFunc("/api/ride/end", withCORS(fleet.EndRide))
 
 	// --- User / Tag Routes ---
-	http.HandleFunc("/api/users", withCORS(fleet.GetAllUsers))
-	http.HandleFunc("/api/user/register", withCORS(fleet.RegisterUser))
-	http.HandleFunc("/api/user", withCORS(fleet.GetUser)) // GET ?riderId=...
-	http.HandleFunc("/api/user/tags/add", withCORS(fleet.AddTagToUser))
-	http.HandleFunc("/api/user/tags/remove", withCORS(fleet.RemoveTagFromUser))
+	http.HandleFunc("/api/users", withCORS(authClient.RequireAuth(fleet.GetAllUsers)))
+	http.HandleFunc("/api/user/register", withCORS(authClient.RequireAuth(fleet.RegisterUser)))
+	http.HandleFunc("/api/user", withCORS(authClient.RequireAuth(fleet.GetUser))) // GET ?riderId=...
+	http.HandleFunc("/api/user/tags/add", withCORS(authClient.RequireAuth(fleet.AddTagToUser)))
+	http.HandleFunc("/api/user/tags/remove", withCORS(authClient.RequireAuth(fleet.RemoveTagFromUser)))
 
 	// --- Events Routes ---
 	http.HandleFunc("/api/events", withCORS(events.ListOrCreate))
