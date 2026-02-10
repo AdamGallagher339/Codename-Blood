@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	cognito "github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 	"github.com/golang-jwt/jwt/v5"
+	bolt "go.etcd.io/bbolt"
 )
 
 type contextKey string
@@ -38,6 +40,7 @@ type AuthClient struct {
 	jwtSecret []byte
 	usersMu   sync.RWMutex
 	users     map[string]localUser
+	db        *bolt.DB
 }
 
 type localUser struct {
@@ -96,20 +99,82 @@ func NewLocalAuthClient() *AuthClient {
 	} else {
 		secret = []byte(s)
 	}
-	users := map[string]localUser{}
-	// default user as requested: BloodBikeAdmin / password
-	users["BloodBikeAdmin"] = localUser{
-		Username: "BloodBikeAdmin",
-		Password: "password",
-		Email:    "admin@blood.bike",
-		Roles:    []string{"BloodBikeAdmin"},
-		Sub:      "local-admin-1",
+
+	// Open (or create) DB for local users
+	dataDir := filepath.Join("..", "data")
+	_ = os.MkdirAll(dataDir, 0o755)
+	dbPath := filepath.Join(dataDir, "users.db")
+	db, err := bolt.Open(dbPath, 0o600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		// If DB can't be opened, fall back to in-memory map
+		users := map[string]localUser{}
+		users["BloodBikeAdmin"] = localUser{
+			Username: "BloodBikeAdmin",
+			Password: "password",
+			Email:    "admin@blood.bike",
+			Roles:    []string{"BloodBikeAdmin"},
+			Sub:      "local-admin-1",
+		}
+		return &AuthClient{local: true, jwtSecret: secret, users: users}
 	}
-	return &AuthClient{
-		local:     true,
-		jwtSecret: secret,
-		users:     users,
+
+	// Ensure users bucket exists
+	_ = db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte("users"))
+		return err
+	})
+
+	a := &AuthClient{local: true, jwtSecret: secret, users: map[string]localUser{}, db: db}
+
+	// load users from DB into memory
+	_ = a.loadUsersFromDB()
+
+	// ensure default admin exists
+	a.usersMu.Lock()
+	if _, ok := a.users["BloodBikeAdmin"]; !ok {
+		u := localUser{Username: "BloodBikeAdmin", Password: "password", Email: "admin@blood.bike", Roles: []string{"BloodBikeAdmin"}, Sub: "local-admin-1"}
+		a.users["BloodBikeAdmin"] = u
+		_ = a.saveUserToDB(u)
 	}
+	a.usersMu.Unlock()
+	return a
+}
+
+func (a *AuthClient) loadUsersFromDB() error {
+	if a.db == nil {
+		return errors.New("no db")
+	}
+	return a.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("users"))
+		if b == nil {
+			return nil
+		}
+		return b.ForEach(func(k, v []byte) error {
+			var u localUser
+			if err := json.Unmarshal(v, &u); err != nil {
+				return nil
+			}
+			a.users[string(k)] = u
+			return nil
+		})
+	})
+}
+
+func (a *AuthClient) saveUserToDB(u localUser) error {
+	if a.db == nil {
+		return errors.New("no db")
+	}
+	data, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
+	return a.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("users"))
+		if b == nil {
+			return errors.New("users bucket missing")
+		}
+		return b.Put([]byte(u.Username), data)
+	})
 }
 
 // SignUpHandler expects JSON: { "username": "u", "password": "p", "email": "e" }
@@ -135,13 +200,16 @@ func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "user exists", http.StatusConflict)
 			return
 		}
-		a.users[body.Username] = localUser{
+		u := localUser{
 			Username: body.Username,
 			Password: body.Password,
 			Email:    body.Email,
 			Roles:    []string{},
 			Sub:      fmt.Sprintf("local-%s", body.Username),
 		}
+		a.users[body.Username] = u
+		// persist
+		_ = a.saveUserToDB(u)
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{"message": "signup created (local)"})
 		return
