@@ -157,7 +157,7 @@ export class CommunityEventsComponent implements OnInit {
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
-    this.currentRole = localStorage.getItem('selectedRole') || '';
+    this.currentRole = localStorage.getItem('bb_selected_role') || '';
     this.loadEvents();
   }
 

@@ -8,7 +8,7 @@ import { inject } from '@angular/core';
  */
 export const hasRoleGuard: CanActivateFn = (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
   const router = inject(Router);
-  const selectedRole = localStorage.getItem('selectedRole') || '';
+  const selectedRole = localStorage.getItem('bb_selected_role') || '';
   const requiredRoles = route.data['roles'] as string[];
 
   if (!requiredRoles || requiredRoles.length === 0) {
