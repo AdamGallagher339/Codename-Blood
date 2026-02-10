@@ -9,12 +9,22 @@
       <div class="header-actions">
         <div class="user-pill" *ngIf="auth.user() as me">
           <span class="user-name">{{ me.username || me.email || me.sub }}</span>
-          <span class="user-roles" *ngIf="me.roles?.length">{{ me.roles.join(', ') }}</span>
+          <ng-container *ngIf="me.roles?.length">
+            <div class="role-bar">
+              <button
+                *ngFor="let r of me.roles"
+                class="role-pill"
+                [class.active]="r === selectedRole"
+                (click)="setRole(r)"
+                title="Switch role"
+              >
+                {{ r }}
+              </button>
+              <button class="role-pill clear" *ngIf="me.roles.length > 1" (click)="setRole(null)">All</button>
+            </div>
+          </ng-container>
         </div>
-        <div class="user-pill" *ngIf="!auth.user() && isGuest">
-          <span class="user-name">Guest</span>
-          <span class="user-roles">Limited access</span>
-        </div>
+        <!-- no guest mode: users must be created by admin -->
         <div class="settings-container">
           <button class="btn-settings" (click)="toggleSettings()" title="Settings">
             ⚙️
@@ -71,10 +81,6 @@
           <p class="auth-hint">New here? Create an account and confirm your email.</p>
           <div class="auth-actions">
             <button class="primary" (click)="navigateAuth('login')">Login</button>
-            <button class="secondary" (click)="navigateAuth('signup')">Sign up</button>
-          </div>
-          <div class="auth-actions" style="margin-top: 12px;">
-            <button class="secondary" (click)="continueAsGuest()">Skip for now</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
@@ -98,10 +104,6 @@
           </label>
           <div class="auth-actions">
             <button class="primary" [disabled]="busy" (click)="signIn()">{{ busy ? 'Signing in…' : 'Sign in' }}</button>
-            <button class="secondary" [disabled]="busy" (click)="navigateAuth('signup')">Create account</button>
-          </div>
-          <div class="auth-actions" style="margin-top: 12px;">
-            <button class="secondary" [disabled]="busy" (click)="continueAsGuest()">Skip for now</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
@@ -130,9 +132,6 @@
           <div class="auth-actions">
             <button class="primary" [disabled]="busy" (click)="signUp()">{{ busy ? 'Creating…' : 'Create account' }}</button>
             <button class="secondary" [disabled]="busy" (click)="navigateAuth('login')">Back to login</button>
-          </div>
-          <div class="auth-actions" style="margin-top: 12px;">
-            <button class="secondary" [disabled]="busy" (click)="continueAsGuest()">Skip for now</button>
           </div>
           <p class="auth-hint">You’ll get an email verification code from Cognito.</p>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
@@ -229,15 +228,38 @@
       </div>
     </div>
 
-    <!-- Admin Roles Page (placeholder) -->
+    <!-- Admin Roles Page -->
     <div *ngIf="currentPage === 'admin-roles'" class="page admin-page">
       <div class="page-header">
-        <h2>🧑‍💼 Admin: Roles</h2>
+        <h2>🧑‍💼 Admin: Create Account</h2>
       </div>
       <div class="page-content">
-        <div class="placeholder-section">
-          <p>Role management</p>
-          <p class="secondary-text">This will manage Cognito group membership (admin only)</p>
+        <div class="auth-card">
+          <label>
+            <span>Username</span>
+            <input [(ngModel)]="adminUsername" placeholder="username" />
+          </label>
+          <label>
+            <span>Email</span>
+            <input [(ngModel)]="adminEmail" type="email" placeholder="you@example.com" />
+          </label>
+          <label>
+            <span>Password</span>
+            <input [(ngModel)]="adminPassword" type="password" placeholder="temporary password" />
+          </label>
+          <label>
+            <span>Role</span>
+            <select [(ngModel)]="adminRole">
+              <option value="BloodBikeAdmin">BloodBikeAdmin</option>
+              <option value="rider">Rider</option>
+              <option value="fleet_manager">Fleet Manager</option>
+              <option value="dispatcher">Dispatcher</option>
+            </select>
+          </label>
+          <div class="auth-actions">
+            <button class="primary" [disabled]="adminBusy" (click)="createAccountByAdmin()">{{ adminBusy ? 'Creating…' : 'Create account' }}</button>
+          </div>
+          <p *ngIf="adminMessage" class="auth-hint">{{ adminMessage }}</p>
         </div>
       </div>
     </div>

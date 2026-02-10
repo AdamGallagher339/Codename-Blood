@@ -9,7 +9,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.15.0
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.53.4
 	github.com/golang-jwt/jwt/v5 v5.1.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
+	go.etcd.io/bbolt v1.4.3
 )
 
 require (
@@ -27,5 +29,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.12 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.4 // indirect
 	github.com/aws/smithy-go v1.24.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 )

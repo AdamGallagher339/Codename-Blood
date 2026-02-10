@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	cognito "github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 	"github.com/golang-jwt/jwt/v5"
+	bolt "go.etcd.io/bbolt"
 )
 
 type contextKey string
@@ -33,6 +35,20 @@ type AuthClient struct {
 	jwks     *keyfunc.JWKS
 	jwksOnce sync.Once
 	jwksErr  error
+	// local mode (development) - simple in-memory users and HMAC-signed JWTs
+	local     bool
+	jwtSecret []byte
+	usersMu   sync.RWMutex
+	users     map[string]localUser
+	db        *bolt.DB
+}
+
+type localUser struct {
+	Username string
+	Password string // stored plaintext for dev only
+	Email    string
+	Roles    []string
+	Sub      string
 }
 
 type TokensResponse struct {
@@ -72,12 +88,102 @@ func NewAuthClient(ctx context.Context) (*AuthClient, error) {
 	}, nil
 }
 
+// NewLocalAuthClient returns an AuthClient configured for local development.
+// It creates an in-memory user store and a default admin user.
+func NewLocalAuthClient() *AuthClient {
+	// Allow override of the dev JWT secret via env var for safety.
+	s := os.Getenv("LOCAL_AUTH_SECRET")
+	var secret []byte
+	if s == "" {
+		secret = []byte("dev-secret-change-me")
+	} else {
+		secret = []byte(s)
+	}
+
+	// Open (or create) DB for local users
+	dataDir := filepath.Join("..", "data")
+	_ = os.MkdirAll(dataDir, 0o755)
+	dbPath := filepath.Join(dataDir, "users.db")
+	db, err := bolt.Open(dbPath, 0o600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		// If DB can't be opened, fall back to in-memory map
+		users := map[string]localUser{}
+		users["BloodBikeAdmin"] = localUser{
+			Username: "BloodBikeAdmin",
+			Password: "password",
+			Email:    "admin@blood.bike",
+			Roles:    []string{"BloodBikeAdmin"},
+			Sub:      "local-admin-1",
+		}
+		return &AuthClient{local: true, jwtSecret: secret, users: users}
+	}
+
+	// Ensure users bucket exists
+	_ = db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte("users"))
+		return err
+	})
+
+	a := &AuthClient{local: true, jwtSecret: secret, users: map[string]localUser{}, db: db}
+
+	// load users from DB into memory
+	_ = a.loadUsersFromDB()
+
+	// ensure default admin exists
+	a.usersMu.Lock()
+	if _, ok := a.users["BloodBikeAdmin"]; !ok {
+		u := localUser{Username: "BloodBikeAdmin", Password: "password", Email: "admin@blood.bike", Roles: []string{"BloodBikeAdmin"}, Sub: "local-admin-1"}
+		a.users["BloodBikeAdmin"] = u
+		_ = a.saveUserToDB(u)
+	}
+	a.usersMu.Unlock()
+	return a
+}
+
+func (a *AuthClient) loadUsersFromDB() error {
+	if a.db == nil {
+		return errors.New("no db")
+	}
+	return a.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("users"))
+		if b == nil {
+			return nil
+		}
+		return b.ForEach(func(k, v []byte) error {
+			var u localUser
+			if err := json.Unmarshal(v, &u); err != nil {
+				return nil
+			}
+			a.users[string(k)] = u
+			return nil
+		})
+	})
+}
+
+func (a *AuthClient) saveUserToDB(u localUser) error {
+	if a.db == nil {
+		return errors.New("no db")
+	}
+	data, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
+	return a.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("users"))
+		if b == nil {
+			return errors.New("users bucket missing")
+		}
+		return b.Put([]byte(u.Username), data)
+	})
+}
+
 // SignUpHandler expects JSON: { "username": "u", "password": "p", "email": "e" }
 func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Username string   `json:"username"`
+		Password string   `json:"password"`
+		Email    string   `json:"email"`
+		Roles    []string `json:"roles,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -85,6 +191,28 @@ func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Username == "" || body.Password == "" || body.Email == "" {
 		http.Error(w, "username, password and email required", http.StatusBadRequest)
+		return
+	}
+
+	if a.local {
+		a.usersMu.Lock()
+		defer a.usersMu.Unlock()
+		if _, ok := a.users[body.Username]; ok {
+			http.Error(w, "user exists", http.StatusConflict)
+			return
+		}
+		u := localUser{
+			Username: body.Username,
+			Password: body.Password,
+			Email:    body.Email,
+			Roles:    body.Roles,
+			Sub:      fmt.Sprintf("local-%s", body.Username),
+		}
+		a.users[body.Username] = u
+		// persist
+		_ = a.saveUserToDB(u)
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "signup created (local)"})
 		return
 	}
 
@@ -121,6 +249,11 @@ func (a *AuthClient) ConfirmSignUpHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "username and code required", http.StatusBadRequest)
 		return
 	}
+	if a.local {
+		// no-op for local
+		json.NewEncoder(w).Encode(map[string]string{"message": "confirmed (local)"})
+		return
+	}
 	input := &cognito.ConfirmSignUpInput{
 		ClientId:         &a.clientID,
 		Username:         &body.Username,
@@ -147,6 +280,38 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Username == "" || body.Password == "" {
 		http.Error(w, "username and password required", http.StatusBadRequest)
+		return
+	}
+
+	if a.local {
+		a.usersMu.RLock()
+		u, ok := a.users[body.Username]
+		a.usersMu.RUnlock()
+		if !ok || u.Password != body.Password {
+			http.Error(w, "invalid username or password", http.StatusUnauthorized)
+			return
+		}
+		// build a simple JWT (HS256)
+		claims := jwt.MapClaims{
+			"sub":              u.Sub,
+			"cognito:username": u.Username,
+			"email":            u.Email,
+			"cognito:groups":   u.Roles,
+			"exp":              time.Now().Add(24 * time.Hour).Unix(),
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		signed, err := token.SignedString(a.jwtSecret)
+		if err != nil {
+			http.Error(w, "failed to sign token", http.StatusInternalServerError)
+			return
+		}
+		out := TokensResponse{
+			AccessToken: signed,
+			IdToken:     signed,
+			ExpiresIn:   86400,
+			TokenType:   "Bearer",
+		}
+		writeJSON(w, http.StatusOK, out)
 		return
 	}
 
@@ -210,6 +375,24 @@ func (a *AuthClient) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (a *AuthClient) VerifyToken(ctx context.Context, tokenString string) (jwt.MapClaims, error) {
+	if a.local {
+		claims := jwt.MapClaims{}
+		parsed, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
+			// only HS256 supported for local tokens
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, errors.New("unexpected signing method")
+			}
+			return a.jwtSecret, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if parsed == nil || !parsed.Valid {
+			return nil, errors.New("invalid token")
+		}
+		return claims, nil
+	}
+
 	// lazy init JWKS
 	a.jwksOnce.Do(func() {
 		jwksURL := fmt.Sprintf(
