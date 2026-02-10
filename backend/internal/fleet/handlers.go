@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
 )
 
 // In-memory storage for now — will replace with DynamoDB in AWS step
@@ -70,6 +72,11 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
+	// Only allow admins to register users
+	if !isAdminRequest(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	var u User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -87,6 +94,11 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 // AddTagToUser expects JSON body: { "riderId": "123", "tag": "Admin" }
 func AddTagToUser(w http.ResponseWriter, r *http.Request) {
+	// Only allow admins to add tags
+	if !isAdminRequest(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	var body struct {
 		RiderID string `json:"riderId"`
 		Tag     string `json:"tag"`
@@ -111,6 +123,11 @@ func AddTagToUser(w http.ResponseWriter, r *http.Request) {
 
 // RemoveTagFromUser expects JSON body: { "riderId": "123", "tag": "Admin" }
 func RemoveTagFromUser(w http.ResponseWriter, r *http.Request) {
+	// Only allow admins to remove tags
+	if !isAdminRequest(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	var body struct {
 		RiderID string `json:"riderId"`
 		Tag     string `json:"tag"`
@@ -140,4 +157,35 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(u)
+}
+
+// isAdminRequest returns true if the request context has auth claims with an admin role.
+func isAdminRequest(r *http.Request) bool {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		return false
+	}
+	if raw, ok := claims["cognito:groups"]; ok {
+		switch v := raw.(type) {
+		case []any:
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					if s == "admin" || s == "BloodBikeAdmin" {
+						return true
+					}
+				}
+			}
+		case []string:
+			for _, s := range v {
+				if s == "admin" || s == "BloodBikeAdmin" {
+					return true
+				}
+			}
+		case string:
+			if v == "admin" || v == "BloodBikeAdmin" {
+				return true
+			}
+		}
+	}
+	return false
 }
