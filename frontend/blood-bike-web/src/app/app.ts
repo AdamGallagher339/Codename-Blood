@@ -46,7 +46,7 @@ export class App implements OnInit {
 
   private readonly allPages = [
     { id: 'map', title: 'Map', icon: '🗺️', requiredRole: 'rider' },
-    { id: 'scanner', title: 'QR Scanner', icon: '📱' },
+    { id: 'scanner', title: 'QR Scanner', icon: '📱', requiredRole: 'rider' },
     { id: 'events', title: 'Events', icon: '📅' },
     { id: 'communications', title: 'Messages', icon: '💬' },
     { id: 'fleet-maintenance', title: 'Fleet', icon: '🛠️', requiredRole: 'fleet_manager' },
@@ -114,14 +114,19 @@ export class App implements OnInit {
   }
 
   navigateTo(pageId: string): void {
-    // Require auth to navigate to most pages
-    if (!this.auth.isLoggedIn()) {
-      this.currentPage = 'welcome';
-      this.showSettings = false;
-      this.router.navigate(['/']);
-      return;
-    }
+    // Always navigate to the selected page; UI will hide tabs the user
+    // shouldn't see. Pages can implement their own auth checks later.
     this.currentPage = pageId;
+    if (pageId === 'scanner') {
+      this.router.navigate(['/scan']);
+    } else if (pageId === 'map') {
+      this.router.navigate(['/tracking']);
+    } else if (pageId === 'events') {
+      this.router.navigate(['/events']);
+    } else {
+      this.router.navigate(['/']);
+    }
+    this.showSettings = false;
 
     if (pageId === 'scanner') {
       this.router.navigate(['/scan']);
