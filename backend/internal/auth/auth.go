@@ -180,9 +180,10 @@ func (a *AuthClient) saveUserToDB(u localUser) error {
 // SignUpHandler expects JSON: { "username": "u", "password": "p", "email": "e" }
 func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Username string   `json:"username"`
+		Password string   `json:"password"`
+		Email    string   `json:"email"`
+		Roles    []string `json:"roles,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -204,7 +205,7 @@ func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 			Username: body.Username,
 			Password: body.Password,
 			Email:    body.Email,
-			Roles:    []string{},
+			Roles:    body.Roles,
 			Sub:      fmt.Sprintf("local-%s", body.Username),
 		}
 		a.users[body.Username] = u

@@ -1,14 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
 import { RouterOutlet, RouterLink, Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { EventsPageComponent } from './components/events-page.component';
 import { finalize } from 'rxjs';
 import { AuthService, AuthPage } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, EventsPageComponent],
+  imports: [CommonModule, FormsModule, HttpClientModule, RouterOutlet, RouterLink, EventsPageComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
@@ -16,7 +18,7 @@ export class App implements OnInit {
   currentPage: string = 'welcome';
   showSettings = false;
 
-  guestMode = false;
+  // guest mode removed — account creation handled by admin
 
   busy = false;
 
@@ -34,18 +36,27 @@ export class App implements OnInit {
   confirmUsername = '';
   confirmCode = '';
 
+  // Admin create-user form
+  adminUsername = '';
+  adminEmail = '';
+  adminPassword = '';
+  adminRole = 'BloodBikeAdmin';
+  adminBusy = false;
+  adminMessage: string | null = null;
+
   private readonly allPages = [
-    { id: 'map', title: 'Map', icon: '🗺️' },
+    { id: 'map', title: 'Map', icon: '🗺️', requiredRole: 'rider' },
     { id: 'scanner', title: 'QR Scanner', icon: '📱' },
     { id: 'events', title: 'Events', icon: '📅' },
     { id: 'communications', title: 'Messages', icon: '💬' },
     { id: 'fleet-maintenance', title: 'Fleet', icon: '🛠️', requiredRole: 'fleet_manager' },
-    { id: 'admin-roles', title: 'Admin: Roles', icon: '🧑‍💼', requiredRole: 'admin' }
+    { id: 'admin-roles', title: 'Admin: Roles', icon: '🧑‍💼', requiredRole: 'BloodBikeAdmin' }
   ] as const;
 
   constructor(
     public readonly auth: AuthService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly http: HttpClient
   ) {}
 
   ngOnInit(): void {
@@ -61,13 +72,10 @@ export class App implements OnInit {
       } else {
         this.selectedRole = null;
       }
-      this.guestMode = false;
     });
   }
 
-  get isGuest(): boolean {
-    return this.guestMode && !this.auth.isLoggedIn();
-  }
+  // guest mode removed
 
   get pages(): Array<{ id: string; title: string; icon: string }> {
     const roles = this.auth.roles();
@@ -76,12 +84,8 @@ export class App implements OnInit {
       const required = (p as any).requiredRole as string | undefined;
       if (!required) return true;
       // If user has selected a role, use that to gate pages.
-      if (active) {
-        if (active === 'BloodBikeAdmin' || active === 'admin') return true;
-        return active === required || active.includes(required);
-      }
-      // Fallback: if any of user's roles grant access
-      if (roles.includes('admin') || roles.includes('BloodBikeAdmin')) return true;
+      if (active) return active === required || active.includes(required);
+      // Fallback: check any of user's roles
       return roles.includes(required);
     });
   }
@@ -105,15 +109,13 @@ export class App implements OnInit {
   }
 
   continueAsGuest(): void {
-    this.guestMode = true;
-    this.currentPage = 'home';
-    this.showSettings = false;
-    this.router.navigate(['/']);
+    // guest mode removed — no-op
+    this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
   }
 
   navigateTo(pageId: string): void {
-    // Allow navigation in guest mode, but keep role-only sections hidden by `pages`.
-    if (!this.auth.isLoggedIn() && !this.guestMode) {
+    // Require auth to navigate to most pages
+    if (!this.auth.isLoggedIn()) {
       this.currentPage = 'welcome';
       this.showSettings = false;
       this.router.navigate(['/']);
@@ -141,8 +143,8 @@ export class App implements OnInit {
 
   logout(): void {
     this.auth.logout();
+    this.setRole(null);
     this.currentPage = 'welcome';
-    this.guestMode = false;
     this.showSettings = false;
     this.router.navigate(['/']);
   }
@@ -190,8 +192,21 @@ export class App implements OnInit {
       .pipe(finalize(() => (this.busy = false)))
       .subscribe({
         next: () => {
-          this.auth.fetchMe().subscribe(() => {
-            this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
+          // Immediately navigate to home so the UI doesn't loop back to login.
+          this.currentPage = 'home';
+          // populate user information (if fetch fails, AuthService will clear tokens)
+          this.auth.fetchMe().subscribe({
+            next: () => {
+              // restore selected role if available
+              const saved = localStorage.getItem('bb_selected_role');
+              const roles = this.auth.roles();
+              if (saved && roles.includes(saved)) this.selectedRole = saved;
+              else if (roles.length > 0) this.selectedRole = roles[0];
+            },
+            error: () => {
+              // fetch failed — AuthService may have logged out; ensure we show login
+              if (!this.auth.isLoggedIn()) this.currentPage = 'login';
+            }
           });
         }
       });
@@ -201,5 +216,53 @@ export class App implements OnInit {
     this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
     this.showSettings = false;
     this.router.navigate(['/']);
+  }
+
+  createAccountByAdmin(): void {
+    if (!this.adminUsername || !this.adminPassword || !this.adminEmail) {
+      this.adminMessage = 'username, email and password required';
+      return;
+    }
+    this.adminBusy = true;
+    this.adminMessage = null;
+    const payload = {
+      username: this.adminUsername.trim(),
+      password: this.adminPassword,
+      email: this.adminEmail.trim(),
+      roles: [this.adminRole]
+    };
+    // Create auth user (Cognito or local)
+    this.http.post('/api/auth/signup', payload).subscribe({
+      next: () => {
+        // create fleet user record
+        const u = { riderId: this.adminUsername.trim(), name: this.adminUsername.trim() };
+        this.http.post('/api/user/register', u).subscribe({
+          next: () => {
+            // add role tag to user record
+            this.http.post('/api/user/tags/add', { riderId: this.adminUsername.trim(), tag: this.adminRole }).subscribe({
+              next: () => {
+                this.adminMessage = 'Account created';
+                this.adminBusy = false;
+                this.adminUsername = '';
+                this.adminEmail = '';
+                this.adminPassword = '';
+              },
+              error: (err) => {
+                this.adminMessage = 'Created auth user but failed to tag user';
+                this.adminBusy = false;
+              }
+            });
+          },
+          error: (err) => {
+            this.adminMessage = 'Created auth user but failed to register fleet user';
+            this.adminBusy = false;
+          }
+        });
+      },
+      error: (_err) => {
+        this.adminMessage = 'signup failed';
+        this.adminBusy = false;
+      }
+    });
   }
 }
