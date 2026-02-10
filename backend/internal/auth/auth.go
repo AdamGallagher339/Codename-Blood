@@ -33,6 +33,19 @@ type AuthClient struct {
 	jwks     *keyfunc.JWKS
 	jwksOnce sync.Once
 	jwksErr  error
+	// local mode (development) - simple in-memory users and HMAC-signed JWTs
+	local     bool
+	jwtSecret []byte
+	usersMu   sync.RWMutex
+	users     map[string]localUser
+}
+
+type localUser struct {
+	Username string
+	Password string // stored plaintext for dev only
+	Email    string
+	Roles    []string
+	Sub      string
 }
 
 type TokensResponse struct {
@@ -72,6 +85,33 @@ func NewAuthClient(ctx context.Context) (*AuthClient, error) {
 	}, nil
 }
 
+// NewLocalAuthClient returns an AuthClient configured for local development.
+// It creates an in-memory user store and a default admin user.
+func NewLocalAuthClient() *AuthClient {
+	// Allow override of the dev JWT secret via env var for safety.
+	s := os.Getenv("LOCAL_AUTH_SECRET")
+	var secret []byte
+	if s == "" {
+		secret = []byte("dev-secret-change-me")
+	} else {
+		secret = []byte(s)
+	}
+	users := map[string]localUser{}
+	// default user as requested: BloodBikeAdmin / password
+	users["BloodBikeAdmin"] = localUser{
+		Username: "BloodBikeAdmin",
+		Password: "password",
+		Email:    "admin@blood.bike",
+		Roles:    []string{"BloodBikeAdmin"},
+		Sub:      "local-admin-1",
+	}
+	return &AuthClient{
+		local:     true,
+		jwtSecret: secret,
+		users:     users,
+	}
+}
+
 // SignUpHandler expects JSON: { "username": "u", "password": "p", "email": "e" }
 func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -85,6 +125,25 @@ func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Username == "" || body.Password == "" || body.Email == "" {
 		http.Error(w, "username, password and email required", http.StatusBadRequest)
+		return
+	}
+
+	if a.local {
+		a.usersMu.Lock()
+		defer a.usersMu.Unlock()
+		if _, ok := a.users[body.Username]; ok {
+			http.Error(w, "user exists", http.StatusConflict)
+			return
+		}
+		a.users[body.Username] = localUser{
+			Username: body.Username,
+			Password: body.Password,
+			Email:    body.Email,
+			Roles:    []string{},
+			Sub:      fmt.Sprintf("local-%s", body.Username),
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "signup created (local)"})
 		return
 	}
 
@@ -121,6 +180,11 @@ func (a *AuthClient) ConfirmSignUpHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "username and code required", http.StatusBadRequest)
 		return
 	}
+	if a.local {
+		// no-op for local
+		json.NewEncoder(w).Encode(map[string]string{"message": "confirmed (local)"})
+		return
+	}
 	input := &cognito.ConfirmSignUpInput{
 		ClientId:         &a.clientID,
 		Username:         &body.Username,
@@ -147,6 +211,38 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Username == "" || body.Password == "" {
 		http.Error(w, "username and password required", http.StatusBadRequest)
+		return
+	}
+
+	if a.local {
+		a.usersMu.RLock()
+		u, ok := a.users[body.Username]
+		a.usersMu.RUnlock()
+		if !ok || u.Password != body.Password {
+			http.Error(w, "invalid username or password", http.StatusUnauthorized)
+			return
+		}
+		// build a simple JWT (HS256)
+		claims := jwt.MapClaims{
+			"sub":              u.Sub,
+			"cognito:username": u.Username,
+			"email":            u.Email,
+			"cognito:groups":   u.Roles,
+			"exp":              time.Now().Add(24 * time.Hour).Unix(),
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		signed, err := token.SignedString(a.jwtSecret)
+		if err != nil {
+			http.Error(w, "failed to sign token", http.StatusInternalServerError)
+			return
+		}
+		out := TokensResponse{
+			AccessToken: signed,
+			IdToken:     signed,
+			ExpiresIn:   86400,
+			TokenType:   "Bearer",
+		}
+		writeJSON(w, http.StatusOK, out)
 		return
 	}
 
@@ -210,6 +306,24 @@ func (a *AuthClient) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (a *AuthClient) VerifyToken(ctx context.Context, tokenString string) (jwt.MapClaims, error) {
+	if a.local {
+		claims := jwt.MapClaims{}
+		parsed, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
+			// only HS256 supported for local tokens
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, errors.New("unexpected signing method")
+			}
+			return a.jwtSecret, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if parsed == nil || !parsed.Valid {
+			return nil, errors.New("invalid token")
+		}
+		return claims, nil
+	}
+
 	// lazy init JWKS
 	a.jwksOnce.Do(func() {
 		jwksURL := fmt.Sprintf(

@@ -17,16 +17,18 @@ import (
 func main() {
 	// Load .env file if it exists
 	_ = godotenv.Load()
-	
+
 	// Initialize location tracking store with 5 minute stale timeout
 	tracking.GlobalStore = tracking.NewStore(5 * time.Minute)
 	go tracking.GlobalStore.Start() // Start the store event loop in a goroutine
 	log.Println("Location tracking store initialized")
-	
+
 	// initialize Cognito auth client (reads COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID env vars)
 	authClient, err := auth.NewAuthClient(context.Background())
 	if err != nil {
-		log.Println("auth client not initialized:", err)
+		log.Println("auth client not initialized:", err, "- falling back to local dev auth")
+		authClient = auth.NewLocalAuthClient()
+		log.Println("Local auth enabled: default user 'BloodBikeAdmin' with password 'password'")
 	}
 
 	withCORS := func(h http.HandlerFunc) http.HandlerFunc {
@@ -58,7 +60,6 @@ func main() {
 
 	// --- Fleet Management Routes ---
 	http.HandleFunc("/api/bikes", withCORS(fleet.GetAllBikes))
-	http.HandleFunc("/api/bike/register", withCORS(fleet.RegisterBike))
 	http.HandleFunc("/api/ride/start", withCORS(fleet.StartRide))
 	http.HandleFunc("/api/ride/end", withCORS(fleet.EndRide))
 
@@ -78,7 +79,7 @@ func main() {
 	http.HandleFunc("/api/tracking/update", withCORS(tracking.HandleLocationUpdate))
 	http.HandleFunc("/api/tracking/locations", withCORS(tracking.HandleGetLocations))
 	http.HandleFunc("/api/tracking/entities", withCORS(tracking.HandleGetEntities))
-	
+
 	// WebSocket endpoint for real-time location updates
 	// Note: WebSocket upgrade doesn't need CORS wrapper
 	http.HandleFunc("/api/tracking/ws", tracking.HandleWebSocket)

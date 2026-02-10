@@ -11,7 +11,7 @@ export class LocationTrackingService {
   
   // API endpoints - uses proxy.conf.json in development
   private readonly API_BASE = '/api/tracking';
-  private readonly WS_BASE = 'ws://localhost:8080/api/tracking';
+  private readonly WS_PATH = '/api/tracking/ws';
   
   // WebSocket connection
   private ws: WebSocket | null = null;
@@ -57,7 +57,10 @@ export class LocationTrackingService {
     this.connectionStatus$.next('connecting');
     
     try {
-      this.ws = new WebSocket(`${this.WS_BASE}/ws`);
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//${window.location.host}${this.WS_PATH}`;
+
+      this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
         console.log('WebSocket connected');
