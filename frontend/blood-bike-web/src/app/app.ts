@@ -24,6 +24,9 @@ export class App implements OnInit {
   loginUsername = '';
   loginPassword = '';
 
+  // Selected role for UI (users can switch between roles)
+  selectedRole: string | null = null;
+
   signupUsername = '';
   signupEmail = '';
   signupPassword = '';
@@ -48,6 +51,16 @@ export class App implements OnInit {
   ngOnInit(): void {
     this.auth.fetchMe().subscribe(() => {
       this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
+      // restore selected role from localStorage or default to first role
+      const saved = localStorage.getItem('bb_selected_role');
+      const roles = this.auth.roles();
+      if (saved && roles.includes(saved)) {
+        this.selectedRole = saved;
+      } else if (roles.length > 0) {
+        this.selectedRole = roles[0];
+      } else {
+        this.selectedRole = null;
+      }
       this.guestMode = false;
     });
   }
@@ -58,12 +71,25 @@ export class App implements OnInit {
 
   get pages(): Array<{ id: string; title: string; icon: string }> {
     const roles = this.auth.roles();
+    const active = this.selectedRole;
     return this.allPages.filter((p) => {
       const required = (p as any).requiredRole as string | undefined;
       if (!required) return true;
-      if (roles.includes('admin')) return true;
+      // If user has selected a role, use that to gate pages.
+      if (active) {
+        if (active === 'BloodBikeAdmin' || active === 'admin') return true;
+        return active === required || active.includes(required);
+      }
+      // Fallback: if any of user's roles grant access
+      if (roles.includes('admin') || roles.includes('BloodBikeAdmin')) return true;
       return roles.includes(required);
     });
+  }
+
+  setRole(role: string | null): void {
+    this.selectedRole = role;
+    if (role) localStorage.setItem('bb_selected_role', role);
+    else localStorage.removeItem('bb_selected_role');
   }
 
   navigateAuth(page: AuthPage): void {

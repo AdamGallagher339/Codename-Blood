@@ -9,7 +9,20 @@
       <div class="header-actions">
         <div class="user-pill" *ngIf="auth.user() as me">
           <span class="user-name">{{ me.username || me.email || me.sub }}</span>
-          <span class="user-roles" *ngIf="me.roles?.length">{{ me.roles.join(', ') }}</span>
+          <ng-container *ngIf="me.roles?.length">
+            <div class="role-bar">
+              <button
+                *ngFor="let r of me.roles"
+                class="role-pill"
+                [class.active]="r === selectedRole"
+                (click)="setRole(r)"
+                title="Switch role"
+              >
+                {{ r }}
+              </button>
+              <button class="role-pill clear" *ngIf="me.roles.length > 1" (click)="setRole(null)">All</button>
+            </div>
+          </ng-container>
         </div>
         <div class="user-pill" *ngIf="!auth.user() && isGuest">
           <span class="user-name">Guest</span>
