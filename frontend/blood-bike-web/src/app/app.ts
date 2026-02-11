@@ -2,10 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
-import { RouterOutlet, Router } from '@angular/router';
+import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { EventsPageComponent } from './components/events-page.component';
-import { finalize } from 'rxjs';
+import { finalize, filter } from 'rxjs';
 import { AuthService, AuthPage } from './services/auth.service';
 
 @Component({
@@ -17,6 +17,7 @@ import { AuthService, AuthPage } from './services/auth.service';
 export class App implements OnInit {
   currentPage: string = 'welcome';
   showSettings = false;
+  showRoutedView = false;
 
   // guest mode removed — account creation handled by admin
 
@@ -61,6 +62,18 @@ export class App implements OnInit {
     { id: 'admin-roles', title: 'Admin: Users', icon: '🧑‍💼', roles: ['BloodBikeAdmin'] }
   ];
 
+  private readonly routedPages = new Set([
+    'tracking',
+    'scan',
+    'dispatcher',
+    'fleet',
+    'jobs',
+    'events',
+    'community-events',
+    'settings',
+    'access-denied'
+  ]);
+
   constructor(
     public readonly auth: AuthService,
     private readonly router: Router,
@@ -68,6 +81,10 @@ export class App implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.router.events
+      .pipe(filter((event) => event instanceof NavigationEnd))
+      .subscribe((event) => this.syncFromUrl((event as NavigationEnd).urlAfterRedirects));
+
     this.auth.fetchMe().subscribe(() => {
       this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
       // restore selected role from localStorage or default to first role
@@ -150,12 +167,14 @@ export class App implements OnInit {
 
   navigateAuth(page: AuthPage): void {
     this.currentPage = page;
+    this.showRoutedView = false;
     this.showSettings = false;
     this.router.navigate(['/']);
   }
 
   goHomeOrWelcome(): void {
     this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
+    this.showRoutedView = false;
     this.showSettings = false;
     this.router.navigate(['/']);
   }
@@ -163,11 +182,19 @@ export class App implements OnInit {
   continueAsGuest(): void {
     // guest mode removed — no-op
     this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
+    this.showRoutedView = false;
   }
 
   navigateTo(pageId: string): void {
-    // Navigate using the router
-    this.router.navigate([`/${pageId}`]);
+    if (this.routedPages.has(pageId)) {
+      this.currentPage = pageId;
+      this.showRoutedView = true;
+      this.router.navigate([`/${pageId}`]);
+    } else {
+      this.currentPage = pageId;
+      this.showRoutedView = false;
+      this.router.navigate(['/']);
+    }
     this.showSettings = false;
   }
 
@@ -183,6 +210,7 @@ export class App implements OnInit {
     this.auth.logout();
     this.setRole(null);
     this.currentPage = 'welcome';
+    this.showRoutedView = false;
     this.showSettings = false;
     this.router.navigate(['/']);
   }
@@ -252,8 +280,27 @@ export class App implements OnInit {
 
   goBack(): void {
     this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
+    this.showRoutedView = false;
     this.showSettings = false;
     this.router.navigate(['/']);
+  }
+
+  private syncFromUrl(url: string): void {
+    const clean = url.split('?')[0].split('#')[0];
+    const path = clean.replace(/^\//, '');
+
+    if (!path) {
+      this.showRoutedView = false;
+      return;
+    }
+
+    if (this.routedPages.has(path)) {
+      this.currentPage = path;
+      this.showRoutedView = true;
+      return;
+    }
+
+    this.showRoutedView = false;
   }
 
   createAccountByAdmin(): void {

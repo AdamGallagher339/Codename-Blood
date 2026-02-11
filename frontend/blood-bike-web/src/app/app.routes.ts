@@ -9,6 +9,7 @@ import { RiderJobsComponent } from './components/rider-jobs.component';
 import { SettingsComponent } from './components/settings.component';
 import { CommunityEventsComponent } from './components/community-events.component';
 import { AccessDeniedComponent } from './components/access-denied.component';
+import { BlankComponent } from './components/blank.component';
 
 export const routes: Routes = [
   // Dashboard / Maps (available to Rider, Fleet Manager, Dispatcher)
@@ -38,7 +39,7 @@ export const routes: Routes = [
   // Access Denied page
   { path: 'access-denied', component: AccessDeniedComponent },
   
-  // Default redirect to settings (accessible to all authenticated users)
-  { path: '', redirectTo: 'settings', pathMatch: 'full' },
+  // Blank route so the app can render inline pages on the root path.
+  { path: '', component: BlankComponent },
   { path: '**', redirectTo: 'access-denied' }
 ];

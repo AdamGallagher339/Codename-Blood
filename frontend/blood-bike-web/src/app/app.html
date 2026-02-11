@@ -62,13 +62,13 @@
 
   <!-- Main Content -->
   <main class="app-main" (click)="showSettings = false">
-    <!-- Routed Components (Scanner and Map) -->
-    <div *ngIf="currentPage === 'scanner' || currentPage === 'map'">
+    <!-- Routed Pages -->
+    <div *ngIf="showRoutedView">
       <router-outlet></router-outlet>
     </div>
 
     <!-- Inline Pages -->
-    <div *ngIf="currentPage !== 'scanner' && currentPage !== 'map'">
+    <div *ngIf="!showRoutedView">
     <!-- Welcome / Auth Landing -->
     <div *ngIf="currentPage === 'welcome'" class="page auth-page">
       <div class="page-content">
