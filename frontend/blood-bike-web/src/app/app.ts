@@ -210,6 +210,10 @@ export class App implements OnInit {
   }
 
   navigateTo(pageId: string): void {
+    if (!this.auth.isLoggedIn() && this.routedPages.has(pageId)) {
+      this.navigateAuth('login');
+      return;
+    }
     if (this.routedPages.has(pageId)) {
       this.currentPage = pageId;
       this.showRoutedView = true;
