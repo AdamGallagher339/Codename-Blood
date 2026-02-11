@@ -74,6 +74,16 @@ export class App implements OnInit {
     'access-denied'
   ]);
 
+  private enterTracking(): void {
+    this.currentPage = 'tracking';
+    this.showRoutedView = true;
+    this.router.navigate(['/tracking']);
+  }
+
+  private normalizeRole(role: string): string {
+    return role.toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
   constructor(
     public readonly auth: AuthService,
     private readonly router: Router,
@@ -151,11 +161,16 @@ export class App implements OnInit {
 
   get pages(): Array<{ id: string; title: string; icon: string; roles: string[] }> {
     const active = this.selectedRole;
+    const activeNormalized = active ? this.normalizeRole(active) : null;
+    const userRolesNormalized = this.auth.roles().map((role) => this.normalizeRole(role));
     return this.allPages.filter((p) => {
       const pageRoles = (p as any).roles as string[];
       if (pageRoles.length === 0) return true; // Available to all
-      if (!active) return false; // Not selected a role, can't access restricted pages
-      return pageRoles.includes(active);
+
+      const pageRolesNormalized = pageRoles.map((role) => this.normalizeRole(role));
+      if (activeNormalized) return pageRolesNormalized.includes(activeNormalized);
+
+      return userRolesNormalized.some((role) => pageRolesNormalized.includes(role));
     });
   }
 
@@ -258,8 +273,8 @@ export class App implements OnInit {
       .pipe(finalize(() => (this.busy = false)))
       .subscribe({
         next: () => {
-          // Immediately navigate to home so the UI doesn't loop back to login.
-          this.currentPage = 'home';
+          // Land on tracking after login.
+          this.enterTracking();
           // populate user information (if fetch fails, AuthService will clear tokens)
           this.auth.fetchMe().subscribe({
             next: () => {
