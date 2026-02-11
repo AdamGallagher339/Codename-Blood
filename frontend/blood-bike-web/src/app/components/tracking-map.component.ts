@@ -107,12 +107,23 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
    * Initialize the Leaflet map
    */
   private initializeMap(): void {
-    // Create map centered on UK (default location)
+    const irelandBounds = L.latLngBounds(
+      [51.35, -10.75],
+      [55.45, -5.35]
+    );
+
+    // Create map centered on Galway
     this.map = L.map('map', {
-      center: [54.5, -4], // Center of UK
-      zoom: 6,
+      center: [53.2707, -9.0568],
+      zoom: 7,
+      minZoom: 7,
+      maxBounds: irelandBounds,
+      maxBoundsViscosity: 1.0,
       zoomControl: true
     });
+
+    // Enforce bounds immediately after map init.
+    this.map.setMaxBounds(irelandBounds);
 
     // Add OpenStreetMap tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
