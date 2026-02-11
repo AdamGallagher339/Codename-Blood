@@ -193,10 +193,14 @@ export class App implements OnInit {
   }
 
   goHomeOrWelcome(): void {
-    this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
-    this.showRoutedView = false;
+    if (this.auth.isLoggedIn()) {
+      this.enterTracking();
+    } else {
+      this.currentPage = 'welcome';
+      this.showRoutedView = false;
+      this.router.navigate(['/']);
+    }
     this.showSettings = false;
-    this.router.navigate(['/']);
   }
 
   continueAsGuest(): void {
@@ -299,10 +303,14 @@ export class App implements OnInit {
   }
 
   goBack(): void {
-    this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
-    this.showRoutedView = false;
+    if (this.auth.isLoggedIn()) {
+      this.enterTracking();
+    } else {
+      this.currentPage = 'welcome';
+      this.showRoutedView = false;
+      this.router.navigate(['/']);
+    }
     this.showSettings = false;
-    this.router.navigate(['/']);
   }
 
   private syncFromUrl(url: string): void {
