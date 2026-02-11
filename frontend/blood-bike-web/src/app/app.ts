@@ -96,7 +96,12 @@ export class App implements OnInit {
       .subscribe((event) => this.syncFromUrl((event as NavigationEnd).urlAfterRedirects));
 
     this.auth.fetchMe().subscribe(() => {
-      this.currentPage = this.auth.isLoggedIn() ? 'home' : 'welcome';
+      if (this.auth.isLoggedIn()) {
+        this.enterTracking();
+      } else {
+        this.currentPage = 'welcome';
+        this.showRoutedView = false;
+      }
       // restore selected role from localStorage or default to first role
       const saved = localStorage.getItem('bb_selected_role');
       const roles = this.auth.roles();
