@@ -9,13 +9,24 @@ import { inject } from '@angular/core';
 export const hasRoleGuard: CanActivateFn = (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
   const router = inject(Router);
   const selectedRole = localStorage.getItem('bb_selected_role') || '';
-  const requiredRoles = route.data['roles'] as string[];
+  const requiredRoles = (route.data['roles'] as string[]) || [];
+  const storedRolesRaw = localStorage.getItem('bb_roles');
+  const storedRoles = storedRolesRaw ? (JSON.parse(storedRolesRaw) as string[]) : [];
 
-  if (!requiredRoles || requiredRoles.length === 0) {
+  const normalizeRole = (role: string) => role.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const requiredNormalized = requiredRoles.map(normalizeRole);
+  const selectedNormalized = normalizeRole(selectedRole);
+  const storedNormalized = storedRoles.map(normalizeRole);
+
+  if (requiredRoles.length === 0) {
     return true; // No role requirement
   }
 
-  if (requiredRoles.includes(selectedRole)) {
+  if (selectedRole && requiredNormalized.includes(selectedNormalized)) {
+    return true;
+  }
+
+  if (storedNormalized.some((role) => requiredNormalized.includes(role))) {
     return true;
   }
 

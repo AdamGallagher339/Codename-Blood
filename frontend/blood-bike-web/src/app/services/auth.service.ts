@@ -59,6 +59,7 @@ export class AuthService {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(ID_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem('bb_roles');
     this.user.set(null);
     this.lastAuthError.set(null);
   }
@@ -104,7 +105,10 @@ export class AuthService {
     }
 
     return this.http.get<MeResponse>('/api/me').pipe(
-      tap((me) => this.user.set(me)),
+      tap((me) => {
+        this.user.set(me);
+        localStorage.setItem('bb_roles', JSON.stringify(me.roles ?? []));
+      }),
       catchError((err) => {
         // If token is invalid/expired, clear it out.
         if (err instanceof HttpErrorResponse && err.status === 401) {
