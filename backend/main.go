@@ -29,6 +29,13 @@ func main() {
 		log.Println("auth client not initialized:", err)
 	}
 
+	trackerStore, err := fleet.NewTrackerStore(context.Background())
+	if err != nil {
+		log.Println("fleet tracker not initialized:", err)
+	} else {
+		fleet.SetTrackerStore(trackerStore)
+	}
+
 	withCORS := func(h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -61,6 +68,10 @@ func main() {
 	http.HandleFunc("/api/bike/register", withCORS(fleet.RegisterBike))
 	http.HandleFunc("/api/ride/start", withCORS(fleet.StartRide))
 	http.HandleFunc("/api/ride/end", withCORS(fleet.EndRide))
+
+	// --- Fleet Tracker Routes (DynamoDB) ---
+	http.HandleFunc("/api/fleet/bikes", withCORS(fleet.FleetListOrCreate))
+	http.HandleFunc("/api/fleet/bikes/", withCORS(fleet.FleetBikeDetail))
 
 	// --- User / Tag Routes ---
 	http.HandleFunc("/api/users", withCORS(fleet.GetAllUsers))
