@@ -99,6 +99,13 @@ export COGNITO_USER_POOL_ID=eu-west-1_XXXXXXX
 export COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
+### Fleet Tracker (DynamoDB)
+
+The fleet tracker endpoints use DynamoDB. Set these to enable `/api/fleet/*` routes:
+
+- `FLEET_BIKES_TABLE`
+- `FLEET_SERVICE_TABLE`
+
 ## Infra (optional)
 
 Infrastructure code is in `infra/` (AWS CDK). This is not required to run the app locally.
