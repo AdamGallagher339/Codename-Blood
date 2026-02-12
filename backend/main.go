@@ -47,7 +47,8 @@ func main() {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
-			h(w, r)
+			rw := &corsResponseWriter{ResponseWriter: w}
+			h(rw, r)
 		}
 	}
 
@@ -76,7 +77,7 @@ func main() {
 
 	// --- User / Tag Routes ---
 	http.HandleFunc("/api/users", withCORS(authClient.RequireAuth(fleet.GetAllUsers)))
-	http.HandleFunc("/api/user/register", withCORS(authClient.RequireAuth(fleet.RegisterUser)))
+	http.HandleFunc("/api/user/register", withCORS(fleet.RegisterUser))
 	http.HandleFunc("/api/user", withCORS(authClient.RequireAuth(fleet.GetUser))) // GET ?riderId=...
 	http.HandleFunc("/api/user/tags/add", withCORS(authClient.RequireAuth(fleet.AddTagToUser)))
 	http.HandleFunc("/api/user/tags/remove", withCORS(authClient.RequireAuth(fleet.RemoveTagFromUser)))
@@ -113,4 +114,16 @@ func main() {
 
 	log.Println("Backend running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+// Ensure CORS headers are set for all responses, including errors
+type corsResponseWriter struct {
+	http.ResponseWriter
+}
+
+func (w *corsResponseWriter) WriteHeader(statusCode int) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+	w.ResponseWriter.WriteHeader(statusCode)
 }

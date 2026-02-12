@@ -338,12 +338,33 @@ export class App implements OnInit {
   }
 
   goBack(): void {
-    if (this.auth.isLoggedIn()) {
-      this.enterTracking();
-    } else {
+    // Navigate to appropriate home page based on user roles
+    if (!this.auth.isLoggedIn()) {
       this.currentPage = 'welcome';
       this.showRoutedView = false;
       this.router.navigate(['/']);
+    } else {
+      // For logged-in users, go to their landing page based on role
+      const userRoles = this.auth.roles();
+      const trackingRoles = ['Rider', 'FleetManager', 'Dispatcher'];
+      const canAccessTracking = userRoles.some((role) => trackingRoles.includes(role));
+
+      if (canAccessTracking) {
+        // Go to tracking for operational roles
+        this.currentPage = 'tracking';
+        this.showRoutedView = true;
+        this.router.navigate(['/tracking']);
+      } else if (userRoles.includes('BloodBikeAdmin')) {
+        // Go to admin-roles for admins
+        this.currentPage = 'admin-roles';
+        this.showRoutedView = false;
+        this.router.navigate(['/']);
+      } else {
+        // Default fallback
+        this.currentPage = 'home';
+        this.showRoutedView = false;
+        this.router.navigate(['/']);
+      }
     }
     this.showSettings = false;
   }
