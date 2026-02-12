@@ -57,6 +57,7 @@ export class App implements OnInit {
     { id: 'jobs', title: 'Jobs', icon: '📋', roles: ['Rider'] },
     { id: 'dispatcher', title: 'Dispatcher', icon: '📞', roles: ['Dispatcher'] },
     { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager'] },
+    { id: 'events', title: 'Events', icon: '📆', roles: [] },
     { id: 'community-events', title: 'Community Events', icon: '🎉', roles: [] },
     { id: 'settings', title: 'Settings', icon: '⚙️', roles: [] },
     { id: 'admin-roles', title: 'Admin: Users', icon: '🧑‍💼', roles: ['BloodBikeAdmin'] }
@@ -177,6 +178,10 @@ export class App implements OnInit {
 
       return userRolesNormalized.some((role) => pageRolesNormalized.includes(role));
     });
+  }
+
+  get footerPages(): Array<{ id: string; title: string; icon: string; roles: string[] }> {
+    return this.pages.filter((page) => page.id !== 'admin-roles');
   }
 
   setRole(role: string | null): void {
