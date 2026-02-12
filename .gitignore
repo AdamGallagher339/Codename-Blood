@@ -1,8 +1,3 @@
-# Local environment variables (do not commit secrets)
-.env
-backend/.env
-frontend/**/.env
-
 # OS/editor
 .DS_Store
 .vscode/
