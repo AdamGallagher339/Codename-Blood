@@ -9,12 +9,22 @@
       <div class="header-actions">
         <div class="user-pill" *ngIf="auth.user() as me">
           <span class="user-name">{{ me.username || me.email || me.sub }}</span>
-          <span class="user-roles" *ngIf="me.roles?.length">{{ me.roles.join(', ') }}</span>
+          <ng-container *ngIf="me.roles?.length">
+            <div class="role-bar">
+              <button
+                *ngFor="let r of me.roles"
+                class="role-pill"
+                [class.active]="r === selectedRole"
+                (click)="setRole(r)"
+                title="Switch role"
+              >
+                {{ r }}
+              </button>
+              <button class="role-pill clear" *ngIf="me.roles.length > 1" (click)="setRole(null)">All</button>
+            </div>
+          </ng-container>
         </div>
-        <div class="user-pill" *ngIf="!auth.user() && isGuest">
-          <span class="user-name">Guest</span>
-          <span class="user-roles">Limited access</span>
-        </div>
+        <!-- no guest mode: users must be created by admin -->
         <div class="settings-container">
           <button class="btn-settings" (click)="toggleSettings()" title="Settings">
             ⚙️
@@ -41,7 +51,7 @@
             </button>
           </div>
         </div>
-        <div *ngIf="currentPage !== 'home' && currentPage !== 'welcome'" class="header-actions">
+        <div *ngIf="currentPage !== 'home' && currentPage !== 'welcome' && currentPage !== 'tracking'" class="header-actions">
           <button class="btn-back" (click)="goBack()" title="Go back">
             ←
           </button>
@@ -52,13 +62,13 @@
 
   <!-- Main Content -->
   <main class="app-main" (click)="showSettings = false">
-    <!-- Routed Components (Scanner and Map) -->
-    <div *ngIf="currentPage === 'scanner' || currentPage === 'map'">
+    <!-- Routed Pages -->
+    <div *ngIf="showRoutedView">
       <router-outlet></router-outlet>
     </div>
 
     <!-- Inline Pages -->
-    <div *ngIf="currentPage !== 'scanner' && currentPage !== 'map'">
+    <div *ngIf="!showRoutedView">
     <!-- Welcome / Auth Landing -->
     <div *ngIf="currentPage === 'welcome'" class="page auth-page">
       <div class="page-content">
@@ -71,10 +81,6 @@
           <p class="auth-hint">New here? Create an account and confirm your email.</p>
           <div class="auth-actions">
             <button class="primary" (click)="navigateAuth('login')">Login</button>
-            <button class="secondary" (click)="navigateAuth('signup')">Sign up</button>
-          </div>
-          <div class="auth-actions" style="margin-top: 12px;">
-            <button class="secondary" (click)="continueAsGuest()">Skip for now</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
@@ -98,10 +104,6 @@
           </label>
           <div class="auth-actions">
             <button class="primary" [disabled]="busy" (click)="signIn()">{{ busy ? 'Signing in…' : 'Sign in' }}</button>
-            <button class="secondary" [disabled]="busy" (click)="navigateAuth('signup')">Create account</button>
-          </div>
-          <div class="auth-actions" style="margin-top: 12px;">
-            <button class="secondary" [disabled]="busy" (click)="continueAsGuest()">Skip for now</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
@@ -130,9 +132,6 @@
           <div class="auth-actions">
             <button class="primary" [disabled]="busy" (click)="signUp()">{{ busy ? 'Creating…' : 'Create account' }}</button>
             <button class="secondary" [disabled]="busy" (click)="navigateAuth('login')">Back to login</button>
-          </div>
-          <div class="auth-actions" style="margin-top: 12px;">
-            <button class="secondary" [disabled]="busy" (click)="continueAsGuest()">Skip for now</button>
           </div>
           <p class="auth-hint">You’ll get an email verification code from Cognito.</p>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
@@ -221,15 +220,63 @@
       <app-fleet-tracker></app-fleet-tracker>
     </div>
 
-    <!-- Admin Roles Page (placeholder) -->
+    <!-- Admin Roles Page -->
     <div *ngIf="currentPage === 'admin-roles'" class="page admin-page">
       <div class="page-header">
-        <h2>🧑‍💼 Admin: Roles</h2>
+        <h2>🧑‍💼 Admin: Users</h2>
       </div>
       <div class="page-content">
-        <div class="placeholder-section">
-          <p>Role management</p>
-          <p class="secondary-text">This will manage Cognito group membership (admin only)</p>
+        <div class="admin-grid">
+          <div class="auth-card">
+            <h3>Create account</h3>
+            <label>
+              <span>Username</span>
+              <input [(ngModel)]="adminUsername" placeholder="username" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input [(ngModel)]="adminEmail" type="email" placeholder="you@example.com" />
+            </label>
+            <label>
+              <span>Password</span>
+              <input [(ngModel)]="adminPassword" type="password" placeholder="temporary password" />
+            </label>
+            <label>
+              <span>Roles</span>
+              <div class="roles-checkboxes">
+                <label><input type="checkbox" [(ngModel)]="adminRoles[0]" [ngModelOptions]="{standalone:true}" (change)="adminRoles = adminRoles.includes('BloodBikeAdmin') ? adminRoles : ['BloodBikeAdmin']"> BloodBikeAdmin</label>
+                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'rider'"> Rider</label>
+                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'fleet_manager'"> Fleet Manager</label>
+                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'dispatcher'"> Dispatcher</label>
+              </div>
+            </label>
+            <div class="auth-actions">
+              <button class="primary" [disabled]="adminBusy" (click)="createAccountByAdmin()">{{ adminBusy ? 'Creating…' : 'Create account' }}</button>
+            </div>
+            <p *ngIf="adminMessage" class="auth-hint">{{ adminMessage }}</p>
+          </div>
+
+          <div class="users-card">
+            <h3>Manage accounts</h3>
+            <div *ngIf="loadUsersBusy">Loading…</div>
+            <table *ngIf="!loadUsersBusy">
+              <thead>
+                <tr><th>Username</th><th>Name</th><th>Roles</th><th>Actions</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let u of users">
+                  <td>{{ u.riderId }}</td>
+                  <td><input [(ngModel)]="u.name" (blur)="http.post('/api/user/register',{ riderId: u.riderId, name: u.name }).subscribe()" /></td>
+                  <td>
+                    <label *ngFor="let r of ['BloodBikeAdmin','rider','fleet_manager','dispatcher']" style="display:inline-block;margin-right:8px;">
+                      <input type="checkbox" [checked]="(u.editTags||[]).includes(r)" (change)="toggleEditTag(u,r)" /> {{ r }}
+                    </label>
+                  </td>
+                  <td><button (click)="saveUserRoles(u)">Save</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -296,7 +343,23 @@
 
   <!-- Footer -->
   <footer class="app-footer">
-    <p>&copy; 2025 Blood Bike. All rights reserved.</p>
+    <ng-container *ngIf="auth.isLoggedIn(); else footerCopy">
+      <nav class="footer-nav" aria-label="Primary">
+        <button
+          *ngFor="let page of footerPages"
+          class="footer-tab"
+          [class.active]="currentPage === page.id"
+          (click)="navigateTo(page.id)"
+          [title]="page.title"
+        >
+          <span class="footer-icon">{{ page.icon }}</span>
+          <span class="footer-label">{{ page.title }}</span>
+        </button>
+      </nav>
+    </ng-container>
+    <ng-template #footerCopy>
+      <p>&copy; 2025 Blood Bike. All rights reserved.</p>
+    </ng-template>
   </footer>
 </div>
 

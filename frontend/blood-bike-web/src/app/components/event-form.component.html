@@ -22,7 +22,8 @@
           <input
             id="title"
             type="text"
-            [(ngModel)]="title"
+            [ngModel]="title()"
+            (ngModelChange)="title.set($event)"
             name="title"
             placeholder="Enter event title"
             required
@@ -33,7 +34,8 @@
           <label for="description">Description</label>
           <textarea
             id="description"
-            [(ngModel)]="description"
+            [ngModel]="description()"
+            (ngModelChange)="description.set($event)"
             name="description"
             placeholder="Enter event description"
             rows="3"
@@ -46,7 +48,8 @@
             <input
               id="date"
               type="date"
-              [(ngModel)]="date"
+              [ngModel]="date()"
+              (ngModelChange)="date.set($event)"
               name="date"
               required
             />
@@ -57,7 +60,8 @@
             <input
               id="startTime"
               type="time"
-              [(ngModel)]="startTime"
+              [ngModel]="startTime()"
+              (ngModelChange)="startTime.set($event)"
               name="startTime"
               required
             />
@@ -68,7 +72,8 @@
             <input
               id="endTime"
               type="time"
-              [(ngModel)]="endTime"
+              [ngModel]="endTime()"
+              (ngModelChange)="endTime.set($event)"
               name="endTime"
               required
             />
@@ -81,7 +86,8 @@
             <input
               id="location"
               type="text"
-              [(ngModel)]="location"
+              [ngModel]="location()"
+              (ngModelChange)="location.set($event)"
               name="location"
               placeholder="Enter location or scan QR code"
               required
@@ -102,7 +108,8 @@
             <label for="type">Event Type *</label>
             <select
               id="type"
-              [(ngModel)]="type"
+              [ngModel]="type()"
+              (ngModelChange)="type.set($event)"
               name="type"
               required
             >
@@ -116,7 +123,8 @@
             <label for="priority">Priority *</label>
             <select
               id="priority"
-              [(ngModel)]="priority"
+              [ngModel]="priority()"
+              (ngModelChange)="priority.set($event)"
               name="priority"
               required
             >

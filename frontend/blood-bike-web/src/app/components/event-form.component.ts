@@ -1,7 +1,6 @@
 import { Component, signal, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import { CreateEventDto, EventType, EventPriority } from '../models/event.model';
 import { QrScannerComponent } from './qr-scanner.component';
 
@@ -44,8 +43,6 @@ export class EventFormComponent {
     { value: EventPriority.HIGH, label: 'High', color: '#f44336' },
     { value: EventPriority.URGENT, label: 'Urgent', color: '#9c27b0' }
   ];
-  
-  constructor(private router: Router) {}
 
   open(): void {
     this.resetForm();
