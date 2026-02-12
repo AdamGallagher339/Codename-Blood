@@ -57,7 +57,7 @@ export class App implements OnInit {
     { id: 'scan', title: 'QR Scanner', icon: '📱', roles: ['Rider', 'FleetManager'] },
     { id: 'jobs', title: 'Jobs', icon: '📋', roles: ['Rider'] },
     { id: 'dispatcher', title: 'Dispatcher', icon: '📞', roles: ['Dispatcher'] },
-    { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager'] },
+    { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager', 'BloodBikeAdmin'] },
     { id: 'events', title: 'Events', icon: '📆', roles: [] },
     { id: 'community-events', title: 'Community Events', icon: '🎉', roles: [] },
     { id: 'settings', title: 'Settings', icon: '⚙️', roles: [] },
