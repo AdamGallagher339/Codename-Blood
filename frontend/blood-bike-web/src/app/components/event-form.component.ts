@@ -46,6 +46,8 @@ export class EventFormComponent {
   ];
   
   constructor(private router: Router) {}
+
+  open(): void {
     this.resetForm();
     this.showModal.set(true);
   }

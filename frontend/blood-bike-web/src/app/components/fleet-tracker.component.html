@@ -1,0 +1,133 @@
+<section class="fleet-tracker">
+  <header class="fleet-header">
+    <div>
+      <h2>🛠️ Fleet Tracker</h2>
+      <p>Register bikes, manage status, and track service history.</p>
+    </div>
+    <div class="fleet-form">
+      <label>
+        <span>Bike ID</span>
+        <input [(ngModel)]="bikeId" placeholder="BB21-WES" />
+      </label>
+      <label>
+        <span>Model</span>
+        <input [(ngModel)]="model" placeholder="Honda Pan European" />
+      </label>
+      <label>
+        <span>Location ID</span>
+        <input [(ngModel)]="locationId" placeholder="Galway-Depot" />
+      </label>
+      <label>
+        <span>Active</span>
+        <select [(ngModel)]="activeMode">
+          <option value="off_duty">Off duty</option>
+          <option value="out_of_service">Out of service</option>
+          <option value="rider">Assigned to rider</option>
+        </select>
+      </label>
+      <label *ngIf="activeMode() === 'rider'">
+        <span>Rider UID</span>
+        <input [(ngModel)]="activeRiderId" placeholder="rider-123" />
+      </label>
+      <button class="primary" (click)="createBike()">Add bike</button>
+    </div>
+  </header>
+
+  <div class="fleet-body">
+    <div class="fleet-list">
+      <h3>Fleet Bikes</h3>
+      <div class="bike-list">
+        <button
+          class="bike-card"
+          *ngFor="let bike of bikes()"
+          (click)="selectBike(bike.bikeId)"
+          [class.active]="bike.bikeId === selectedBikeId()"
+        >
+          <div class="bike-title">
+            <span class="bike-id">{{ bike.bikeId }}</span>
+            <span class="bike-model">{{ bike.model }}</span>
+          </div>
+          <div class="bike-meta">
+            <span>Location: {{ bike.locationId }}</span>
+            <span>Status: {{ formatActive(bike.active) }}</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <div class="fleet-details" *ngIf="selectedBike() as bike">
+      <h3>Bike Details</h3>
+      <div class="details-grid">
+        <label>
+          <span>Model</span>
+          <input [(ngModel)]="editModel" />
+        </label>
+        <label>
+          <span>Location ID</span>
+          <input [(ngModel)]="editLocationId" />
+        </label>
+        <label>
+          <span>Active</span>
+          <select [(ngModel)]="editActiveMode">
+            <option value="off_duty">Off duty</option>
+            <option value="out_of_service">Out of service</option>
+            <option value="rider">Assigned to rider</option>
+          </select>
+        </label>
+        <label *ngIf="editActiveMode() === 'rider'">
+          <span>Rider UID</span>
+          <input [(ngModel)]="editActiveRiderId" />
+        </label>
+        <button class="secondary" (click)="saveBike()">Save updates</button>
+      </div>
+
+      <div class="service-section">
+        <div class="service-header">
+          <h4>Service History</h4>
+        </div>
+        <div class="service-form">
+          <label>
+            <span>Service type</span>
+            <select [(ngModel)]="serviceType">
+              <option value="oil">Oil</option>
+              <option value="chain">Chain</option>
+              <option value="tyres">Tyres</option>
+              <option value="brakes">Brakes</option>
+              <option value="coolant">Coolant</option>
+            </select>
+          </label>
+          <label>
+            <span>Service date</span>
+            <input type="date" [(ngModel)]="serviceDate" />
+          </label>
+          <label>
+            <span>Performed by</span>
+            <input [(ngModel)]="servicePerformedBy" placeholder="Mechanic or rider" />
+          </label>
+          <label class="notes">
+            <span>Notes</span>
+            <textarea [(ngModel)]="serviceNotes" rows="2" placeholder="Observations or parts used"></textarea>
+          </label>
+          <button class="primary" (click)="addServiceEntry()">Add service entry</button>
+        </div>
+
+        <div class="service-list">
+          <div class="service-card" *ngFor="let entry of (serviceHistory()[bike.bikeId] || [])">
+            <div>
+              <strong>{{ entry.serviceType | titlecase }}</strong>
+              <span class="service-date">{{ entry.serviceDate | date: 'mediumDate' }}</span>
+            </div>
+            <p *ngIf="entry.notes">{{ entry.notes }}</p>
+            <span *ngIf="entry.performedBy" class="service-meta">Performed by {{ entry.performedBy }}</span>
+          </div>
+          <p class="empty" *ngIf="(serviceHistory()[bike.bikeId] || []).length === 0">No service history yet.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="fleet-details empty" *ngIf="!selectedBike()">
+      <h3>Bike Details</h3>
+      <p>Select a bike to view and update service history.</p>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,218 @@
+.fleet-tracker {
+  padding: var(--spacing-xl);
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  gap: var(--spacing-xl);
+  animation: fadeInUp 0.4s ease-out;
+}
+
+.fleet-header {
+  display: grid;
+  gap: var(--spacing-lg);
+  background: var(--color-white);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.fleet-header h2 {
+  margin: 0 0 var(--spacing-xs);
+  font-size: var(--font-size-2xl);
+}
+
+.fleet-header p {
+  margin: 0;
+  color: var(--color-dark-gray);
+}
+
+.fleet-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+  align-items: end;
+}
+
+.fleet-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-dark-gray);
+}
+
+.fleet-form input,
+.fleet-form select,
+.fleet-form textarea {
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--color-light-gray);
+  font-size: var(--font-size-base);
+}
+
+.fleet-form button {
+  align-self: stretch;
+}
+
+.fleet-body {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: var(--spacing-xl);
+}
+
+.fleet-list {
+  background: var(--color-white);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.bike-list {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.bike-card {
+  border: 2px solid var(--color-light-gray);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  background: var(--color-white);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.bike-card:hover {
+  border-color: var(--color-red);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.bike-card.active {
+  border-color: var(--color-dark-red);
+  background: rgba(220, 20, 60, 0.05);
+}
+
+.bike-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.bike-id {
+  font-weight: 700;
+  color: var(--color-text-dark);
+}
+
+.bike-model {
+  color: var(--color-dark-gray);
+  font-size: var(--font-size-sm);
+}
+
+.bike-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--color-dark-gray);
+}
+
+.fleet-details {
+  background: var(--color-white);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.fleet-details.empty {
+  color: var(--color-dark-gray);
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+  align-items: end;
+}
+
+.details-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-dark-gray);
+}
+
+.details-grid input,
+.details-grid select,
+.details-grid textarea {
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--color-light-gray);
+  font-size: var(--font-size-base);
+}
+
+.service-section {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.service-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+  align-items: end;
+}
+
+.service-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-dark-gray);
+}
+
+.service-form .notes {
+  grid-column: 1 / -1;
+}
+
+.service-form textarea {
+  resize: vertical;
+}
+
+.service-list {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.service-card {
+  border: 1px solid var(--color-light-gray);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  display: grid;
+  gap: 4px;
+}
+
+.service-date {
+  margin-left: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-dark-gray);
+}
+
+.service-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-dark-gray);
+}
+
+.empty {
+  color: var(--color-dark-gray);
+}
+
+@media (max-width: 1024px) {
+  .fleet-body {
+    grid-template-columns: 1fr;
+  }
+}

@@ -3,12 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterOutlet, RouterLink, Router } from '@angular/router';
 import { EventsPageComponent } from './components/events-page.component';
+import { FleetTrackerComponent } from './components/fleet-tracker.component';
 import { finalize } from 'rxjs';
 import { AuthService, AuthPage } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, EventsPageComponent],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, EventsPageComponent, FleetTrackerComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
