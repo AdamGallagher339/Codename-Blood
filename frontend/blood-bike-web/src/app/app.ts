@@ -77,9 +77,26 @@ export class App implements OnInit {
   ]);
 
   private enterTracking(): void {
-    this.currentPage = 'tracking';
-    this.showRoutedView = true;
-    this.router.navigate(['/tracking']);
+    // Check if user can access tracking based on their roles
+    const userRoles = this.auth.roles();
+    const trackingRoles = ['Rider', 'FleetManager', 'Dispatcher'];
+    const canAccessTracking = userRoles.some((role) => trackingRoles.includes(role));
+
+    if (canAccessTracking) {
+      this.currentPage = 'tracking';
+      this.showRoutedView = true;
+      this.router.navigate(['/tracking']);
+    } else if (userRoles.includes('BloodBikeAdmin')) {
+      // If user is admin but can't access tracking, go to admin-roles page instead
+      this.currentPage = 'admin-roles';
+      this.showRoutedView = false;
+      this.router.navigate(['/']);
+    } else {
+      // Default to home
+      this.currentPage = 'home';
+      this.showRoutedView = false;
+      this.router.navigate(['/']);
+    }
   }
 
   private normalizeRole(role: string): string {
@@ -179,6 +196,14 @@ export class App implements OnInit {
 
       return userRolesNormalized.some((role) => pageRolesNormalized.includes(role));
     });
+  }
+
+  toggleAdminRole(role: string): void {
+    if (this.adminRoles.includes(role)) {
+      this.adminRoles = this.adminRoles.filter(r => r !== role);
+    } else {
+      this.adminRoles.push(role);
+    }
   }
 
   get footerPages(): Array<{ id: string; title: string; icon: string; roles: string[] }> {
@@ -346,6 +371,10 @@ export class App implements OnInit {
       this.adminMessage = 'username, email and password required';
       return;
     }
+    if (this.adminRoles.length === 0) {
+      this.adminMessage = 'at least one role must be selected';
+      return;
+    }
     this.adminBusy = true;
     this.adminMessage = null;
     const payload = {
@@ -354,37 +383,53 @@ export class App implements OnInit {
       email: this.adminEmail.trim(),
       roles: this.adminRoles
     };
+    console.log('Creating auth user with payload:', payload);
     // Create auth user (Cognito or local)
     this.http.post('/api/auth/signup', payload).subscribe({
       next: () => {
+        console.log('Auth user created successfully');
         // create fleet user record
         const u = { riderId: this.adminUsername.trim(), name: this.adminUsername.trim() };
+        console.log('Registering fleet user with payload:', u);
         this.http.post('/api/user/register', u).subscribe({
           next: () => {
-            // add role tag to user record
-            this.http.post('/api/user/tags/add', { riderId: this.adminUsername.trim(), tag: this.adminRole }).subscribe({
-              next: () => {
-                this.adminMessage = 'Account created';
+            console.log('Fleet user registered successfully');
+            // add all selected role tags to user record
+            const roleTags = this.adminRoles.slice(); // Make a copy
+            const addTagsRecursively = (index: number) => {
+              if (index >= roleTags.length) {
+                this.adminMessage = 'Account created successfully';
                 this.adminBusy = false;
                 this.adminUsername = '';
                 this.adminEmail = '';
                 this.adminPassword = '';
+                this.adminRoles = ['BloodBikeAdmin']; // Reset to default
                 this.loadUsers();
-              },
-              error: (err) => {
-                this.adminMessage = 'Created auth user but failed to tag user';
-                this.adminBusy = false;
+                return;
               }
-            });
+              const tag = roleTags[index];
+              this.http.post('/api/user/tags/add', { riderId: this.adminUsername.trim(), tag }).subscribe({
+                next: () => addTagsRecursively(index + 1),
+                error: (err) => {
+                  console.error('Failed to add tag:', tag, err);
+                  this.adminMessage = `Created user but failed to add role ${tag}`;
+                  this.adminBusy = false;
+                }
+              });
+            };
+            addTagsRecursively(0);
           },
           error: (err) => {
-            this.adminMessage = 'Created auth user but failed to register fleet user';
+            console.error('Fleet user registration error:', {status: err.status, statusText: err.statusText, error: err.error});
+            const errorMsg = err.error?.message || err.error || err.statusText || `HTTP ${err.status}`;
+            this.adminMessage = `Failed to register fleet user: ${errorMsg}`;
             this.adminBusy = false;
           }
         });
       },
       error: (_err) => {
-        this.adminMessage = 'signup failed';
+        console.error('Auth signup error:', {status: _err.status, statusText: _err.statusText, error: _err.error});
+        this.adminMessage = `Account signup failed: ${_err.error?.message || _err.statusText || 'unknown error'}`;
         this.adminBusy = false;
       }
     });

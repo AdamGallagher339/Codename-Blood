@@ -244,10 +244,10 @@
             <label>
               <span>Roles</span>
               <div class="roles-checkboxes">
-                <label><input type="checkbox" [(ngModel)]="adminRoles[0]" [ngModelOptions]="{standalone:true}" (change)="adminRoles = adminRoles.includes('BloodBikeAdmin') ? adminRoles : ['BloodBikeAdmin']"> BloodBikeAdmin</label>
-                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'rider'"> Rider</label>
-                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'fleet_manager'"> Fleet Manager</label>
-                <label><input type="checkbox" [(ngModel)]="adminRoles" [value]="'dispatcher'"> Dispatcher</label>
+                <label><input type="checkbox" [checked]="adminRoles.includes('BloodBikeAdmin')" (change)="toggleAdminRole('BloodBikeAdmin')"> BloodBikeAdmin</label>
+                <label><input type="checkbox" [checked]="adminRoles.includes('Rider')" (change)="toggleAdminRole('Rider')"> Rider</label>
+                <label><input type="checkbox" [checked]="adminRoles.includes('FleetManager')" (change)="toggleAdminRole('FleetManager')"> Fleet Manager</label>
+                <label><input type="checkbox" [checked]="adminRoles.includes('Dispatcher')" (change)="toggleAdminRole('Dispatcher')"> Dispatcher</label>
               </div>
             </label>
             <div class="auth-actions">
