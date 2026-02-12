@@ -170,19 +170,19 @@ func isAdminRequest(r *http.Request) bool {
 		case []any:
 			for _, item := range v {
 				if s, ok := item.(string); ok {
-					if s == "admin" || s == "BloodBikeAdmin" {
+					if s == "admin" || s == "Admin" || s == "BloodBikeAdmin" {
 						return true
 					}
 				}
 			}
 		case []string:
 			for _, s := range v {
-				if s == "admin" || s == "BloodBikeAdmin" {
+				if s == "admin" || s == "Admin" || s == "BloodBikeAdmin" {
 					return true
 				}
 			}
 		case string:
-			if v == "admin" || v == "BloodBikeAdmin" {
+			if v == "admin" || v == "Admin" || v == "BloodBikeAdmin" {
 				return true
 			}
 		}

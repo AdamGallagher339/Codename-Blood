@@ -23,7 +23,8 @@ export const hasRoleGuard: CanActivateFn = (route: ActivatedRouteSnapshot, state
   }
 
   // Allow admins to access all guarded routes.
-  const isAdmin = selectedNormalized === 'bloodbikeadmin' || storedNormalized.includes('bloodbikeadmin');
+  const adminRoles = new Set(['bloodbikeadmin', 'admin']);
+  const isAdmin = adminRoles.has(selectedNormalized) || storedNormalized.some((role) => adminRoles.has(role));
   if (isAdmin) {
     return true;
   }
