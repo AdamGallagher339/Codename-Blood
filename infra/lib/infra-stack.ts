@@ -33,6 +33,20 @@ export class InfraStack extends Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
     });
 
+    // Fleet Tracker Tables
+    const fleetBikesTable = new dynamodb.Table(this, 'FleetBikesTable', {
+      tableName: 'FleetBikes',
+      partitionKey: { name: 'BikeID', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+
+    const fleetServiceTable = new dynamodb.Table(this, 'FleetServiceHistoryTable', {
+      tableName: 'FleetServiceHistory',
+      partitionKey: { name: 'BikeID', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'ServiceID', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+
     // ------------------------------
     //      GET BIKES LAMBDA
     // ------------------------------
@@ -110,6 +124,8 @@ export class InfraStack extends Stack {
       // CloudFormation outputs for frontend integration
       new CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
       new CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
+      new CfnOutput(this, 'FleetBikesTableName', { value: fleetBikesTable.tableName });
+      new CfnOutput(this, 'FleetServiceTableName', { value: fleetServiceTable.tableName });
 
 
   }
