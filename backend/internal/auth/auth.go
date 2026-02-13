@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -79,6 +80,8 @@ func NewAuthClient(ctx context.Context) (*AuthClient, error) {
 	if region == "" {
 		return nil, errors.New("AWS region not configured (set AWS_REGION)")
 	}
+	// Ensure the service client uses the same region we record.
+	cfg.Region = region
 
 	return &AuthClient{
 		client:     cognito.NewFromConfig(cfg),
@@ -86,6 +89,90 @@ func NewAuthClient(ctx context.Context) (*AuthClient, error) {
 		userPoolID: userPool,
 		clientID:   clientId,
 	}, nil
+}
+
+// SetUserGroups sets a user's Cognito groups to match the provided list.
+// This is used by the fleet package to keep roles (groups) in sync with the DB/API.
+func (a *AuthClient) SetUserGroups(ctx context.Context, username string, groups []string) error {
+	if username == "" {
+		return errors.New("username required")
+	}
+
+	// Normalize desired groups (dedupe + stable)
+	desiredSet := map[string]struct{}{}
+	for _, g := range groups {
+		if g == "" {
+			continue
+		}
+		desiredSet[g] = struct{}{}
+	}
+	desired := make([]string, 0, len(desiredSet))
+	for g := range desiredSet {
+		desired = append(desired, g)
+	}
+	sort.Strings(desired)
+
+	if a.local {
+		// Best-effort local mode: update roles in the dev store.
+		a.usersMu.Lock()
+		u, ok := a.users[username]
+		if ok {
+			u.Roles = desired
+			a.users[username] = u
+			_ = a.saveUserToDB(u)
+		}
+		a.usersMu.Unlock()
+		return nil
+	}
+
+	// Fetch current groups.
+	currentSet := map[string]struct{}{}
+	listOut, err := a.client.AdminListGroupsForUser(ctx, &cognito.AdminListGroupsForUserInput{
+		UserPoolId: &a.userPoolID,
+		Username:   &username,
+	})
+	if err != nil {
+		return fmt.Errorf("list cognito groups: %w", err)
+	}
+	for _, g := range listOut.Groups {
+		if g.GroupName != nil && *g.GroupName != "" {
+			currentSet[*g.GroupName] = struct{}{}
+		}
+	}
+
+	// Remove groups not desired.
+	for g := range currentSet {
+		if _, ok := desiredSet[g]; ok {
+			continue
+		}
+		name := g
+		_, err := a.client.AdminRemoveUserFromGroup(ctx, &cognito.AdminRemoveUserFromGroupInput{
+			GroupName:  &name,
+			UserPoolId: &a.userPoolID,
+			Username:   &username,
+		})
+		if err != nil {
+			return fmt.Errorf("remove user from group %s: %w", g, err)
+		}
+	}
+
+	// Add missing desired groups.
+	for _, g := range desired {
+		if _, ok := currentSet[g]; ok {
+			continue
+		}
+		name := g
+		_, err := a.client.AdminAddUserToGroup(ctx, &cognito.AdminAddUserToGroupInput{
+			GroupName:  &name,
+			UserPoolId: &a.userPoolID,
+			Username:   &username,
+		})
+		if err != nil {
+			return fmt.Errorf("add user to group %s: %w", g, err)
+		}
+	}
+
+	return nil
 }
 
 // NewLocalAuthClient returns an AuthClient configured for local development.

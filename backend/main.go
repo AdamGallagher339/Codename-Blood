@@ -11,6 +11,7 @@ import (
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/events"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/fleet"
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo/dynamo"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/tracking"
 	"github.com/joho/godotenv"
 )
@@ -27,10 +28,16 @@ func main() {
 	// initialize Cognito auth client (reads COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID env vars)
 	authClient, err := auth.NewAuthClient(context.Background())
 	if err != nil {
-		log.Println("auth client not initialized:", err, "- falling back to local dev auth")
-		authClient = auth.NewLocalAuthClient()
-		log.Println("Local auth enabled: default user 'BloodBikeAdmin' with password 'password'")
+		log.Fatal("auth client not initialized:", err)
 	}
+
+	// DynamoDB repositories (USERS_TABLE/BIKES_TABLE/DEPOTS_TABLE/JOBS_TABLE)
+	dynamoRepos, err := dynamo.New(context.Background(), dynamo.ConfigFromEnv())
+	if err != nil {
+		log.Fatal("dynamo repos not initialized:", err)
+	}
+	fleet.SetRepositories(dynamoRepos.Users, dynamoRepos.Bikes)
+	fleet.SetCognitoGroupManager(authClient)
 
 	trackerStore, err := fleet.NewTrackerStore(context.Background())
 	if err != nil {
@@ -53,59 +60,30 @@ func main() {
 		}
 	}
 
-	notConfigured := func(feature string) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			http.Error(
-				w,
-				feature+" not configured (set AWS_REGION, COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID)",
-				http.StatusNotImplemented,
-			)
+	// GET /api/users: list from DynamoDB (single source of truth for user profiles).
+	getAllUsers := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if dynamoRepos.Users == nil {
+			http.Error(w, "USERS_TABLE not configured", http.StatusNotImplemented)
+			return
 		}
-	}
-
-	// Combined handler to list all users (both auth and fleet)
-	combinedGetAllUsers := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
-		// Get all fleet users
-		fleetUsersMap := fleet.GetUsersMap()
-		fleetUsers := make([]*fleet.User, 0, len(fleetUsersMap))
-		for _, u := range fleetUsersMap {
-			fleetUsers = append(fleetUsers, u)
+		users, err := dynamoRepos.Users.List(r.Context())
+		if err != nil {
+			log.Printf("op=ListUsers err=%v", err)
+			http.Error(w, "failed to list users", http.StatusInternalServerError)
+			return
 		}
-
-		// Get all auth users
-		authUsers := authClient.GetAllAuthUsers()
-
-		// Combine into a single response
-		combinedUsers := make([]map[string]any, 0)
-
-		// Add fleet users
-		for _, u := range fleetUsers {
-			combinedUsers = append(combinedUsers, map[string]any{
+		out := make([]map[string]any, 0, len(users))
+		for _, u := range users {
+			out = append(out, map[string]any{
 				"riderId":   u.RiderID,
 				"name":      u.Name,
 				"tags":      u.Tags,
+				"roles":     u.Tags, // backward compat: frontend supports tags || roles
 				"updatedAt": u.UpdatedAt,
 			})
 		}
-
-		// Add auth users not already in fleet
-		fleetRiderIds := make(map[string]bool)
-		for _, u := range fleetUsers {
-			fleetRiderIds[u.RiderID] = true
-		}
-		for _, authUser := range authUsers {
-			username := authUser["username"].(string)
-			if !fleetRiderIds[username] {
-				combinedUsers = append(combinedUsers, map[string]any{
-					"riderId": username,
-					"name":    username,
-					"roles":   authUser["roles"],
-				})
-			}
-		}
-
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(combinedUsers)
+		_ = json.NewEncoder(w).Encode(out)
 	})
 
 	// --- Health Check ---
@@ -123,10 +101,10 @@ func main() {
 	http.HandleFunc("/api/fleet/bikes/", withCORS(authClient.RequireAuth(fleet.FleetBikeDetail)))
 
 	// --- User / Tag Routes ---
-	http.HandleFunc("/api/users", withCORS(combinedGetAllUsers))
+	http.HandleFunc("/api/users", withCORS(getAllUsers))
 	http.HandleFunc("/api/users/", withCORS(authClient.RequireAuth(fleet.HandleUserDetail))) // PUT/DELETE for individual users
-	http.HandleFunc("/api/user/register", withCORS(fleet.RegisterUser))
-	http.HandleFunc("/api/user/roles/init", withCORS(fleet.InitializeUserRoles)) // Initial role setup after signup
+	http.HandleFunc("/api/user/register", withCORS(authClient.RequireAuth(fleet.RegisterUser)))
+	http.HandleFunc("/api/user/roles/init", withCORS(authClient.RequireAuth(fleet.InitializeUserRoles))) // Initial role setup after signup
 	http.HandleFunc("/api/user/tags/add", withCORS(authClient.RequireAuth(fleet.AddTagToUser)))
 	http.HandleFunc("/api/user/tags/remove", withCORS(authClient.RequireAuth(fleet.RemoveTagFromUser)))
 	http.HandleFunc("/api/user", withCORS(authClient.RequireAuth(fleet.GetUser))) // GET ?riderId=... (generic, must come LAST)
@@ -146,21 +124,14 @@ func main() {
 	http.HandleFunc("/api/tracking/ws", authClient.RequireAuth(tracking.HandleWebSocket))
 
 	// --- Auth routes (Cognito) ---
-	if authClient != nil {
-		http.HandleFunc("/api/auth/signup", withCORS(authClient.SignUpHandler))
-		http.HandleFunc("/api/auth/confirm", withCORS(authClient.ConfirmSignUpHandler))
-		http.HandleFunc("/api/auth/signin", withCORS(authClient.SignInHandler))
+	http.HandleFunc("/api/auth/signup", withCORS(authClient.SignUpHandler))
+	http.HandleFunc("/api/auth/confirm", withCORS(authClient.ConfirmSignUpHandler))
+	http.HandleFunc("/api/auth/signin", withCORS(authClient.SignInHandler))
 
-		// Example: protect register bike route with Cognito
-		http.HandleFunc("/api/bike/register", withCORS(authClient.RequireAuth(fleet.RegisterBike)))
-		http.HandleFunc("/api/me", withCORS(authClient.RequireAuth(authClient.MeHandler)))
-		http.HandleFunc("/api/auth/users", withCORS(authClient.RequireAuth(authClient.ListUsersHandler)))
-	} else {
-		http.HandleFunc("/api/auth/signup", withCORS(notConfigured("auth")))
-		http.HandleFunc("/api/auth/confirm", withCORS(notConfigured("auth")))
-		http.HandleFunc("/api/auth/signin", withCORS(notConfigured("auth")))
-		http.HandleFunc("/api/me", withCORS(notConfigured("auth")))
-	}
+	// Example: protect register bike route with Cognito
+	http.HandleFunc("/api/bike/register", withCORS(authClient.RequireAuth(fleet.RegisterBike)))
+	http.HandleFunc("/api/me", withCORS(authClient.RequireAuth(authClient.MeHandler)))
+	http.HandleFunc("/api/auth/users", withCORS(authClient.RequireAuth(authClient.ListUsersHandler)))
 
 	log.Println("Backend running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
