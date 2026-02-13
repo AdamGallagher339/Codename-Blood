@@ -7,7 +7,6 @@ import { DispatcherComponent } from './components/dispatcher.component';
 import { FleetManagerComponent } from './components/fleet-manager.component';
 import { RiderJobsComponent } from './components/rider-jobs.component';
 import { SettingsComponent } from './components/settings.component';
-import { CommunityEventsComponent } from './components/community-events.component';
 import { AccessDeniedComponent } from './components/access-denied.component';
 import { BlankComponent } from './components/blank.component';
 
@@ -29,9 +28,6 @@ export const routes: Routes = [
   
   // Events (available to all authenticated users)
   { path: 'events', component: EventsPageComponent },
-  
-  // Community Events (available to all authenticated users)
-  { path: 'community-events', component: CommunityEventsComponent },
   
   // Settings (available to all authenticated users)
   { path: 'settings', component: SettingsComponent },
