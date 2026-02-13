@@ -257,7 +257,10 @@
           </div>
 
           <div class="users-card">
-            <h3>Manage accounts</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <h3>Manage accounts</h3>
+              <button (click)="reloadAccounts()" style="padding:8px 16px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">↻ Reload Accounts</button>
+            </div>
             <div *ngIf="loadUsersBusy">Loading…</div>
             <table *ngIf="!loadUsersBusy">
               <thead>
@@ -268,11 +271,20 @@
                   <td>{{ u.riderId }}</td>
                   <td><input [(ngModel)]="u.name" (blur)="http.post('/api/user/register',{ riderId: u.riderId, name: u.name }).subscribe()" /></td>
                   <td>
-                    <label *ngFor="let r of ['BloodBikeAdmin','rider','fleet_manager','dispatcher']" style="display:inline-block;margin-right:8px;">
-                      <input type="checkbox" [checked]="(u.editTags||[]).includes(r)" (change)="toggleEditTag(u,r)" /> {{ r }}
-                    </label>
+                    <button *ngFor="let r of allRoles" 
+                            (click)="toggleUserRole(u,r)"
+                            [style.background]="hasRole(u, r) ? '#66bb6a' : '#ffcccc'"
+                            [style.color]="'#000'"
+                            [style.border]="'none'"
+                            [style.padding]="'6px 12px'"
+                            [style.margin]="'4px 4px'"
+                            [style.border-radius]="'4px'"
+                            [style.cursor]="'pointer'"
+                            [style.font-weight]="'500'">
+                      {{ r }}
+                    </button>
                   </td>
-                  <td><button (click)="saveUserRoles(u)">Save</button></td>
+                  <td><button (click)="saveUserRoles(u)" [disabled]="!isDirty(u)">Save</button> <button (click)="deleteUser(u)" style="background:#d32f2f;margin-left:8px;">Delete</button></td>
                 </tr>
               </tbody>
             </table>

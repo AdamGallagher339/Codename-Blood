@@ -188,6 +188,82 @@ func InitializeUserRoles(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(u)
 }
 
+// DeleteUser deletes a user from the fleet (admin only)
+// Expects JSON body: { "riderId": "user123" }
+// HandleUserDetail handles PUT and DELETE for individual users at /api/users/{username}
+func HandleUserDetail(w http.ResponseWriter, r *http.Request) {
+	// Extract username from path: /api/users/{username}
+	path := r.URL.Path
+	const prefix = "/api/users/"
+	if len(path) <= len(prefix) {
+		http.Error(w, "username required", http.StatusBadRequest)
+		return
+	}
+	username := path[len(prefix):]
+
+	switch r.Method {
+	case http.MethodPut:
+		// Update user roles
+		handleUpdateUserRolesRESTful(w, r, username)
+	case http.MethodDelete:
+		// Delete user
+		handleDeleteUserRESTful(w, r, username)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleUpdateUserRolesRESTful handles PUT /api/users/{username}/roles
+func handleUpdateUserRolesRESTful(w http.ResponseWriter, r *http.Request, username string) {
+	// Only allow admins to update roles
+	if !isAdminRequest(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var body struct {
+		Roles []string `json:"roles"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	u, ok := users[username]
+	if !ok {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	// Clear existing tags and add new ones
+	u.Tags = []string{}
+	for _, role := range body.Roles {
+		u.AddTag(role)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(u)
+}
+
+// handleDeleteUserRESTful handles DELETE /api/users/{username}
+func handleDeleteUserRESTful(w http.ResponseWriter, r *http.Request, username string) {
+	// Only allow admins to delete
+	if !isAdminRequest(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	_, ok := users[username]
+	if !ok {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	delete(users, username)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // isAdminRequest returns true if the request context has auth claims with an admin role.
 func isAdminRequest(r *http.Request) bool {
 	claims := auth.ClaimsFromContext(r.Context())
@@ -217,4 +293,13 @@ func isAdminRequest(r *http.Request) bool {
 		}
 	}
 	return false
+}
+
+// GetUsersMap returns a copy of all fleet users
+func GetUsersMap() map[string]*User {
+	result := make(map[string]*User)
+	for k, v := range users {
+		result[k] = v
+	}
+	return result
 }

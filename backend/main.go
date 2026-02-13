@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -61,6 +62,52 @@ func main() {
 			)
 		}
 	}
+
+	// Combined handler to list all users (both auth and fleet)
+	combinedGetAllUsers := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		// Get all fleet users
+		fleetUsersMap := fleet.GetUsersMap()
+		fleetUsers := make([]*fleet.User, 0, len(fleetUsersMap))
+		for _, u := range fleetUsersMap {
+			fleetUsers = append(fleetUsers, u)
+		}
+
+		// Get all auth users
+		authUsers := authClient.GetAllAuthUsers()
+
+		// Combine into a single response
+		combinedUsers := make([]map[string]any, 0)
+
+		// Add fleet users
+		for _, u := range fleetUsers {
+			combinedUsers = append(combinedUsers, map[string]any{
+				"riderId":   u.RiderID,
+				"name":      u.Name,
+				"tags":      u.Tags,
+				"updatedAt": u.UpdatedAt,
+			})
+		}
+
+		// Add auth users not already in fleet
+		fleetRiderIds := make(map[string]bool)
+		for _, u := range fleetUsers {
+			fleetRiderIds[u.RiderID] = true
+		}
+		for _, authUser := range authUsers {
+			username := authUser["username"].(string)
+			if !fleetRiderIds[username] {
+				combinedUsers = append(combinedUsers, map[string]any{
+					"riderId": username,
+					"name":    username,
+					"roles":   authUser["roles"],
+				})
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(combinedUsers)
+	})
+
 	// --- Health Check ---
 	http.HandleFunc("/api/health", withCORS(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "OK")
@@ -76,12 +123,13 @@ func main() {
 	http.HandleFunc("/api/fleet/bikes/", withCORS(authClient.RequireAuth(fleet.FleetBikeDetail)))
 
 	// --- User / Tag Routes ---
-	http.HandleFunc("/api/users", withCORS(authClient.RequireAuth(fleet.GetAllUsers)))
+	http.HandleFunc("/api/users", withCORS(combinedGetAllUsers))
+	http.HandleFunc("/api/users/", withCORS(authClient.RequireAuth(fleet.HandleUserDetail))) // PUT/DELETE for individual users
 	http.HandleFunc("/api/user/register", withCORS(fleet.RegisterUser))
 	http.HandleFunc("/api/user/roles/init", withCORS(fleet.InitializeUserRoles)) // Initial role setup after signup
-	http.HandleFunc("/api/user", withCORS(authClient.RequireAuth(fleet.GetUser)))                        // GET ?riderId=...
 	http.HandleFunc("/api/user/tags/add", withCORS(authClient.RequireAuth(fleet.AddTagToUser)))
 	http.HandleFunc("/api/user/tags/remove", withCORS(authClient.RequireAuth(fleet.RemoveTagFromUser)))
+	http.HandleFunc("/api/user", withCORS(authClient.RequireAuth(fleet.GetUser))) // GET ?riderId=... (generic, must come LAST)
 
 	// --- Events Routes ---
 	http.HandleFunc("/api/events", withCORS(authClient.RequireAuth(events.ListOrCreate)))
@@ -106,6 +154,7 @@ func main() {
 		// Example: protect register bike route with Cognito
 		http.HandleFunc("/api/bike/register", withCORS(authClient.RequireAuth(fleet.RegisterBike)))
 		http.HandleFunc("/api/me", withCORS(authClient.RequireAuth(authClient.MeHandler)))
+		http.HandleFunc("/api/auth/users", withCORS(authClient.RequireAuth(authClient.ListUsersHandler)))
 	} else {
 		http.HandleFunc("/api/auth/signup", withCORS(notConfigured("auth")))
 		http.HandleFunc("/api/auth/confirm", withCORS(notConfigured("auth")))

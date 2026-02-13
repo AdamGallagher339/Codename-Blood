@@ -454,6 +454,29 @@ func (a *AuthClient) MeHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ListUsersHandler returns all auth users (admin only)
+func (a *AuthClient) ListUsersHandler(w http.ResponseWriter, r *http.Request) {
+	if a.local {
+		a.usersMu.RLock()
+		list := make([]map[string]any, 0)
+		for _, u := range a.users {
+			list = append(list, map[string]any{
+				"username": u.Username,
+				"email":    u.Email,
+				"roles":    u.Roles,
+				"sub":      u.Sub,
+			})
+		}
+		a.usersMu.RUnlock()
+		writeJSON(w, http.StatusOK, list)
+		return
+	}
+
+	// For Cognito, this would need to call ListUsers API
+	// For now, return empty list
+	writeJSON(w, http.StatusOK, []map[string]any{})
+}
+
 func ClaimsFromContext(ctx context.Context) jwt.MapClaims {
 	if ctx == nil {
 		return nil
@@ -489,4 +512,21 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// GetAllAuthUsers returns all auth users as a slice of maps for serialization
+func (a *AuthClient) GetAllAuthUsers() []map[string]any {
+	a.usersMu.RLock()
+	defer a.usersMu.RUnlock()
+
+	result := make([]map[string]any, 0, len(a.users))
+	for _, u := range a.users {
+		result = append(result, map[string]any{
+			"username": u.Username,
+			"email":    u.Email,
+			"roles":    u.Roles,
+			"sub":      u.Sub,
+		})
+	}
+	return result
 }

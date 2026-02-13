@@ -1,9 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HttpClient, HttpHeaders } from '@angular/common/http';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
 import { EventsPageComponent } from './components/events-page.component';
 import { FleetTrackerComponent } from './components/fleet-tracker.component';
 import { finalize, filter } from 'rxjs';
@@ -146,45 +145,131 @@ export class App implements OnInit {
   }
 
   loadUsers(): void {
-    if (!this.auth.hasRole || !this.auth.hasRole('BloodBikeAdmin')) return;
+    if (!this.auth.hasRole || !this.auth.hasRole('BloodBikeAdmin')) {
+      console.log('User is not BloodBikeAdmin, skipping loadUsers');
+      return;
+    }
+    console.log('loadUsers: Fetching users from API');
     this.loadUsersBusy = true;
-    this.http.get('/api/users').subscribe({
+    
+    // Attach Authorization header using proper HttpHeaders
+    const token = this.auth.getIdToken() || this.auth.getAccessToken();
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    });
+    
+    this.http.get('/api/users', { headers }).subscribe({
       next: (res: any) => {
+        console.log('loadUsers success:', res);
         this.users = (res || []).map((u: any) => ({
           riderId: u.riderId,
-          name: u.name,
-          tags: u.tags || [],
-          editTags: [...(u.tags || [])],
+          name: u.name || u.riderId,
+          roles: new Set((u.tags || u.roles || []) as string[]),
+          originalRoles: new Set((u.tags || u.roles || []) as string[]),
         }));
+        console.log('Formatted users:', this.users);
         this.loadUsersBusy = false;
       },
-      error: () => {
+      error: (err: any) => {
+        console.error('loadUsers error:', err);
         this.users = [];
         this.loadUsersBusy = false;
       }
     });
   }
 
-  toggleEditTag(user: any, role: string): void {
-    const idx = (user.editTags || []).indexOf(role);
-    if (idx === -1) user.editTags.push(role);
-    else user.editTags.splice(idx, 1);
+  reloadAccounts(): void {
+    console.log('Reloading accounts...');
+    this.loadUsersBusy = true;
+    
+    const token = this.auth.getIdToken() || this.auth.getAccessToken();
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    });
+    
+    this.http.get('/api/users', { headers }).subscribe({
+      next: (res: any) => {
+        console.log('Accounts loaded successfully:', res);
+        this.users = (res || []).map((u: any) => ({
+          riderId: u.riderId,
+          name: u.name || u.riderId,
+          roles: new Set((u.tags || u.roles || []) as string[]),
+          originalRoles: new Set((u.tags || u.roles || []) as string[]),
+        }));
+        console.log('Formatted users:', this.users);
+        this.loadUsersBusy = false;
+      },
+      error: (err: any) => {
+        console.error('Failed to load accounts:', err);
+        this.users = [];
+        this.loadUsersBusy = false;
+      }
+    });
+  }
+
+  allRoles: string[] = ['BloodBikeAdmin', 'rider', 'fleet_manager', 'dispatcher'];
+
+  hasRole(user: any, role: string): boolean {
+    return user.roles.has(role);
+  }
+
+  toggleUserRole(user: any, role: string): void {
+    if (user.roles.has(role)) {
+      user.roles.delete(role);
+    } else {
+      user.roles.add(role);
+    }
+  }
+
+  isDirty(user: any): boolean {
+    if (user.roles.size !== user.originalRoles.size) return true;
+    for (const r of user.roles) {
+      if (!user.originalRoles.has(r)) return true;
+    }
+    return false;
   }
 
   saveUserRoles(user: any): void {
-    const orig = user.tags || [];
-    const updated = user.editTags || [];
-    const toAdd = updated.filter((r: string) => !orig.includes(r));
-    const toRemove = orig.filter((r: string) => !updated.includes(r));
+    const token = this.auth.getIdToken() || this.auth.getAccessToken();
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    });
 
-    const calls: any[] = [];
-    toAdd.forEach((r: string) => calls.push(this.http.post('/api/user/tags/add', { riderId: user.riderId, tag: r }).toPromise()));
-    toRemove.forEach((r: string) => calls.push(this.http.post('/api/user/tags/remove', { riderId: user.riderId, tag: r }).toPromise()));
+    const payload = {
+      roles: Array.from(user.roles)
+    };
 
-    Promise.all(calls).then(() => {
-      user.tags = [...user.editTags];
-    }).catch(() => {
-      // ignore errors for now
+    this.http.put(`/api/users/${encodeURIComponent(user.riderId)}`, payload, { headers }).subscribe({
+      next: () => {
+        console.log('User roles updated successfully');
+        user.originalRoles = new Set(user.roles);
+      },
+      error: (err) => {
+        console.error('Failed to update user roles:', err);
+        alert(`Failed to update roles: ${err.error?.message || err.message}`);
+      }
+    });
+  }
+
+  deleteUser(user: any): void {
+    if (!confirm(`Are you sure you want to delete user "${user.riderId}"?`)) {
+      return;
+    }
+
+    const token = this.auth.getIdToken() || this.auth.getAccessToken();
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    });
+
+    this.http.delete(`/api/users/${encodeURIComponent(user.riderId)}`, { headers }).subscribe({
+      next: () => {
+        console.log('User deleted:', user.riderId);
+        this.users = this.users.filter(u => u.riderId !== user.riderId);
+      },
+      error: (err) => {
+        console.error('Failed to delete user:', err);
+        alert(`Failed to delete user: ${err.error?.message || err.message}`);
+      }
     });
   }
 
