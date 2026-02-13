@@ -151,6 +151,20 @@
             <span>Location / Depot</span>
             <input [value]="bike.locationId" disabled />
           </label>
+          <div class="location-action">
+            <button class="btn btn-change-location" (click)="openLocationScanner()">Change Location</button>
+          </div>
+          @if (showLocationScanner()) {
+            <div class="location-scanner-overlay">
+              <div class="location-scanner-panel">
+                <div class="scanner-panel-header">
+                  <h4>📍 Scan Depot QR Code</h4>
+                  <button class="btn btn-outline btn-sm" (click)="cancelLocationScanner()">Cancel</button>
+                </div>
+                <app-qr-scanner (scanComplete)="onLocationScanned($event)"></app-qr-scanner>
+              </div>
+            </div>
+          }
           <label>
             <span>Status</span>
             <select [(ngModel)]="editActiveMode">

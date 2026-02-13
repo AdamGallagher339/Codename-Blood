@@ -108,6 +108,11 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if action == "change-location" {
+		handleChangeLocation(w, r, bikeID)
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		bike, ok, err := trackerStore.GetBike(r.Context(), bikeID)
@@ -193,6 +198,40 @@ func handleDeleteServiceEntry(w http.ResponseWriter, r *http.Request, bikeID str
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
+}
+
+func handleChangeLocation(w http.ResponseWriter, r *http.Request, bikeID string) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		LocationID string `json:"locationId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.LocationID) == "" {
+		http.Error(w, "locationId is required", http.StatusBadRequest)
+		return
+	}
+
+	bike, ok, err := trackerStore.GetBike(r.Context(), bikeID)
+	if err != nil {
+		http.Error(w, "failed to get bike", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		http.Error(w, "bike not found", http.StatusNotFound)
+		return
+	}
+
+	bike.LocationID = strings.TrimSpace(req.LocationID)
+	bike.UpdatedAt = time.Now()
+
+	if err := trackerStore.PutBike(r.Context(), bike); err != nil {
+		http.Error(w, "failed to update bike", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, bike)
 }
 
 func handleServiceHistory(w http.ResponseWriter, r *http.Request, bikeID string) {

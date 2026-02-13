@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { FleetTrackerService } from '../services/fleet-tracker.service';
 import { AuthService } from '../services/auth.service';
 import { FleetServiceType } from '../models/fleet-bike.model';
+import { QrScannerComponent } from './qr-scanner.component';
 
 @Component({
   selector: 'app-fleet-tracker',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, QrScannerComponent],
   templateUrl: './fleet-tracker.component.html',
   styleUrl: './fleet-tracker.component.scss'
 })
@@ -53,6 +54,9 @@ export class FleetTrackerComponent {
     if (!bike) return false;
     return this.deleteConfirm().trim() === bike.registration;
   });
+
+  // QR scanner state for location change
+  showLocationScanner = signal(false);
 
   // Service history form
   serviceType = signal<FleetServiceType>('oil');
@@ -143,6 +147,23 @@ export class FleetTrackerComponent {
     this.fleetService.deleteBike(bike.bikeId);
     this.selectedBikeId.set(null);
     this.deleteConfirm.set('');
+  }
+
+  openLocationScanner(): void {
+    this.showLocationScanner.set(true);
+  }
+
+  onLocationScanned(locationId: string): void {
+    const bike = this.selectedBike();
+    if (!bike) return;
+
+    this.fleetService.changeLocation(bike.bikeId, locationId);
+    this.editLocationId.set(locationId);
+    this.showLocationScanner.set(false);
+  }
+
+  cancelLocationScanner(): void {
+    this.showLocationScanner.set(false);
   }
 
   formatActive(value: string): string {

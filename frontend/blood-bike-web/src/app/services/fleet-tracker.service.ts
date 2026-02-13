@@ -150,6 +150,24 @@ export class FleetTrackerService {
       });
   }
 
+  changeLocation(bikeId: string, locationId: string): void {
+    this.http
+      .post<ApiFleetBike>(`/api/fleet/bikes/${bikeId}/change-location`, { locationId })
+      .pipe(
+        map((bike) => this.fromApiBike(bike)),
+        catchError((err) => {
+          console.error('Failed to change location', err);
+          return of(null);
+        })
+      )
+      .subscribe((bike) => {
+        if (!bike) return;
+        this.bikes.update((bikes) =>
+          bikes.map((item) => (item.bikeId === bikeId ? bike : item))
+        );
+      });
+  }
+
   private loadBikes(): void {
     this.http
       .get<ApiFleetBike[]>('/api/fleet/bikes')

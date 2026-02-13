@@ -430,6 +430,62 @@
   gap: var(--spacing-md);
 }
 
+// ===== CHANGE LOCATION BUTTON & SCANNER =====
+.location-action {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 2px;
+}
+
+.btn-change-location {
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: var(--border-radius-md);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #333;
+  }
+
+  &:active {
+    background: #000;
+  }
+}
+
+.location-scanner-overlay {
+  grid-column: 1 / -1;
+  background: var(--color-light-gray);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.location-scanner-panel {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.scanner-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  h4 {
+    margin: 0;
+    font-size: var(--font-size-md);
+  }
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: var(--font-size-sm);
+}
+
 // ===== SERVICE FORM =====
 .service-form {
   display: grid;
