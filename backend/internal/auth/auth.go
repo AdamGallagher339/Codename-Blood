@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	cognito "github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
+	"github.com/aws/smithy-go"
 	"github.com/golang-jwt/jwt/v5"
 	bolt "go.etcd.io/bbolt"
 )
@@ -445,12 +446,17 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Add SECRET_HASH if client has a secret
 	if a.clientSecret != "" {
-		input.AuthParameters["SECRET_HASH"] = a.computeSecretHash(body.Username)
+		hash := a.computeSecretHash(body.Username)
+		input.AuthParameters["SECRET_HASH"] = hash
+		log.Printf("SignIn with SECRET_HASH: username=%s hash=%s", body.Username, hash[:20]+"...")
+	} else {
+		log.Printf("SignIn without SECRET_HASH (no client secret configured)")
 	}
 
 	resp, err := a.client.InitiateAuth(r.Context(), input)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("signin failed: %v", err), http.StatusUnauthorized)
+		fmt.Printf("InitiateAuth err type=%T err=%v\n", err, err)
+		http.Error(w, fmt.Sprintf("signin failed: %s", awsErrString(err)), http.StatusUnauthorized)
 		return
 	}
 	if resp.AuthenticationResult == nil {
@@ -665,4 +671,13 @@ func (a *AuthClient) GetAllAuthUsers() []map[string]any {
 		})
 	}
 	return result
+}
+
+func awsErrString(err error) string {
+	// Most useful: Cognito error code + message
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		return fmt.Sprintf("%s: %s", apiErr.ErrorCode(), apiErr.ErrorMessage())
+	}
+	return err.Error()
 }
