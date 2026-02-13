@@ -343,23 +343,7 @@
 
   <!-- Footer -->
   <footer class="app-footer">
-    <ng-container *ngIf="auth.isLoggedIn(); else footerCopy">
-      <nav class="footer-nav" aria-label="Primary">
-        <button
-          *ngFor="let page of footerPages"
-          class="footer-tab"
-          [class.active]="currentPage === page.id"
-          (click)="navigateTo(page.id)"
-          [title]="page.title"
-        >
-          <span class="footer-icon">{{ page.icon }}</span>
-          <span class="footer-label">{{ page.title }}</span>
-        </button>
-      </nav>
-    </ng-container>
-    <ng-template #footerCopy>
-      <p>&copy; 2025 Blood Bike. All rights reserved.</p>
-    </ng-template>
+    <p>&copy; Copyright 2026. All Rights Reserved</p>
   </footer>
 </div>
 
