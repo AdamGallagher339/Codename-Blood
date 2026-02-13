@@ -59,8 +59,8 @@ func FleetListOrCreate(w http.ResponseWriter, r *http.Request) {
 			Registration: registration,
 			LocationID:   locationID,
 			Active:       active,
-			CreatedAt:  now,
-			UpdatedAt:  now,
+			CreatedAt:    now,
+			UpdatedAt:    now,
 		}
 
 		if err := trackerStore.PutBike(r.Context(), bike); err != nil {
@@ -216,13 +216,13 @@ func parseBikePath(path string) (string, string) {
 
 func validateCreateBike(req CreateFleetBikeRequest) error {
 	bike := FleetBike{
-		BikeID:     strings.TrimSpace(req.BikeID),
-		Make:       strings.TrimSpace(req.Make),
-		Model:      strings.TrimSpace(req.Model),
-		VehicleType: strings.ToLower(strings.TrimSpace(req.VehicleType)),
+		BikeID:       strings.TrimSpace(req.BikeID),
+		Make:         strings.TrimSpace(req.Make),
+		Model:        strings.TrimSpace(req.Model),
+		VehicleType:  strings.ToLower(strings.TrimSpace(req.VehicleType)),
 		Registration: strings.TrimSpace(req.Registration),
-		LocationID: strings.TrimSpace(req.LocationID),
-		Active:     strings.TrimSpace(req.Active),
+		LocationID:   strings.TrimSpace(req.LocationID),
+		Active:       strings.TrimSpace(req.Active),
 	}
 	return validateBike(bike, true)
 }

@@ -22,7 +22,7 @@ export const routes: Routes = [
   { path: 'dispatcher', component: DispatcherComponent, canActivate: [hasRoleGuard], data: { roles: ['Dispatcher'] } },
   
   // Fleet Manager Dashboard
-  { path: 'fleet', component: FleetManagerComponent, canActivate: [hasRoleGuard], data: { roles: ['FleetManager', 'BloodBikeAdmin'] } },
+  { path: 'fleet', component: FleetManagerComponent, canActivate: [hasRoleGuard], data: { roles: ['FleetManager', 'BloodBikeAdmin', 'Admin'] } },
   
   // Rider Jobs Page
   { path: 'jobs', component: RiderJobsComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider'] } },

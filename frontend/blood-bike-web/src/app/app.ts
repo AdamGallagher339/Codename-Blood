@@ -57,7 +57,7 @@ export class App implements OnInit {
     { id: 'scan', title: 'QR Scanner', icon: '📱', roles: ['Rider', 'FleetManager'] },
     { id: 'jobs', title: 'Jobs', icon: '📋', roles: ['Rider'] },
     { id: 'dispatcher', title: 'Dispatcher', icon: '📞', roles: ['Dispatcher'] },
-    { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager', 'BloodBikeAdmin'] },
+    { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager', 'BloodBikeAdmin', 'Admin'] },
     { id: 'events', title: 'Events', icon: '📆', roles: [] },
     { id: 'community-events', title: 'Community Events', icon: '🎉', roles: [] },
     { id: 'settings', title: 'Settings', icon: '⚙️', roles: [] },
@@ -80,17 +80,18 @@ export class App implements OnInit {
     // Check if user can access tracking based on their roles
     const userRoles = this.auth.roles();
     const trackingRoles = ['Rider', 'FleetManager', 'Dispatcher'];
+    const fleetRoles = ['FleetManager', 'BloodBikeAdmin', 'Admin'];
     const canAccessTracking = userRoles.some((role) => trackingRoles.includes(role));
+    const canAccessFleet = userRoles.some((role) => fleetRoles.includes(role));
 
     if (canAccessTracking) {
       this.currentPage = 'tracking';
       this.showRoutedView = true;
       this.router.navigate(['/tracking']);
-    } else if (userRoles.includes('BloodBikeAdmin')) {
-      // If user is admin but can't access tracking, go to admin-roles page instead
-      this.currentPage = 'admin-roles';
-      this.showRoutedView = false;
-      this.router.navigate(['/']);
+    } else if (canAccessFleet) {
+      this.currentPage = 'fleet';
+      this.showRoutedView = true;
+      this.router.navigate(['/fleet']);
     } else {
       // Default to home
       this.currentPage = 'home';
