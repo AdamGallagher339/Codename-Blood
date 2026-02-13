@@ -67,13 +67,13 @@ func main() {
 	}))
 
 	// --- Fleet Management Routes ---
-	http.HandleFunc("/api/bikes", withCORS(fleet.GetAllBikes))
-	http.HandleFunc("/api/ride/start", withCORS(fleet.StartRide))
-	http.HandleFunc("/api/ride/end", withCORS(fleet.EndRide))
+	http.HandleFunc("/api/bikes", withCORS(authClient.RequireAuth(fleet.GetAllBikes)))
+	http.HandleFunc("/api/ride/start", withCORS(authClient.RequireAuth(fleet.StartRide)))
+	http.HandleFunc("/api/ride/end", withCORS(authClient.RequireAuth(fleet.EndRide)))
 
 	// --- Fleet Tracker Routes (DynamoDB) ---
-	http.HandleFunc("/api/fleet/bikes", withCORS(fleet.FleetListOrCreate))
-	http.HandleFunc("/api/fleet/bikes/", withCORS(fleet.FleetBikeDetail))
+	http.HandleFunc("/api/fleet/bikes", withCORS(authClient.RequireAuth(fleet.FleetListOrCreate)))
+	http.HandleFunc("/api/fleet/bikes/", withCORS(authClient.RequireAuth(fleet.FleetBikeDetail)))
 
 	// --- User / Tag Routes ---
 	http.HandleFunc("/api/users", withCORS(authClient.RequireAuth(fleet.GetAllUsers)))
@@ -84,18 +84,18 @@ func main() {
 	http.HandleFunc("/api/user/tags/remove", withCORS(authClient.RequireAuth(fleet.RemoveTagFromUser)))
 
 	// --- Events Routes ---
-	http.HandleFunc("/api/events", withCORS(events.ListOrCreate))
-	http.HandleFunc("/api/events/", withCORS(events.GetUpdateOrDelete))
+	http.HandleFunc("/api/events", withCORS(authClient.RequireAuth(events.ListOrCreate)))
+	http.HandleFunc("/api/events/", withCORS(authClient.RequireAuth(events.GetUpdateOrDelete)))
 
 	// --- Tracking Routes ---
 	// HTTP endpoints for location updates
-	http.HandleFunc("/api/tracking/update", withCORS(tracking.HandleLocationUpdate))
-	http.HandleFunc("/api/tracking/locations", withCORS(tracking.HandleGetLocations))
-	http.HandleFunc("/api/tracking/entities", withCORS(tracking.HandleGetEntities))
+	http.HandleFunc("/api/tracking/update", withCORS(authClient.RequireAuth(tracking.HandleLocationUpdate)))
+	http.HandleFunc("/api/tracking/locations", withCORS(authClient.RequireAuth(tracking.HandleGetLocations)))
+	http.HandleFunc("/api/tracking/entities", withCORS(authClient.RequireAuth(tracking.HandleGetEntities)))
 
 	// WebSocket endpoint for real-time location updates
 	// Note: WebSocket upgrade doesn't need CORS wrapper
-	http.HandleFunc("/api/tracking/ws", tracking.HandleWebSocket)
+	http.HandleFunc("/api/tracking/ws", authClient.RequireAuth(tracking.HandleWebSocket))
 
 	// --- Auth routes (Cognito) ---
 	if authClient != nil {
