@@ -9,11 +9,14 @@ import (
 // so the Angular frontend doesn't break.
 
 type User struct {
-	RiderID   string    `json:"riderId"`
-	Name      string    `json:"name,omitempty"`
-	Email     string    `json:"email,omitempty"`
-	Tags      []string  `json:"tags,omitempty"`
-	UpdatedAt time.Time `json:"updatedAt,omitempty"`
+	RiderID        string    `json:"riderId"`
+	Name           string    `json:"name,omitempty"`
+	Email          string    `json:"email,omitempty"`
+	Tags           []string  `json:"tags,omitempty"`
+	Status         string    `json:"status,omitempty"`
+	AvailableUntil string    `json:"availableUntil,omitempty"`
+	CurrentJobID   string    `json:"currentJobId,omitempty"`
+	UpdatedAt      time.Time `json:"updatedAt,omitempty"`
 }
 
 type UsersRepository interface {

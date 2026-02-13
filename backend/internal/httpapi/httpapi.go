@@ -268,6 +268,139 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	mux.HandleFunc("/api/jobs", withCORS(listOrCreateJobs))
 	mux.HandleFunc("/api/jobs/", withCORS(jobDetail))
 
+	// --- Rider Availability Routes ---
+	riderAvailabilityList := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if dynamoRepos.Users == nil {
+			http.Error(w, "USERS_TABLE not configured", http.StatusNotImplemented)
+			return
+		}
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		users, err := dynamoRepos.Users.List(r.Context())
+		if err != nil {
+			log.Printf("op=ListRiderAvailability err=%v", err)
+			http.Error(w, "failed to list users", http.StatusInternalServerError)
+			return
+		}
+		// Filter to only riders (users with "Rider" tag/role)
+		now := time.Now().UTC()
+		riders := make([]map[string]any, 0)
+		for _, u := range users {
+			isRider := false
+			for _, tag := range u.Tags {
+				if strings.EqualFold(tag, "Rider") {
+					isRider = true
+					break
+				}
+			}
+			if !isRider {
+				continue
+			}
+			status := u.Status
+			if status == "" {
+				status = "offline"
+			}
+			// Auto-expire: if availableUntil is set and in the past, mark offline
+			if status == "available" && u.AvailableUntil != "" {
+				expiry, err := time.Parse(time.RFC3339, u.AvailableUntil)
+				if err == nil && now.After(expiry) {
+					status = "offline"
+					// Persist the expiry
+					u.Status = "offline"
+					u.AvailableUntil = ""
+					u.UpdatedAt = now
+					_ = dynamoRepos.Users.Put(r.Context(), &u)
+				}
+			}
+			riders = append(riders, map[string]any{
+				"riderId":        u.RiderID,
+				"name":           u.Name,
+				"status":         status,
+				"availableUntil": u.AvailableUntil,
+				"currentJobId":   u.CurrentJobID,
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(riders)
+	})
+
+	riderAvailabilityUpdate := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if dynamoRepos.Users == nil {
+			http.Error(w, "USERS_TABLE not configured", http.StatusNotImplemented)
+			return
+		}
+		if r.Method != http.MethodPut {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var body struct {
+			Status   string `json:"status"`
+			Duration int    `json:"duration"` // hours to stay available
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if body.Status != "available" && body.Status != "offline" {
+			http.Error(w, "status must be 'available' or 'offline'", http.StatusBadRequest)
+			return
+		}
+
+		// Get username from JWT
+		claims := auth.ClaimsFromContext(r.Context())
+		username := ""
+		if claims != nil {
+			if u, ok := claims["cognito:username"].(string); ok {
+				username = u
+			} else if u, ok := claims["username"].(string); ok {
+				username = u
+			}
+		}
+		if username == "" {
+			http.Error(w, "could not determine username", http.StatusUnauthorized)
+			return
+		}
+
+		user, found, err := dynamoRepos.Users.Get(r.Context(), username)
+		if err != nil {
+			log.Printf("op=UpdateAvailability err=%v", err)
+			http.Error(w, "failed to get user", http.StatusInternalServerError)
+			return
+		}
+		if !found {
+			// Auto-create user record if not found (rider may not have been registered)
+			user = &repo.User{RiderID: username, Name: username}
+		}
+
+		user.Status = body.Status
+		user.UpdatedAt = time.Now().UTC()
+
+		if body.Status == "available" && body.Duration > 0 {
+			user.AvailableUntil = time.Now().UTC().Add(time.Duration(body.Duration) * time.Hour).Format(time.RFC3339)
+		} else if body.Status == "offline" {
+			user.AvailableUntil = ""
+			user.CurrentJobID = ""
+		}
+
+		if err := dynamoRepos.Users.Put(r.Context(), user); err != nil {
+			log.Printf("op=UpdateAvailability err=%v", err)
+			http.Error(w, "failed to update availability", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"riderId":        user.RiderID,
+			"status":         user.Status,
+			"availableUntil": user.AvailableUntil,
+		})
+	})
+
+	mux.HandleFunc("/api/riders/availability", withCORS(riderAvailabilityList))
+	mux.HandleFunc("/api/riders/availability/me", withCORS(riderAvailabilityUpdate))
+
 	// --- Tracking Routes ---
 	// HTTP endpoints for location updates
 	mux.HandleFunc("/api/tracking/update", withCORS(authClient.RequireAuth(tracking.HandleLocationUpdate)))

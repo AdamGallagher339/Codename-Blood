@@ -67,6 +67,8 @@ export class App implements OnInit {
     { id: 'jobs', title: 'Jobs', icon: '📋', roles: ['Rider'] },
     { id: 'dispatcher', title: 'Dispatcher', icon: '📞', roles: ['Dispatcher'] },
     { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager'] },
+    { id: 'active-riders', title: 'Active Riders', icon: '🏍️', roles: ['BloodBikeAdmin', 'FleetManager', 'Dispatcher'] },
+    { id: 'my-availability', title: 'My Availability', icon: '🟢', roles: ['Rider'] },
     { id: 'events', title: 'Events', icon: '📆', roles: [] },
     { id: 'admin-roles', title: 'Admin: Users', icon: '🧑‍💼', roles: ['BloodBikeAdmin'] }
   ];
@@ -78,6 +80,8 @@ export class App implements OnInit {
     'fleet',
     'jobs',
     'events',
+    'active-riders',
+    'my-availability',
     'settings',
     'access-denied'
   ]);

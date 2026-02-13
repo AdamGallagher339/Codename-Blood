@@ -9,6 +9,8 @@ import { RiderJobsComponent } from './components/rider-jobs.component';
 import { SettingsComponent } from './components/settings.component';
 import { AccessDeniedComponent } from './components/access-denied.component';
 import { BlankComponent } from './components/blank.component';
+import { ActiveRidersComponent } from './components/active-riders.component';
+import { RiderAvailabilityComponent } from './components/rider-availability.component';
 
 export const routes: Routes = [
   // Dashboard / Maps (available to Rider, Fleet Manager, Dispatcher)
@@ -26,6 +28,12 @@ export const routes: Routes = [
   // Rider Jobs Page
   { path: 'jobs', component: RiderJobsComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider'] } },
   
+  // Active Riders – admin, fleet manager, dispatcher
+  { path: 'active-riders', component: ActiveRidersComponent, canActivate: [hasRoleGuard], data: { roles: ['BloodBikeAdmin', 'FleetManager', 'Dispatcher'] } },
+
+  // Rider Availability – riders set their own status
+  { path: 'my-availability', component: RiderAvailabilityComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider'] } },
+
   // Events (available to all authenticated users)
   { path: 'events', component: EventsPageComponent },
   

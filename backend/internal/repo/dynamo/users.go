@@ -20,12 +20,15 @@ type usersRepo struct {
 }
 
 type userItem struct {
-	RiderID   string    `dynamodbav:"riderId,omitempty"`
-	UserID    string    `dynamodbav:"userId,omitempty"`
-	Name      string    `dynamodbav:"name,omitempty"`
-	Email     string    `dynamodbav:"email,omitempty"`
-	Tags      []string  `dynamodbav:"tags,omitempty"`
-	UpdatedAt time.Time `dynamodbav:"updatedAt,omitempty"`
+	RiderID        string    `dynamodbav:"riderId,omitempty"`
+	UserID         string    `dynamodbav:"userId,omitempty"`
+	Name           string    `dynamodbav:"name,omitempty"`
+	Email          string    `dynamodbav:"email,omitempty"`
+	Tags           []string  `dynamodbav:"tags,omitempty"`
+	Status         string    `dynamodbav:"status,omitempty"`
+	AvailableUntil string    `dynamodbav:"availableUntil,omitempty"`
+	CurrentJobID   string    `dynamodbav:"currentJobId,omitempty"`
+	UpdatedAt      time.Time `dynamodbav:"updatedAt,omitempty"`
 }
 
 func newUsersRepo(client *dynamodb.Client, tableName string) repo.UsersRepository {
@@ -49,11 +52,14 @@ func (r *usersRepo) List(ctx context.Context) ([]repo.User, error) {
 			riderID = it.UserID
 		}
 		users = append(users, repo.User{
-			RiderID:   riderID,
-			Name:      it.Name,
-			Email:     it.Email,
-			Tags:      it.Tags,
-			UpdatedAt: it.UpdatedAt,
+			RiderID:        riderID,
+			Name:           it.Name,
+			Email:          it.Email,
+			Tags:           it.Tags,
+			Status:         it.Status,
+			AvailableUntil: it.AvailableUntil,
+			CurrentJobID:   it.CurrentJobID,
+			UpdatedAt:      it.UpdatedAt,
 		})
 	}
 	return users, nil
@@ -86,7 +92,7 @@ func (r *usersRepo) Get(ctx context.Context, riderID string) (*repo.User, bool, 
 	if it.RiderID == "" {
 		it.RiderID = it.UserID
 	}
-	return &repo.User{RiderID: it.RiderID, Name: it.Name, Email: it.Email, Tags: it.Tags, UpdatedAt: it.UpdatedAt}, true, nil
+	return &repo.User{RiderID: it.RiderID, Name: it.Name, Email: it.Email, Tags: it.Tags, Status: it.Status, AvailableUntil: it.AvailableUntil, CurrentJobID: it.CurrentJobID, UpdatedAt: it.UpdatedAt}, true, nil
 }
 
 func (r *usersRepo) Put(ctx context.Context, u *repo.User) error {
@@ -106,12 +112,15 @@ func (r *usersRepo) Put(ctx context.Context, u *repo.User) error {
 	}
 
 	it := userItem{
-		RiderID:   u.RiderID,
-		UserID:    u.RiderID,
-		Name:      u.Name,
-		Email:     u.Email,
-		Tags:      u.Tags,
-		UpdatedAt: u.UpdatedAt,
+		RiderID:        u.RiderID,
+		UserID:         u.RiderID,
+		Name:           u.Name,
+		Email:          u.Email,
+		Tags:           u.Tags,
+		Status:         u.Status,
+		AvailableUntil: u.AvailableUntil,
+		CurrentJobID:   u.CurrentJobID,
+		UpdatedAt:      u.UpdatedAt,
 	}
 
 	item, err := attributevalue.MarshalMap(it)
