@@ -22,6 +22,13 @@ export class FleetTrackerComponent {
     this.bikes().find((bike) => bike.bikeId === this.selectedBikeId()) ?? null
   );
 
+  // UI state
+  showAddForm = signal(false);
+  activeTab = signal<'details' | 'service' | 'remove'>('details');
+  activeBikeCount = computed(() =>
+    this.bikes().filter(b => b.active !== 'off_duty' && b.active !== 'out_of_service').length
+  );
+
   // Create bike form
   make = signal('');
   model = signal('');
@@ -70,6 +77,7 @@ export class FleetTrackerComponent {
         this.editActiveRiderId.set(bike.active);
       }
       this.deleteConfirm.set('');
+      this.activeTab.set('details');
       this.fleetService.refreshServiceHistory(bikeId);
     }
   }

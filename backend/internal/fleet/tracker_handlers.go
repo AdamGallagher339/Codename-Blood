@@ -98,6 +98,11 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if action == "delete" {
+		handleDeleteBike(w, r, bikeID)
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		bike, ok, err := trackerStore.GetBike(r.Context(), bikeID)
@@ -163,14 +168,22 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, bike)
 	case http.MethodDelete:
-		if err := trackerStore.DeleteBike(r.Context(), bikeID); err != nil {
-			http.Error(w, "failed to delete bike", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
+		handleDeleteBike(w, r, bikeID)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func handleDeleteBike(w http.ResponseWriter, r *http.Request, bikeID string) {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if err := trackerStore.DeleteBike(r.Context(), bikeID); err != nil {
+		http.Error(w, "failed to delete bike", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
 func handleServiceHistory(w http.ResponseWriter, r *http.Request, bikeID string) {

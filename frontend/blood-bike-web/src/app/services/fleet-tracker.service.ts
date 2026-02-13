@@ -114,7 +114,7 @@ export class FleetTrackerService {
 
   deleteBike(bikeId: string): void {
     this.http
-      .delete(`/api/fleet/bikes/${bikeId}`)
+      .post(`/api/fleet/bikes/${bikeId}/delete`, {})
       .pipe(
         catchError((err) => {
           console.error('Failed to delete bike', err);

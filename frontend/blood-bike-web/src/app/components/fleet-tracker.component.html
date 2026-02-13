@@ -1,173 +1,268 @@
 <section class="fleet-tracker">
+  <!-- Page Header -->
   <header class="fleet-header">
-    <div>
-      <h2>🛠️ Fleet Tracker</h2>
-      <p>Register bikes, manage status, and track service history.</p>
+    <div class="header-top">
+      <div class="header-info">
+        <h2>🛠️ Fleet Tracker</h2>
+        <p>Register vehicles, manage status, and track service history.</p>
+      </div>
+      <div class="header-stats">
+        <div class="stat-chip">
+          <span class="stat-value">{{ bikes().length }}</span>
+          <span class="stat-label">Total</span>
+        </div>
+        <div class="stat-chip stat-active">
+          <span class="stat-value">{{ activeBikeCount() }}</span>
+          <span class="stat-label">Active</span>
+        </div>
+        <div class="stat-chip stat-inactive">
+          <span class="stat-value">{{ bikes().length - activeBikeCount() }}</span>
+          <span class="stat-label">Inactive</span>
+        </div>
+      </div>
     </div>
-    <div class="fleet-form">
-      <label>
-        <span>Make</span>
-        <input [(ngModel)]="make" placeholder="Honda" />
-      </label>
-      <label>
-        <span>Model</span>
-        <input [(ngModel)]="model" placeholder="Honda Pan European" />
-      </label>
-      <label>
-        <span>Type</span>
-        <select [(ngModel)]="vehicleType">
-          <option value="motorcycle">Motorcycle</option>
-          <option value="car">Car</option>
-        </select>
-      </label>
-      <label>
-        <span>Registration</span>
-        <input [(ngModel)]="registration" placeholder="12-D-12345" />
-      </label>
-      <label>
-        <span>Location ID</span>
-        <input [(ngModel)]="locationId" placeholder="Galway-Depot" />
-      </label>
-      <label>
-        <span>Active</span>
-        <select [(ngModel)]="activeMode">
-          <option value="off_duty">Off duty</option>
-          <option value="out_of_service">Out of service</option>
-          <option value="rider">Assigned to rider</option>
-        </select>
-      </label>
-      <label *ngIf="activeMode() === 'rider'">
-        <span>Rider UID</span>
-        <input [(ngModel)]="activeRiderId" placeholder="rider-123" />
-      </label>
-      <button class="primary" (click)="createBike()">Add bike</button>
+
+    <!-- Collapsible Add Form -->
+    <button class="toggle-form-btn" (click)="showAddForm.set(!showAddForm())">
+      <span>{{ showAddForm() ? '▾' : '▸' }} Add New Vehicle</span>
+    </button>
+    <div class="fleet-form" *ngIf="showAddForm()">
+      <div class="form-row">
+        <label>
+          <span>Make</span>
+          <input [(ngModel)]="make" placeholder="Honda" />
+        </label>
+        <label>
+          <span>Model</span>
+          <input [(ngModel)]="model" placeholder="Pan European" />
+        </label>
+        <label>
+          <span>Type</span>
+          <select [(ngModel)]="vehicleType">
+            <option value="motorcycle">🏍️ Motorcycle</option>
+            <option value="car">🚗 Car</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-row">
+        <label>
+          <span>Registration</span>
+          <input [(ngModel)]="registration" placeholder="12-D-12345" />
+        </label>
+        <label>
+          <span>Location / Depot</span>
+          <input [(ngModel)]="locationId" placeholder="Galway-Depot" />
+        </label>
+        <label>
+          <span>Status</span>
+          <select [(ngModel)]="activeMode">
+            <option value="off_duty">Off duty</option>
+            <option value="out_of_service">Out of service</option>
+            <option value="rider">Assigned to rider</option>
+          </select>
+        </label>
+        <label *ngIf="activeMode() === 'rider'">
+          <span>Rider UID</span>
+          <input [(ngModel)]="activeRiderId" placeholder="rider-123" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" (click)="createBike()">
+          ＋ Register Vehicle
+        </button>
+      </div>
     </div>
   </header>
 
+  <!-- Fleet Body -->
   <div class="fleet-body">
+    <!-- Bike List Panel -->
     <div class="fleet-list">
-      <h3>Fleet Bikes</h3>
-      <div class="bike-list">
+      <div class="panel-header">
+        <h3>Fleet Vehicles</h3>
+        <span class="badge">{{ bikes().length }}</span>
+      </div>
+
+      <div class="bike-list" *ngIf="bikes().length > 0">
         <button
           class="bike-card"
           *ngFor="let bike of bikes()"
           (click)="selectBike(bike.bikeId)"
           [class.active]="bike.bikeId === selectedBikeId()"
         >
-          <div class="bike-title">
-            <span class="bike-id">{{ bike.bikeId }}</span>
-            <span class="bike-model">{{ bike.model }}</span>
+          <div class="bike-card-left">
+            <span class="vehicle-icon">{{ bike.vehicleType === 'car' ? '🚗' : '🏍️' }}</span>
           </div>
-          <div class="bike-meta">
-            <span>Location: {{ bike.locationId }}</span>
-            <span>Status: {{ formatActive(bike.active) }}</span>
+          <div class="bike-card-center">
+            <span class="bike-model">{{ bike.make }} {{ bike.model }}</span>
+            <span class="bike-reg">{{ bike.registration }}</span>
+            <span class="bike-location">📍 {{ bike.locationId }}</span>
+          </div>
+          <div class="bike-card-right">
+            <span class="status-dot"
+              [class.status-active]="bike.active !== 'off_duty' && bike.active !== 'out_of_service'"
+              [class.status-off]="bike.active === 'off_duty'"
+              [class.status-oos]="bike.active === 'out_of_service'"
+            ></span>
+            <span class="status-label">{{ formatActive(bike.active) }}</span>
           </div>
         </button>
       </div>
+
+      <div class="empty-fleet" *ngIf="bikes().length === 0">
+        <span class="empty-icon">🏍️</span>
+        <p>No vehicles registered yet.</p>
+        <button class="btn btn-outline" (click)="showAddForm.set(true)">Add your first vehicle</button>
+      </div>
     </div>
 
+    <!-- Details Panel -->
     <div class="fleet-details" *ngIf="selectedBike() as bike">
-      <h3>Bike Details</h3>
-      <div class="details-grid">
-        <label>
-          <span>Make</span>
-          <input [(ngModel)]="editMake" />
-        </label>
-        <label>
-          <span>Model</span>
-          <input [(ngModel)]="editModel" />
-        </label>
-        <label>
-          <span>Type</span>
-          <select [(ngModel)]="editVehicleType">
-            <option value="motorcycle">Motorcycle</option>
-            <option value="car">Car</option>
-          </select>
-        </label>
-        <label>
-          <span>Registration</span>
-          <input [(ngModel)]="editRegistration" />
-        </label>
-        <label>
-          <span>Location ID</span>
-          <input [(ngModel)]="editLocationId" />
-        </label>
-        <label>
-          <span>Active</span>
-          <select [(ngModel)]="editActiveMode">
-            <option value="off_duty">Off duty</option>
-            <option value="out_of_service">Out of service</option>
-            <option value="rider">Assigned to rider</option>
-          </select>
-        </label>
-        <label *ngIf="editActiveMode() === 'rider'">
-          <span>Rider UID</span>
-          <input [(ngModel)]="editActiveRiderId" />
-        </label>
-        <button class="secondary" (click)="saveBike()">Save updates</button>
+      <!-- Bike Summary Banner -->
+      <div class="detail-banner">
+        <span class="banner-icon">{{ bike.vehicleType === 'car' ? '🚗' : '🏍️' }}</span>
+        <div class="banner-info">
+          <h3>{{ bike.make }} {{ bike.model }}</h3>
+          <span class="banner-reg">{{ bike.registration }}</span>
+        </div>
+        <span class="status-pill"
+          [class.status-active]="bike.active !== 'off_duty' && bike.active !== 'out_of_service'"
+          [class.status-off]="bike.active === 'off_duty'"
+          [class.status-oos]="bike.active === 'out_of_service'"
+        >{{ formatActive(bike.active) }}</span>
       </div>
 
-      <div class="service-section">
-        <div class="service-header">
-          <h4>Service History</h4>
-        </div>
-        <div class="service-form">
+      <!-- Tabs -->
+      <div class="detail-tabs">
+        <button class="tab" [class.active]="activeTab() === 'details'" (click)="activeTab.set('details')">Details</button>
+        <button class="tab" [class.active]="activeTab() === 'service'" (click)="activeTab.set('service')">Service History</button>
+        <button class="tab tab-danger" [class.active]="activeTab() === 'remove'" (click)="activeTab.set('remove')">Remove</button>
+      </div>
+
+      <!-- Details Tab -->
+      <div class="tab-content" *ngIf="activeTab() === 'details'">
+        <div class="details-grid">
           <label>
-            <span>Service type</span>
-            <select [(ngModel)]="serviceType">
-              <option value="oil">Oil</option>
-              <option value="chain">Chain</option>
-              <option value="tyres">Tyres</option>
-              <option value="brakes">Brakes</option>
-              <option value="coolant">Coolant</option>
+            <span>Make</span>
+            <input [(ngModel)]="editMake" />
+          </label>
+          <label>
+            <span>Model</span>
+            <input [(ngModel)]="editModel" />
+          </label>
+          <label>
+            <span>Type</span>
+            <select [(ngModel)]="editVehicleType">
+              <option value="motorcycle">🏍️ Motorcycle</option>
+              <option value="car">🚗 Car</option>
             </select>
           </label>
           <label>
-            <span>Service date</span>
-            <input type="date" [(ngModel)]="serviceDate" />
+            <span>Registration</span>
+            <input [(ngModel)]="editRegistration" />
           </label>
           <label>
-            <span>Performed by</span>
-            <input [(ngModel)]="servicePerformedBy" placeholder="Mechanic or rider" />
+            <span>Location / Depot</span>
+            <input [(ngModel)]="editLocationId" />
           </label>
-          <label class="notes">
-            <span>Notes</span>
-            <textarea [(ngModel)]="serviceNotes" rows="2" placeholder="Observations or parts used"></textarea>
+          <label>
+            <span>Status</span>
+            <select [(ngModel)]="editActiveMode">
+              <option value="off_duty">Off duty</option>
+              <option value="out_of_service">Out of service</option>
+              <option value="rider">Assigned to rider</option>
+            </select>
           </label>
-          <button class="primary" (click)="addServiceEntry()">Add service entry</button>
+          <label *ngIf="editActiveMode() === 'rider'">
+            <span>Rider UID</span>
+            <input [(ngModel)]="editActiveRiderId" />
+          </label>
         </div>
-
-        <div class="service-list">
-          <div class="service-card" *ngFor="let entry of (serviceHistory()[bike.bikeId] || [])">
-            <div>
-              <strong>{{ entry.serviceType | titlecase }}</strong>
-              <span class="service-date">{{ entry.serviceDate | date: 'mediumDate' }}</span>
-            </div>
-            <p *ngIf="entry.notes">{{ entry.notes }}</p>
-            <span *ngIf="entry.performedBy" class="service-meta">Performed by {{ entry.performedBy }}</span>
-          </div>
-          <p class="empty" *ngIf="(serviceHistory()[bike.bikeId] || []).length === 0">No service history yet.</p>
+        <div class="form-actions">
+          <button class="btn btn-primary" (click)="saveBike()">Save Changes</button>
         </div>
       </div>
 
-      <div class="danger-zone">
-        <h4>Remove bike</h4>
-        <p>Type the registration to confirm removal.</p>
-        <div class="danger-controls">
-          <input
-            [(ngModel)]="deleteConfirm"
-            placeholder="Enter registration"
-          />
-          <button class="danger" (click)="deleteBike()" [disabled]="!deleteMatchesRegistration()">
-            Remove bike
-          </button>
+      <!-- Service History Tab -->
+      <div class="tab-content" *ngIf="activeTab() === 'service'">
+        <div class="service-form">
+          <div class="form-row">
+            <label>
+              <span>Service type</span>
+              <select [(ngModel)]="serviceType">
+                <option value="oil">🛢️ Oil</option>
+                <option value="chain">⛓️ Chain</option>
+                <option value="tyres">🛞 Tyres</option>
+                <option value="brakes">🔧 Brakes</option>
+                <option value="coolant">💧 Coolant</option>
+              </select>
+            </label>
+            <label>
+              <span>Service date</span>
+              <input type="date" [(ngModel)]="serviceDate" />
+            </label>
+            <label>
+              <span>Performed by</span>
+              <input [(ngModel)]="servicePerformedBy" placeholder="Mechanic or rider" />
+            </label>
+          </div>
+          <label class="full-width">
+            <span>Notes</span>
+            <textarea [(ngModel)]="serviceNotes" rows="2" placeholder="Observations or parts used"></textarea>
+          </label>
+          <div class="form-actions">
+            <button class="btn btn-primary" (click)="addServiceEntry()">Add Service Entry</button>
+          </div>
+        </div>
+
+        <div class="service-timeline">
+          <div class="timeline-entry" *ngFor="let entry of (serviceHistory()[bike.bikeId] || [])">
+            <div class="timeline-dot"></div>
+            <div class="timeline-card">
+              <div class="timeline-header">
+                <strong>{{ entry.serviceType | titlecase }}</strong>
+                <span class="timeline-date">{{ entry.serviceDate | date: 'mediumDate' }}</span>
+              </div>
+              <p *ngIf="entry.notes" class="timeline-notes">{{ entry.notes }}</p>
+              <span *ngIf="entry.performedBy" class="timeline-meta">👤 {{ entry.performedBy }}</span>
+            </div>
+          </div>
+          <p class="empty-message" *ngIf="(serviceHistory()[bike.bikeId] || []).length === 0">
+            No service records yet. Add the first entry above.
+          </p>
+        </div>
+      </div>
+
+      <!-- Remove Tab -->
+      <div class="tab-content" *ngIf="activeTab() === 'remove'">
+        <div class="danger-zone">
+          <div class="danger-header">
+            <span class="danger-icon">⚠️</span>
+            <div>
+              <h4>Remove this vehicle</h4>
+              <p>This action cannot be undone. Type the registration <strong>{{ bike.registration }}</strong> to confirm.</p>
+            </div>
+          </div>
+          <div class="danger-controls">
+            <input
+              [(ngModel)]="deleteConfirm"
+              placeholder="Type registration to confirm"
+            />
+            <button class="btn btn-danger" (click)="deleteBike()" [disabled]="!deleteMatchesRegistration()">
+              Remove Vehicle
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="fleet-details empty" *ngIf="!selectedBike()">
-      <h3>Bike Details</h3>
-      <p>Select a bike to view and update service history.</p>
+    <!-- Empty State -->
+    <div class="fleet-details empty-details" *ngIf="!selectedBike()">
+      <div class="empty-state">
+        <span class="empty-icon-lg">🏍️</span>
+        <h3>Select a vehicle</h3>
+        <p>Choose a vehicle from the list to view details, manage service history, or update status.</p>
+      </div>
     </div>
   </div>
 </section>
