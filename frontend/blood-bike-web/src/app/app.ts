@@ -306,7 +306,7 @@ export class App implements OnInit {
     if (!this.auth.isLoggedIn()) return this.currentPage === 'welcome';
     const role = this.selectedRole;
     const normalized = role ? this.normalizeRole(role) : null;
-    if (normalized === 'bloodbikeadmin') return this.currentPage === 'admin-roles';
+    if (normalized === 'bloodbikeadmin') return this.currentPage === 'home';
     if (normalized === 'dispatcher') return this.currentPage === 'dispatcher';
     if (normalized === 'fleetmanager') return this.currentPage === 'fleet';
     if (normalized === 'rider') return this.currentPage === 'tracking';
@@ -327,7 +327,7 @@ export class App implements OnInit {
     const normalizedRole = role ? this.normalizeRole(role) : null;
 
     if (normalizedRole === 'bloodbikeadmin') {
-      this.currentPage = 'admin-roles';
+      this.currentPage = 'home';
       this.showRoutedView = false;
       this.router.navigate(['/']);
     } else if (normalizedRole === 'dispatcher') {
