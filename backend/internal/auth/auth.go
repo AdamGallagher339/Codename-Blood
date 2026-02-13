@@ -197,6 +197,48 @@ func (a *AuthClient) SetUserGroups(ctx context.Context, username string, groups 
 	return nil
 }
 
+// ListUsersInGroup returns the usernames of all users in a Cognito group.
+func (a *AuthClient) ListUsersInGroup(ctx context.Context, groupName string) ([]string, error) {
+	if a.local {
+		a.usersMu.RLock()
+		defer a.usersMu.RUnlock()
+		var out []string
+		for _, u := range a.users {
+			for _, r := range u.Roles {
+				if strings.EqualFold(r, groupName) {
+					out = append(out, u.Username)
+					break
+				}
+			}
+		}
+		return out, nil
+	}
+
+	var usernames []string
+	var nextToken *string
+	for {
+		input := &cognito.ListUsersInGroupInput{
+			UserPoolId: &a.userPoolID,
+			GroupName:  &groupName,
+			NextToken:  nextToken,
+		}
+		out, err := a.client.ListUsersInGroup(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("list users in group %s: %w", groupName, err)
+		}
+		for _, u := range out.Users {
+			if u.Username != nil {
+				usernames = append(usernames, *u.Username)
+			}
+		}
+		if out.NextToken == nil {
+			break
+		}
+		nextToken = out.NextToken
+	}
+	return usernames, nil
+}
+
 // NewLocalAuthClient returns an AuthClient configured for local development.
 // It creates an in-memory user store and a default admin user.
 func NewLocalAuthClient() *AuthClient {

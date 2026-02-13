@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-rider-availability',
@@ -83,7 +84,7 @@ export class RiderAvailabilityComponent implements OnInit, OnDestroy {
   isError = false;
   private timer: any;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private auth: AuthService) {}
 
   ngOnInit() {
     this.loadCurrent();
@@ -97,9 +98,11 @@ export class RiderAvailabilityComponent implements OnInit, OnDestroy {
   loadCurrent() {
     this.http.get<any[]>('/api/riders/availability').subscribe({
       next: riders => {
-        // Find ourselves — the backend uses the JWT username
-        // We'll just grab the status from the update response instead, 
-        // for now load from the list
+        const me = riders.find(r => r.riderId === this.auth.username());
+        if (me) {
+          this.currentStatus = me.status || 'offline';
+          this.expiresAt = me.availableUntil || null;
+        }
       }
     });
   }

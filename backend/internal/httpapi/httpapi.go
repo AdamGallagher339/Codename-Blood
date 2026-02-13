@@ -278,48 +278,68 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		users, err := dynamoRepos.Users.List(r.Context())
+
+		// Get all members of the Cognito "Rider" group
+		riderUsernames, err := authClient.ListUsersInGroup(r.Context(), "Rider")
 		if err != nil {
-			log.Printf("op=ListRiderAvailability err=%v", err)
+			log.Printf("op=ListRiderAvailability cognito err=%v", err)
+			http.Error(w, "failed to list riders", http.StatusInternalServerError)
+			return
+		}
+
+		// Build a map of DynamoDB availability data keyed by riderId
+		allUsers, err := dynamoRepos.Users.List(r.Context())
+		if err != nil {
+			log.Printf("op=ListRiderAvailability dynamo err=%v", err)
 			http.Error(w, "failed to list users", http.StatusInternalServerError)
 			return
 		}
-		// Filter to only riders (users with "Rider" tag/role)
+		byID := make(map[string]*repo.User, len(allUsers))
+		for i := range allUsers {
+			byID[allUsers[i].RiderID] = &allUsers[i]
+		}
+
 		now := time.Now().UTC()
-		riders := make([]map[string]any, 0)
-		for _, u := range users {
-			isRider := false
-			for _, tag := range u.Tags {
-				if strings.EqualFold(tag, "Rider") {
-					isRider = true
-					break
+		riders := make([]map[string]any, 0, len(riderUsernames))
+		for _, username := range riderUsernames {
+			u := byID[username]
+
+			status := "offline"
+			availableUntil := ""
+			currentJobID := ""
+			name := username
+
+			if u != nil {
+				if u.Name != "" {
+					name = u.Name
 				}
-			}
-			if !isRider {
-				continue
-			}
-			status := u.Status
-			if status == "" {
-				status = "offline"
-			}
-			// Auto-expire: if availableUntil is set and in the past, mark offline
-			if status == "available" && u.AvailableUntil != "" {
-				expiry, err := time.Parse(time.RFC3339, u.AvailableUntil)
-				if err == nil && now.After(expiry) {
+				status = u.Status
+				if status == "" {
 					status = "offline"
-					// Persist the expiry
-					u.Status = "offline"
-					u.AvailableUntil = ""
-					u.UpdatedAt = now
-					_ = dynamoRepos.Users.Put(r.Context(), &u)
+				}
+				availableUntil = u.AvailableUntil
+				currentJobID = u.CurrentJobID
+
+				// Auto-expire: if availableUntil is set and in the past, mark offline
+				if status == "available" && availableUntil != "" {
+					expiry, err := time.Parse(time.RFC3339, availableUntil)
+					if err == nil && now.After(expiry) {
+						status = "offline"
+						availableUntil = ""
+						u.Status = "offline"
+						u.AvailableUntil = ""
+						u.UpdatedAt = now
+						_ = dynamoRepos.Users.Put(r.Context(), u)
+					}
 				}
 			}
+
 			riders = append(riders, map[string]any{
-				"riderId":        u.RiderID,
-				"name":           u.Name,
+				"riderId":        username,
+				"name":           name,
 				"status":         status,
-				"availableUntil": u.AvailableUntil,
-				"currentJobId":   u.CurrentJobID,
+				"availableUntil": availableUntil,
+				"currentJobId":   currentJobID,
 			})
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -371,7 +391,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		}
 		if !found {
 			// Auto-create user record if not found (rider may not have been registered)
-			user = &repo.User{RiderID: username, Name: username}
+			user = &repo.User{RiderID: username, Name: username, Tags: []string{"Rider"}}
 		}
 
 		user.Status = body.Status
