@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, Subject, BehaviorSubject } from 'rxjs';
-import { LocationUpdate, TrackedEntity, WebSocketMessage } from '../models/location.model';
+import { Observable, Subject, BehaviorSubject, Subscription, interval, of } from 'rxjs';
+import { catchError, startWith, switchMap } from 'rxjs/operators';
+import { LocationUpdate, TrackedEntity } from '../models/location.model';
 
 @Injectable({
   providedIn: 'root'
@@ -11,13 +12,14 @@ export class LocationTrackingService {
   
   // API endpoints - uses proxy.conf.json in development
   private readonly API_BASE = '/api/tracking';
-  private readonly WS_PATH = '/api/tracking/ws';
   
-  // WebSocket connection
-  private ws: WebSocket | null = null;
+  // Polling (HTTP) instead of WebSockets (Lambda + API Gateway REST friendly)
+  private pollingSub: Subscription | null = null;
+  private lastSeenUpdatedAtByEntity = new Map<string, string>();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 3000; // 3 seconds
+  private readonly defaultPollMs = 3000;
   
   // Observable streams for real-time updates
   private locationUpdates$ = new Subject<LocationUpdate>();
@@ -46,92 +48,35 @@ export class LocationTrackingService {
   }
   
   /**
-   * Connect to WebSocket for real-time location updates
+   * Connect to tracking updates.
+   *
+   * Historically this used WebSockets, but for the Lambda + API Gateway deployment
+   * we use simple HTTP polling.
    */
   connectWebSocket(): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('WebSocket already connected');
+    if (this.pollingSub) {
       return;
     }
-    
-    this.connectionStatus$.next('connecting');
-    
-    try {
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}${this.WS_PATH}`;
 
-      this.ws = new WebSocket(wsUrl);
-      
-      this.ws.onopen = () => {
-        console.log('WebSocket connected');
-        this.connectionStatus$.next('connected');
-        this.reconnectAttempts = 0;
-      };
-      
-      this.ws.onmessage = (event) => {
-        try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          
-          if (message.type === 'initial' && message.locations) {
-            // Initial load of all locations
-            this.allLocations$.next(message.locations);
-            message.locations.forEach(loc => this.locationUpdates$.next(loc));
-          } else if (message.type === 'update' && message.location) {
-            // Single location update
-            this.locationUpdates$.next(message.location);
-            
-            // Update allLocations array
-            const currentLocations = this.allLocations$.value;
-            const index = currentLocations.findIndex(l => l.entityId === message.location!.entityId);
-            if (index >= 0) {
-              currentLocations[index] = message.location;
-            } else {
-              currentLocations.push(message.location);
-            }
-            this.allLocations$.next([...currentLocations]);
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
-      
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-      
-      this.ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        this.connectionStatus$.next('disconnected');
-        this.attemptReconnect();
-      };
-      
-    } catch (error) {
-      console.error('Error creating WebSocket:', error);
-      this.connectionStatus$.next('disconnected');
-      this.attemptReconnect();
-    }
+    this.connectionStatus$.next('connecting');
+    this.startPolling(this.defaultPollMs);
   }
   
   /**
-   * Disconnect from WebSocket
+   * Disconnect from tracking updates.
    */
   disconnectWebSocket(): void {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+    this.stopPolling();
     this.connectionStatus$.next('disconnected');
   }
   
   /**
-   * Send location update through WebSocket (if connected)
+   * Send location update (legacy name kept for compatibility).
    */
   sendLocationViaWebSocket(update: Partial<LocationUpdate>): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(update));
-    } else {
-      console.warn('WebSocket not connected, cannot send location');
-    }
+    this.updateLocation(update).subscribe({
+      error: (err) => console.error('Failed to send location update:', err),
+    });
   }
   
   /**
@@ -156,7 +101,7 @@ export class LocationTrackingService {
   }
   
   /**
-   * Attempt to reconnect to WebSocket with exponential backoff
+   * Attempt to reconnect polling with exponential backoff
    */
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -172,6 +117,51 @@ export class LocationTrackingService {
     setTimeout(() => {
       this.connectWebSocket();
     }, delay);
+  }
+
+  private startPolling(intervalMs: number): void {
+    this.pollingSub = interval(intervalMs)
+      .pipe(
+        startWith(0),
+        switchMap(() =>
+          this.getAllLocations().pipe(
+            catchError((err) => {
+              console.error('Polling error:', err);
+              this.connectionStatus$.next('disconnected');
+              this.stopPolling();
+              this.attemptReconnect();
+              return of<LocationUpdate[] | null>(null);
+            })
+          )
+        )
+      )
+      .subscribe((locations) => {
+        if (!locations) return;
+
+        this.connectionStatus$.next('connected');
+        this.applyPolledLocations(locations);
+      });
+  }
+
+  private stopPolling(): void {
+    if (this.pollingSub) {
+      this.pollingSub.unsubscribe();
+      this.pollingSub = null;
+    }
+  }
+
+  private applyPolledLocations(locations: LocationUpdate[]): void {
+    // Update snapshot
+    this.allLocations$.next(locations);
+
+    // Emit only changed locations to keep marker animation reasonable
+    for (const loc of locations) {
+      const previous = this.lastSeenUpdatedAtByEntity.get(loc.entityId);
+      if (!previous || previous !== loc.updatedAt) {
+        this.lastSeenUpdatedAtByEntity.set(loc.entityId, loc.updatedAt);
+        this.locationUpdates$.next(loc);
+      }
+    }
   }
   
   /**

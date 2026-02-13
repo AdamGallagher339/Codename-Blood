@@ -124,7 +124,10 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 
 	// WebSocket endpoint for real-time location updates
 	// Note: API Gateway REST proxy does not support WebSocket upgrades.
-	mux.HandleFunc("/api/tracking/ws", authClient.RequireAuth(tracking.HandleWebSocket))
+	// We intentionally disable this endpoint and rely on HTTP polling.
+	mux.HandleFunc("/api/tracking/ws", withCORS(authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "websocket tracking disabled; use HTTP polling (GET /api/tracking/locations)", http.StatusNotImplemented)
+	})))
 
 	// --- Auth routes (Cognito) ---
 	mux.HandleFunc("/api/auth/signup", withCORS(authClient.SignUpHandler))
