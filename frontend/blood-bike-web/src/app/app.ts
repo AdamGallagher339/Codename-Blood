@@ -439,7 +439,7 @@ export class App implements OnInit {
   submitChallenge(): void {
     this.busy = true;
     this.auth
-      .respondToChallenge(this.challengeNewPassword, this.challengeEmail)
+      .respondToChallenge(this.challengeNewPassword)
       .pipe(finalize(() => (this.busy = false)))
       .subscribe({
         next: () => {
