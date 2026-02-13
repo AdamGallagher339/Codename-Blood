@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -118,6 +119,34 @@ func (s *TrackerStore) ListServiceEntries(ctx context.Context, bikeID string) ([
 	return entries, nil
 }
 
+func (s *TrackerStore) FindBikeByRegistration(ctx context.Context, registration string) (*FleetBike, error) {
+	if strings.TrimSpace(registration) == "" {
+		return nil, nil
+	}
+
+	reg := strings.TrimSpace(registration)
+	out, err := s.client.Scan(ctx, &dynamodb.ScanInput{
+		TableName:        &s.bikesTable,
+		FilterExpression: awsString("Registration = :reg"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":reg": &types.AttributeValueMemberS{Value: reg},
+		},
+		Limit: awsInt32(1),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(out.Items) == 0 {
+		return nil, nil
+	}
+
+	var bike FleetBike
+	if err := attributevalue.UnmarshalMap(out.Items[0], &bike); err != nil {
+		return nil, err
+	}
+	return &bike, nil
+}
+
 func newServiceID() string {
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
@@ -133,3 +162,5 @@ func newBikeID() string {
 func awsString(value string) *string { return &value }
 
 func awsBool(value bool) *bool { return &value }
+
+func awsInt32(value int32) *int32 { return &value }

@@ -1,6 +1,7 @@
 package fleet
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -42,6 +43,12 @@ func FleetListOrCreate(w http.ResponseWriter, r *http.Request) {
 		if err := validateCreateBike(req, bikeID); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+		if trackerStore != nil {
+			if err := ensureUniqueRegistration(r.Context(), req.Registration, bikeID); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
 
 		make := strings.TrimSpace(req.Make)
@@ -134,6 +141,12 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.LocationID != nil {
 			bike.LocationID = strings.TrimSpace(*req.LocationID)
+		}
+		if trackerStore != nil {
+			if err := ensureUniqueRegistration(r.Context(), bike.Registration, bike.BikeID); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
 		if req.Active != nil {
 			bike.Active = strings.TrimSpace(*req.Active)
@@ -267,6 +280,22 @@ func validateServiceEntry(req CreateServiceEntryRequest) error {
 	}
 	if _, ok := validServiceTypes[req.ServiceType]; !ok {
 		return errors.New("invalid serviceType")
+	}
+	return nil
+}
+
+func ensureUniqueRegistration(ctx context.Context, registration string, currentBikeID string) error {
+	reg := strings.TrimSpace(registration)
+	if reg == "" || trackerStore == nil {
+		return nil
+	}
+
+	match, err := trackerStore.FindBikeByRegistration(ctx, reg)
+	if err != nil {
+		return errors.New("failed to validate registration")
+	}
+	if match != nil && match.BikeID != currentBikeID {
+		return errors.New("registration must be unique")
 	}
 	return nil
 }
