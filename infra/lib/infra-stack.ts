@@ -48,6 +48,36 @@ export class InfraStack extends Stack {
     });
 
     // ------------------------------
+    //      MAIN BACKEND TABLES
+    // ------------------------------
+    // These tables support the Go backend repo layer (USERS_TABLE, BIKES_TABLE, ...)
+
+    const usersTable = new dynamodb.Table(this, 'UsersTable', {
+      tableName: 'Users',
+      partitionKey: { name: 'riderId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+
+    const bikesTable = new dynamodb.Table(this, 'BikesTable', {
+      tableName: 'Bikes',
+      partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+
+    // Optional / forward-compat tables (backend code supports them but may not expose endpoints yet)
+    const depotsTable = new dynamodb.Table(this, 'DepotsTable', {
+      tableName: 'Depots',
+      partitionKey: { name: 'depotId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+
+    const jobsTable = new dynamodb.Table(this, 'JobsTable', {
+      tableName: 'Jobs',
+      partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+
+    // ------------------------------
     //      GET BIKES LAMBDA
     // ------------------------------
 
@@ -93,6 +123,29 @@ export class InfraStack extends Stack {
       generateSecret: false,
     });
 
+    // Cognito groups used for roles/authorization.
+    // NOTE: AdminAddUserToGroup/AdminRemoveUserFromGroup require groups to exist.
+    new cognito.CfnUserPoolGroup(this, 'GroupBloodBikeAdmin', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'BloodBikeAdmin',
+      description: 'Administrators',
+    });
+    new cognito.CfnUserPoolGroup(this, 'GroupRider', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'Rider',
+      description: 'Riders',
+    });
+    new cognito.CfnUserPoolGroup(this, 'GroupDispatcher', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'Dispatcher',
+      description: 'Dispatchers',
+    });
+    new cognito.CfnUserPoolGroup(this, 'GroupFleetManager', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'FleetManager',
+      description: 'Fleet managers',
+    });
+
     const api = new apigw.RestApi(this, 'FleetApi', {
         restApiName: 'BloodBike Fleet API',
       });
@@ -126,6 +179,12 @@ export class InfraStack extends Stack {
       new CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
       new CfnOutput(this, 'FleetBikesTableName', { value: fleetBikesTable.tableName });
       new CfnOutput(this, 'FleetServiceTableName', { value: fleetServiceTable.tableName });
+
+      // Outputs for backend integration
+      new CfnOutput(this, 'UsersTableName', { value: usersTable.tableName });
+      new CfnOutput(this, 'BikesTableName', { value: bikesTable.tableName });
+      new CfnOutput(this, 'DepotsTableName', { value: depotsTable.tableName });
+      new CfnOutput(this, 'JobsTableName', { value: jobsTable.tableName });
 
 
   }
