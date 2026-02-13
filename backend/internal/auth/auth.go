@@ -652,9 +652,68 @@ func (a *AuthClient) ListUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For Cognito, this would need to call ListUsers API
-	// For now, return empty list
-	writeJSON(w, http.StatusOK, []map[string]any{})
+	// For Cognito, call ListUsers API with pagination
+	var allUsers []map[string]any
+	var paginationToken *string
+	for {
+		out, err := a.client.ListUsers(r.Context(), &cognito.ListUsersInput{
+			UserPoolId:      &a.userPoolID,
+			PaginationToken: paginationToken,
+			Limit:           awsInt32Ptr(60),
+		})
+		if err != nil {
+			log.Printf("op=ListUsers err=%v", err)
+			http.Error(w, "failed to list users", http.StatusInternalServerError)
+			return
+		}
+		for _, u := range out.Users {
+			username := ""
+			email := ""
+			status := ""
+			if u.Username != nil {
+				username = *u.Username
+			}
+			if u.UserStatus != "" {
+				status = string(u.UserStatus)
+			}
+			for _, attr := range u.Attributes {
+				if attr.Name != nil && *attr.Name == "email" && attr.Value != nil {
+					email = *attr.Value
+				}
+			}
+			allUsers = append(allUsers, map[string]any{
+				"username": username,
+				"email":    email,
+				"status":   status,
+				"roles":    []string{},
+			})
+		}
+		if out.PaginationToken == nil {
+			break
+		}
+		paginationToken = out.PaginationToken
+	}
+
+	// Enrich with group membership
+	knownGroups := []string{"BloodBikeAdmin", "Rider", "FleetManager", "Dispatcher"}
+	userRoles := make(map[string][]string)
+	for _, g := range knownGroups {
+		members, err := a.ListUsersInGroup(r.Context(), g)
+		if err != nil {
+			log.Printf("op=ListUsersInGroup group=%s err=%v", g, err)
+			continue
+		}
+		for _, m := range members {
+			userRoles[m] = append(userRoles[m], g)
+		}
+	}
+	for i, u := range allUsers {
+		if roles, ok := userRoles[u["username"].(string)]; ok {
+			allUsers[i]["roles"] = roles
+		}
+	}
+
+	writeJSON(w, http.StatusOK, allUsers)
 }
 
 func ClaimsFromContext(ctx context.Context) jwt.MapClaims {
@@ -687,6 +746,8 @@ func extractBearer(r *http.Request) (string, error) {
 }
 
 func awsString(s string) *string { return &s }
+
+func awsInt32Ptr(v int32) *int32 { return &v }
 
 // RespondToChallengeHandler handles Cognito auth challenges (e.g. NEW_PASSWORD_REQUIRED).
 func (a *AuthClient) RespondToChallengeHandler(w http.ResponseWriter, r *http.Request) {
@@ -809,6 +870,12 @@ func (a *AuthClient) AdminCreateUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 	if body.Username == "" || body.Email == "" {
 		http.Error(w, "username and email required", http.StatusBadRequest)
+		return
+	}
+	// Cognito usernames must not contain whitespace
+	body.Username = strings.ReplaceAll(body.Username, " ", "")
+	if body.Username == "" {
+		http.Error(w, "username must not be empty or only whitespace", http.StatusBadRequest)
 		return
 	}
 	// Accept "password" as alias for "temporaryPassword"

@@ -488,6 +488,11 @@ export class App implements OnInit {
       this.adminMessage = 'username, email and password required';
       return;
     }
+    const username = this.adminUsername.trim();
+    if (/\s/.test(username)) {
+      this.adminMessage = 'Username cannot contain spaces';
+      return;
+    }
     if (this.adminRoles.length === 0) {
       this.adminMessage = 'at least one role must be selected';
       return;

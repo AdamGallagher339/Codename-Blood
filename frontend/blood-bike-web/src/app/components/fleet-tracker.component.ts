@@ -2,6 +2,7 @@ import { Component, computed, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FleetTrackerService } from '../services/fleet-tracker.service';
+import { AuthService } from '../services/auth.service';
 import { FleetServiceType } from '../models/fleet-bike.model';
 
 @Component({
@@ -13,6 +14,7 @@ import { FleetServiceType } from '../models/fleet-bike.model';
 })
 export class FleetTrackerComponent {
   private fleetService = inject(FleetTrackerService);
+  private authService = inject(AuthService);
 
   bikes = this.fleetService.getBikes();
   serviceHistory = this.fleetService.getServiceHistory();
@@ -56,7 +58,7 @@ export class FleetTrackerComponent {
   serviceType = signal<FleetServiceType>('oil');
   serviceDate = signal(this.getTodayString());
   serviceNotes = signal('');
-  servicePerformedBy = signal('');
+  servicePerformedBy = signal(this.authService.username());
 
   selectBike(bikeId: string): void {
     this.selectedBikeId.set(bikeId);
@@ -126,7 +128,7 @@ export class FleetTrackerComponent {
     });
 
     this.serviceNotes.set('');
-    this.servicePerformedBy.set('');
+    this.servicePerformedBy.set(this.authService.username());
   }
 
   deleteServiceEntry(bikeId: string, serviceId: string): void {
