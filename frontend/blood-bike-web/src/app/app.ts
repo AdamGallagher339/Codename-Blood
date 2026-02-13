@@ -147,23 +147,24 @@ export class App implements OnInit {
       console.log('User is not BloodBikeAdmin, skipping loadUsers');
       return;
     }
-    console.log('loadUsers: Fetching users from API');
+    console.log('loadUsers: Fetching users from Cognito');
     this.loadUsersBusy = true;
     
-    // Attach Authorization header using proper HttpHeaders
     const token = this.auth.getIdToken() || this.auth.getAccessToken();
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${token}`
     });
     
-    this.http.get('/api/users', { headers }).subscribe({
+    this.http.get('/api/auth/users', { headers }).subscribe({
       next: (res: any) => {
         console.log('loadUsers success:', res);
         this.users = (res || []).map((u: any) => ({
-          riderId: u.riderId,
-          name: u.name || u.riderId,
-          roles: new Set((u.tags || u.roles || []) as string[]),
-          originalRoles: new Set((u.tags || u.roles || []) as string[]),
+          riderId: u.username,
+          name: u.username,
+          email: u.email || '',
+          status: u.status || '',
+          roles: new Set((u.roles || []) as string[]),
+          originalRoles: new Set((u.roles || []) as string[]),
         }));
         console.log('Formatted users:', this.users);
         this.loadUsersBusy = false;
@@ -177,32 +178,7 @@ export class App implements OnInit {
   }
 
   reloadAccounts(): void {
-    console.log('Reloading accounts...');
-    this.loadUsersBusy = true;
-    
-    const token = this.auth.getIdToken() || this.auth.getAccessToken();
-    const headers = new HttpHeaders({
-      'Authorization': `Bearer ${token}`
-    });
-    
-    this.http.get('/api/users', { headers }).subscribe({
-      next: (res: any) => {
-        console.log('Accounts loaded successfully:', res);
-        this.users = (res || []).map((u: any) => ({
-          riderId: u.riderId,
-          name: u.name || u.riderId,
-          roles: new Set((u.tags || u.roles || []) as string[]),
-          originalRoles: new Set((u.tags || u.roles || []) as string[]),
-        }));
-        console.log('Formatted users:', this.users);
-        this.loadUsersBusy = false;
-      },
-      error: (err: any) => {
-        console.error('Failed to load accounts:', err);
-        this.users = [];
-        this.loadUsersBusy = false;
-      }
-    });
+    this.loadUsers();
   }
 
   allRoles: string[] = ['BloodBikeAdmin', 'Rider', 'FleetManager', 'Dispatcher'];

@@ -288,12 +288,13 @@
             <div *ngIf="loadUsersBusy">Loading…</div>
             <table *ngIf="!loadUsersBusy">
               <thead>
-                <tr><th>Username</th><th>Name</th><th>Roles</th><th>Actions</th></tr>
+                <tr><th>Username</th><th>Email</th><th>Status</th><th>Roles</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 <tr *ngFor="let u of users">
                   <td>{{ u.riderId }}</td>
-                  <td><input [(ngModel)]="u.name" (blur)="http.post('/api/user/register',{ riderId: u.riderId, name: u.name }).subscribe()" /></td>
+                  <td>{{ u.email }}</td>
+                  <td>{{ u.status }}</td>
                   <td>
                     <button *ngFor="let r of allRoles" 
                             (click)="toggleUserRole(u,r)"

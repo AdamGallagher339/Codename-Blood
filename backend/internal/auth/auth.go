@@ -775,9 +775,78 @@ func (a *AuthClient) ListUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For Cognito, this would need to call ListUsers API
-	// For now, return empty list
-	writeJSON(w, http.StatusOK, []map[string]any{})
+	// List all users from Cognito User Pool
+	var allUsers []types.UserType
+	var paginationToken *string
+	for {
+		out, err := a.client.ListUsers(r.Context(), &cognito.ListUsersInput{
+			UserPoolId:      &a.userPoolID,
+			PaginationToken: paginationToken,
+		})
+		if err != nil {
+			log.Printf("op=ListUsers err=%v", err)
+			http.Error(w, "failed to list users", http.StatusInternalServerError)
+			return
+		}
+		allUsers = append(allUsers, out.Users...)
+		if out.PaginationToken == nil {
+			break
+		}
+		paginationToken = out.PaginationToken
+	}
+
+	// Build response with group membership for each user
+	list := make([]map[string]any, 0, len(allUsers))
+	for _, u := range allUsers {
+		username := ""
+		if u.Username != nil {
+			username = *u.Username
+		}
+		email := ""
+		sub := ""
+		for _, attr := range u.Attributes {
+			if attr.Name != nil && attr.Value != nil {
+				switch *attr.Name {
+				case "email":
+					email = *attr.Value
+				case "sub":
+					sub = *attr.Value
+				}
+			}
+		}
+
+		// Get groups for this user
+		var roles []string
+		groupsOut, err := a.client.AdminListGroupsForUser(r.Context(), &cognito.AdminListGroupsForUserInput{
+			UserPoolId: &a.userPoolID,
+			Username:   &username,
+		})
+		if err != nil {
+			log.Printf("op=AdminListGroupsForUser user=%s err=%v", username, err)
+		} else {
+			for _, g := range groupsOut.Groups {
+				if g.GroupName != nil {
+					roles = append(roles, *g.GroupName)
+				}
+			}
+		}
+
+		status := ""
+		if u.UserStatus != "" {
+			status = string(u.UserStatus)
+		}
+
+		list = append(list, map[string]any{
+			"username": username,
+			"email":    email,
+			"roles":    roles,
+			"sub":      sub,
+			"status":   status,
+			"enabled":  u.Enabled,
+			"created":  u.UserCreateDate,
+		})
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 func ClaimsFromContext(ctx context.Context) jwt.MapClaims {
