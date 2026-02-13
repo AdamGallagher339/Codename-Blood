@@ -341,12 +341,101 @@ func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := a.client.SignUp(r.Context(), input)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("signup failed: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("signup failed: %s", awsErrString(err)), http.StatusBadRequest)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "signup initiated"})
+}
+
+// AdminCreateUserHandler creates a user via Cognito AdminCreateUser (admin-only).
+// The user is auto-confirmed with a permanent password and added to groups.
+// Expects JSON: { "username": "u", "password": "p", "email": "e", "roles": ["Rider",...] }
+func (a *AuthClient) AdminCreateUserHandler(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Username string   `json:"username"`
+		Password string   `json:"password"`
+		Email    string   `json:"email"`
+		Roles    []string `json:"roles,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.Username == "" || body.Password == "" || body.Email == "" {
+		http.Error(w, "username, password and email required", http.StatusBadRequest)
+		return
+	}
+
+	if a.local {
+		a.usersMu.Lock()
+		defer a.usersMu.Unlock()
+		if _, ok := a.users[body.Username]; ok {
+			http.Error(w, "user exists", http.StatusConflict)
+			return
+		}
+		u := localUser{
+			Username: body.Username,
+			Password: body.Password,
+			Email:    body.Email,
+			Roles:    body.Roles,
+			Sub:      fmt.Sprintf("local-%s", body.Username),
+		}
+		a.users[body.Username] = u
+		_ = a.saveUserToDB(u)
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "user created (local)"})
+		return
+	}
+
+	// 1. Create the user in Cognito (admin API — no confirmation required)
+	createInput := &cognito.AdminCreateUserInput{
+		UserPoolId:    &a.userPoolID,
+		Username:      &body.Username,
+		MessageAction: types.MessageActionTypeSuppress, // Don't send welcome email
+		UserAttributes: []types.AttributeType{
+			{Name: awsString("email"), Value: &body.Email},
+			{Name: awsString("email_verified"), Value: awsString("true")},
+		},
+	}
+	_, err := a.client.AdminCreateUser(r.Context(), createInput)
+	if err != nil {
+		log.Printf("AdminCreateUser error: %s", awsErrString(err))
+		http.Error(w, fmt.Sprintf("create user failed: %s", awsErrString(err)), http.StatusBadRequest)
+		return
+	}
+
+	// 2. Set a permanent password so the user can sign in immediately
+	setPwInput := &cognito.AdminSetUserPasswordInput{
+		UserPoolId: &a.userPoolID,
+		Username:   &body.Username,
+		Password:   &body.Password,
+		Permanent:  true,
+	}
+	_, err = a.client.AdminSetUserPassword(r.Context(), setPwInput)
+	if err != nil {
+		log.Printf("AdminSetUserPassword error: %s", awsErrString(err))
+		http.Error(w, fmt.Sprintf("set password failed: %s", awsErrString(err)), http.StatusInternalServerError)
+		return
+	}
+
+	// 3. Add user to Cognito groups for each role
+	for _, role := range body.Roles {
+		groupInput := &cognito.AdminAddUserToGroupInput{
+			UserPoolId: &a.userPoolID,
+			Username:   &body.Username,
+			GroupName:  awsString(role),
+		}
+		_, err = a.client.AdminAddUserToGroup(r.Context(), groupInput)
+		if err != nil {
+			log.Printf("AdminAddUserToGroup role=%s error: %s", role, awsErrString(err))
+			// Continue adding other roles even if one fails
+		}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "user created"})
 }
 
 // ConfirmSignUpHandler expects JSON: { "username": "u", "code": "123456" }

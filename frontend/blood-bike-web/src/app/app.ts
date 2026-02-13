@@ -531,34 +531,33 @@ export class App implements OnInit {
     }
     this.adminBusy = true;
     this.adminMessage = null;
+
+    const token = this.auth.getIdToken() || this.auth.getAccessToken();
+    const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
+
     const payload = {
       username: this.adminUsername.trim(),
       password: this.adminPassword,
       email: this.adminEmail.trim(),
       roles: this.adminRoles
     };
-    console.log('Creating auth user with payload:', payload);
-    // Create auth user (Cognito or local)
-    this.http.post('/api/auth/signup', payload).subscribe({
+
+    // 1. Create Cognito user (admin API — auto-confirmed with permanent password + groups)
+    this.http.post('/api/auth/admin/create-user', payload, { headers }).subscribe({
       next: () => {
-        console.log('Auth user created successfully');
-        // create fleet user record
-        const u = { riderId: this.adminUsername.trim(), name: this.adminUsername.trim() };
-        console.log('Registering fleet user with payload:', u);
-        this.http.post('/api/user/register', u).subscribe({
+        // 2. Create fleet user record in DynamoDB
+        const fleetUser = { riderId: this.adminUsername.trim(), name: this.adminUsername.trim() };
+        this.http.post('/api/user/register', fleetUser, { headers }).subscribe({
           next: () => {
-            console.log('Fleet user registered successfully');
-            // Initialize all selected roles in one call
-            console.log('Initializing roles:', this.adminRoles);
-            this.http.post('/api/user/roles/init', { riderId: this.adminUsername.trim(), roles: this.adminRoles }).subscribe({
+            // 3. Initialize roles in DynamoDB (tags) + sync to Cognito groups
+            this.http.post('/api/user/roles/init', { riderId: this.adminUsername.trim(), roles: this.adminRoles }, { headers }).subscribe({
               next: () => {
-                console.log('User roles initialized successfully');
                 this.adminMessage = 'Account created successfully';
                 this.adminBusy = false;
                 this.adminUsername = '';
                 this.adminEmail = '';
                 this.adminPassword = '';
-                this.adminRoles = ['BloodBikeAdmin']; // Reset to default
+                this.adminRoles = ['BloodBikeAdmin'];
                 this.adminRoleSelection = {
                   'BloodBikeAdmin': true,
                   'Rider': false,
@@ -569,22 +568,24 @@ export class App implements OnInit {
               },
               error: (err) => {
                 console.error('Failed to initialize roles:', err);
-                this.adminMessage = `Created user but failed to assign roles`;
+                this.adminMessage = 'Created user but failed to assign roles in fleet DB';
                 this.adminBusy = false;
+                this.loadUsers();
               }
             });
           },
           error: (err) => {
-            console.error('Fleet user registration error:', {status: err.status, statusText: err.statusText, error: err.error});
+            console.error('Fleet user registration error:', err);
             const errorMsg = err.error?.message || err.error || err.statusText || `HTTP ${err.status}`;
-            this.adminMessage = `Failed to register fleet user: ${errorMsg}`;
+            this.adminMessage = `Created auth user but failed to register fleet profile: ${errorMsg}`;
             this.adminBusy = false;
           }
         });
       },
-      error: (_err) => {
-        console.error('Auth signup error:', {status: _err.status, statusText: _err.statusText, error: _err.error});
-        this.adminMessage = `Account signup failed: ${_err.error?.message || _err.statusText || 'unknown error'}`;
+      error: (err) => {
+        console.error('Admin create user error:', err);
+        const errorMsg = typeof err.error === 'string' ? err.error : (err.error?.message || err.statusText || 'unknown error');
+        this.adminMessage = `Create user failed: ${errorMsg}`;
         this.adminBusy = false;
       }
     });
