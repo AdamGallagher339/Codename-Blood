@@ -14,6 +14,7 @@ import (
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/fleet"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo/dynamo"
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo/memory"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/tracking"
 	"github.com/google/uuid"
 )
@@ -40,7 +41,20 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("dynamo repos not initialized: %w", err)
 	}
-	fleet.SetRepositories(dynamoRepos.Users, dynamoRepos.Bikes)
+
+	// Fall back to in-memory repos when DynamoDB tables are not configured (local dev).
+	var users repo.UsersRepository = dynamoRepos.Users
+	var bikes repo.BikesRepository = dynamoRepos.Bikes
+	if users == nil {
+		log.Println("USERS_TABLE not set – using in-memory users repo")
+		users = memory.NewUsersRepo()
+	}
+	if bikes == nil {
+		log.Println("BIKES_TABLE not set – using in-memory bikes repo")
+		bikes = memory.NewBikesRepo()
+	}
+
+	fleet.SetRepositories(users, bikes)
 	fleet.SetCognitoGroupManager(authClient)
 
 	trackerStore, err := fleet.NewTrackerStore(ctx)
