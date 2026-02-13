@@ -302,13 +302,49 @@ export class App implements OnInit {
     this.router.navigate(['/']);
   }
 
+  isOnHomePage(): boolean {
+    if (!this.auth.isLoggedIn()) return this.currentPage === 'welcome';
+    const role = this.selectedRole;
+    const normalized = role ? this.normalizeRole(role) : null;
+    if (normalized === 'bloodbikeadmin') return this.currentPage === 'admin-roles';
+    if (normalized === 'dispatcher') return this.currentPage === 'dispatcher';
+    if (normalized === 'fleetmanager') return this.currentPage === 'fleet';
+    if (normalized === 'rider') return this.currentPage === 'tracking';
+    return this.currentPage === 'home' || this.currentPage === 'welcome' || this.currentPage === 'tracking';
+  }
+
   goHomeOrWelcome(): void {
-    if (this.auth.isLoggedIn()) {
-      this.enterTracking();
-    } else {
+    if (!this.auth.isLoggedIn()) {
       this.currentPage = 'welcome';
       this.showRoutedView = false;
       this.router.navigate(['/']);
+      this.showSettings = false;
+      return;
+    }
+
+    // Navigate to the home page for the currently selected role
+    const role = this.selectedRole;
+    const normalizedRole = role ? this.normalizeRole(role) : null;
+
+    if (normalizedRole === 'bloodbikeadmin') {
+      this.currentPage = 'admin-roles';
+      this.showRoutedView = false;
+      this.router.navigate(['/']);
+    } else if (normalizedRole === 'dispatcher') {
+      this.currentPage = 'dispatcher';
+      this.showRoutedView = true;
+      this.router.navigate(['/dispatcher']);
+    } else if (normalizedRole === 'fleetmanager') {
+      this.currentPage = 'fleet';
+      this.showRoutedView = true;
+      this.router.navigate(['/fleet']);
+    } else if (normalizedRole === 'rider') {
+      this.currentPage = 'tracking';
+      this.showRoutedView = true;
+      this.router.navigate(['/tracking']);
+    } else {
+      // Fallback: use enterTracking for users with tracking access, otherwise home
+      this.enterTracking();
     }
     this.showSettings = false;
   }
@@ -447,35 +483,7 @@ export class App implements OnInit {
   }
 
   goBack(): void {
-    // Navigate to appropriate home page based on user roles
-    if (!this.auth.isLoggedIn()) {
-      this.currentPage = 'welcome';
-      this.showRoutedView = false;
-      this.router.navigate(['/']);
-    } else {
-      // For logged-in users, go to their landing page based on role
-      const userRoles = this.auth.roles();
-      const trackingRoles = ['Rider', 'FleetManager', 'Dispatcher'];
-      const canAccessTracking = userRoles.some((role) => trackingRoles.includes(role));
-
-      if (canAccessTracking) {
-        // Go to tracking for operational roles
-        this.currentPage = 'tracking';
-        this.showRoutedView = true;
-        this.router.navigate(['/tracking']);
-      } else if (userRoles.includes('BloodBikeAdmin')) {
-        // Go to admin-roles for admins
-        this.currentPage = 'admin-roles';
-        this.showRoutedView = false;
-        this.router.navigate(['/']);
-      } else {
-        // Default fallback
-        this.currentPage = 'home';
-        this.showRoutedView = false;
-        this.router.navigate(['/']);
-      }
-    }
-    this.showSettings = false;
+    this.goHomeOrWelcome();
   }
 
   private syncFromUrl(url: string): void {

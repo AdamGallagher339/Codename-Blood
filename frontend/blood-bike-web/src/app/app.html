@@ -51,7 +51,7 @@
             </button>
           </div>
         </div>
-        <div *ngIf="currentPage !== 'home' && currentPage !== 'welcome' && currentPage !== 'tracking'" class="header-actions">
+        <div *ngIf="!isOnHomePage()" class="header-actions">
           <button class="btn-back" (click)="goHomeOrWelcome()" title="Go back">
             ←
           </button>
