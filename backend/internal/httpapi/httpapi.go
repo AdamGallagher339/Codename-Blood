@@ -246,6 +246,34 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 				http.Error(w, "failed to update job", http.StatusInternalServerError)
 				return
 			}
+
+			// When a rider accepts a job, set their availability to "on-job"
+			if body.Status == "accepted" && body.AcceptedBy != "" && dynamoRepos.Users != nil {
+				rider, found, _ := dynamoRepos.Users.Get(r.Context(), body.AcceptedBy)
+				if !found {
+					rider = &repo.User{RiderID: body.AcceptedBy, Name: body.AcceptedBy, Tags: []string{"Rider"}}
+				}
+				rider.Status = "on-job"
+				rider.CurrentJobID = jobID
+				rider.UpdatedAt = time.Now().UTC()
+				if err := dynamoRepos.Users.Put(r.Context(), rider); err != nil {
+					log.Printf("op=UpdateRiderOnAccept rider=%s err=%v", body.AcceptedBy, err)
+				}
+			}
+
+			// When a job is completed/cancelled, set the rider back to available
+			if (body.Status == "completed" || body.Status == "cancelled") && job.AcceptedBy != "" && dynamoRepos.Users != nil {
+				rider, found, _ := dynamoRepos.Users.Get(r.Context(), job.AcceptedBy)
+				if found && rider.Status == "on-job" {
+					rider.Status = "available"
+					rider.CurrentJobID = ""
+					rider.UpdatedAt = time.Now().UTC()
+					if err := dynamoRepos.Users.Put(r.Context(), rider); err != nil {
+						log.Printf("op=UpdateRiderOnComplete rider=%s err=%v", job.AcceptedBy, err)
+					}
+				}
+			}
+
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(job)
 		case http.MethodDelete:
