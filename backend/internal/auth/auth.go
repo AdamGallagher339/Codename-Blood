@@ -462,8 +462,8 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 	if resp.AuthenticationResult == nil {
 		// Challenge required (e.g. NEW_PASSWORD_REQUIRED)
 		challenge := map[string]any{
-			"challengeName": string(resp.ChallengeName),
-			"session":       resp.Session,
+			"challenge": string(resp.ChallengeName),
+			"session":   resp.Session,
 		}
 		if resp.ChallengeParameters != nil {
 			challenge["challengeParameters"] = resp.ChallengeParameters
@@ -661,6 +661,8 @@ func (a *AuthClient) RespondToChallengeHandler(w http.ResponseWriter, r *http.Re
 		ChallengeName      string            `json:"challengeName"`
 		Session            string            `json:"session"`
 		Username           string            `json:"username"`
+		NewPassword        string            `json:"newPassword"`
+		Email              string            `json:"email"`
 		ChallengeResponses map[string]string `json:"challengeResponses"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -677,11 +679,22 @@ func (a *AuthClient) RespondToChallengeHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Build ChallengeResponses from flat fields if not provided directly
+	if body.ChallengeResponses == nil {
+		body.ChallengeResponses = make(map[string]string)
+	}
+	if body.NewPassword != "" {
+		body.ChallengeResponses["NEW_PASSWORD"] = body.NewPassword
+	}
+	if body.Username != "" {
+		body.ChallengeResponses["USERNAME"] = body.Username
+	}
+	if body.Email != "" {
+		body.ChallengeResponses["userAttributes.email"] = body.Email
+	}
+
 	// Add SECRET_HASH if client has a secret
 	if a.clientSecret != "" && body.Username != "" {
-		if body.ChallengeResponses == nil {
-			body.ChallengeResponses = make(map[string]string)
-		}
 		body.ChallengeResponses["SECRET_HASH"] = a.computeSecretHash(body.Username)
 	}
 
@@ -701,8 +714,8 @@ func (a *AuthClient) RespondToChallengeHandler(w http.ResponseWriter, r *http.Re
 	// Another challenge required
 	if resp.AuthenticationResult == nil {
 		challenge := map[string]any{
-			"challengeName": string(resp.ChallengeName),
-			"session":       resp.Session,
+			"challenge": string(resp.ChallengeName),
+			"session":   resp.Session,
 		}
 		if resp.ChallengeParameters != nil {
 			challenge["challengeParameters"] = resp.ChallengeParameters
@@ -741,10 +754,12 @@ func (a *AuthClient) AdminCreateUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	var body struct {
-		Username       string   `json:"username"`
-		Email          string   `json:"email"`
-		TemporaryPassword string `json:"temporaryPassword"`
-		Groups         []string `json:"groups"`
+		Username          string   `json:"username"`
+		Email             string   `json:"email"`
+		TemporaryPassword string   `json:"temporaryPassword"`
+		Password          string   `json:"password"`
+		Groups            []string `json:"groups"`
+		Roles             []string `json:"roles"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -753,6 +768,14 @@ func (a *AuthClient) AdminCreateUserHandler(w http.ResponseWriter, r *http.Reque
 	if body.Username == "" || body.Email == "" {
 		http.Error(w, "username and email required", http.StatusBadRequest)
 		return
+	}
+	// Accept "password" as alias for "temporaryPassword"
+	if body.TemporaryPassword == "" && body.Password != "" {
+		body.TemporaryPassword = body.Password
+	}
+	// Accept "roles" as alias for "groups"
+	if len(body.Groups) == 0 && len(body.Roles) > 0 {
+		body.Groups = body.Roles
 	}
 
 	if a.local {
@@ -791,9 +814,9 @@ func (a *AuthClient) AdminCreateUserHandler(w http.ResponseWriter, r *http.Reque
 		{Name: strPtr("email_verified"), Value: strPtr("true")},
 	}
 	createInput := &cognito.AdminCreateUserInput{
-		UserPoolId:         &a.userPoolID,
-		Username:           &body.Username,
-		UserAttributes:     attrs,
+		UserPoolId:             &a.userPoolID,
+		Username:               &body.Username,
+		UserAttributes:         attrs,
 		DesiredDeliveryMediums: []types.DeliveryMediumType{types.DeliveryMediumTypeEmail},
 	}
 	if body.TemporaryPassword != "" {
