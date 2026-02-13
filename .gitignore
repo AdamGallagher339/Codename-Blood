@@ -2,5 +2,11 @@
 .DS_Store
 .vscode/
 
+# Local env (do not commit secrets)
+backend/.env
+
+# Built binaries
+backend/backend
+
 # Local dev auth store
 data/users.db
