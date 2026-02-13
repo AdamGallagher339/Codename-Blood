@@ -73,7 +73,7 @@
         </div>
 
         <div class="auth-card">
-          <p class="auth-hint">New here? Create an account and confirm your email.</p>
+          <p class="auth-hint">Sign in with your account credentials. Contact an admin if you need an account.</p>
           <div class="auth-actions">
             <button class="primary" (click)="navigateAuth('login')">Login</button>
           </div>
@@ -259,8 +259,8 @@
                 <input [(ngModel)]="adminEmail" type="email" placeholder="you@example.com" />
               </label>
               <label>
-                <span>Password</span>
-                <input [(ngModel)]="adminPassword" type="password" placeholder="temporary password" />
+                <span>Temporary Password <small>(optional)</small></span>
+                <input [(ngModel)]="adminPassword" type="password" placeholder="leave blank to email one" />
               </label>
               <div class="field">
                 <span class="field-label">Roles</span>

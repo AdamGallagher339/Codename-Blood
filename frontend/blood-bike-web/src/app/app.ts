@@ -484,8 +484,8 @@ export class App implements OnInit {
   }
 
   createAccountByAdmin(): void {
-    if (!this.adminUsername || !this.adminPassword || !this.adminEmail) {
-      this.adminMessage = 'username, email and password required';
+    if (!this.adminUsername || !this.adminEmail) {
+      this.adminMessage = 'username and email required';
       return;
     }
     const username = this.adminUsername.trim();
@@ -503,12 +503,16 @@ export class App implements OnInit {
     const token = this.auth.getIdToken() || this.auth.getAccessToken();
     const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
 
-    const payload = {
+    const payload: Record<string, any> = {
       username: this.adminUsername.trim(),
-      password: this.adminPassword,
       email: this.adminEmail.trim(),
       roles: this.adminRoles
     };
+    // Only include temporaryPassword if the admin explicitly set one;
+    // otherwise Cognito will auto-generate one and email it to the user.
+    if (this.adminPassword) {
+      payload['password'] = this.adminPassword;
+    }
 
     // 1. Create Cognito user (admin API — auto-confirmed with permanent password + groups)
     this.http.post('/api/auth/admin/create-user', payload, { headers }).subscribe({
@@ -520,7 +524,9 @@ export class App implements OnInit {
             // 3. Initialize roles in DynamoDB (tags) + sync to Cognito groups
             this.http.post('/api/user/roles/init', { riderId: this.adminUsername.trim(), roles: this.adminRoles }, { headers }).subscribe({
               next: () => {
-                this.adminMessage = 'Account created successfully';
+                this.adminMessage = this.adminPassword
+                  ? 'Account created — user can sign in with the temporary password'
+                  : 'Account created — user will receive an email with a temporary password';
                 this.adminBusy = false;
                 this.adminUsername = '';
                 this.adminEmail = '';
