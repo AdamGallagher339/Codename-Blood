@@ -98,7 +98,7 @@ interface Job {
       </section>
     </div>
   `,
-  styles: [\`
+  styles: [`
     .page-container {
       padding: 20px;
       max-width: 1200px;
@@ -169,7 +169,7 @@ interface Job {
       text-align: left;
     }
     th { background: #f5f5f5; }
-  \`]
+  `]
 })
 export class RiderJobsComponent implements OnInit {
   riderStatus = 'available';
@@ -184,7 +184,7 @@ export class RiderJobsComponent implements OnInit {
 
   private getHeaders(): HttpHeaders {
     const token = this.auth.getIdToken() || this.auth.getAccessToken();
-    return new HttpHeaders({ 'Authorization': \`Bearer \${token}\` });
+    return new HttpHeaders({ 'Authorization': `Bearer ${token}` });
   }
 
   private get username(): string {
@@ -216,28 +216,28 @@ export class RiderJobsComponent implements OnInit {
 
   acceptJob(job: Job): void {
     const payload = { status: 'accepted', acceptedBy: this.username };
-    this.http.put<Job>(\`/api/jobs/\${job.jobId}\`, payload, { headers: this.getHeaders() }).subscribe({
+    this.http.put<Job>(`/api/jobs/${job.jobId}`, payload, { headers: this.getHeaders() }).subscribe({
       next: (updated) => {
         const idx = this.jobs.findIndex(j => j.jobId === job.jobId);
         if (idx >= 0) this.jobs[idx] = updated;
       },
       error: (err) => {
         console.error('Failed to accept job:', err);
-        alert(\`Failed to accept job: \${err.error || err.statusText}\`);
+        alert(`Failed to accept job: ${err.error || err.statusText}`);
       }
     });
   }
 
   completeJob(job: Job): void {
     const payload = { status: 'completed' };
-    this.http.put<Job>(\`/api/jobs/\${job.jobId}\`, payload, { headers: this.getHeaders() }).subscribe({
+    this.http.put<Job>(`/api/jobs/${job.jobId}`, payload, { headers: this.getHeaders() }).subscribe({
       next: (updated) => {
         const idx = this.jobs.findIndex(j => j.jobId === job.jobId);
         if (idx >= 0) this.jobs[idx] = updated;
       },
       error: (err) => {
         console.error('Failed to complete job:', err);
-        alert(\`Failed to complete job: \${err.error || err.statusText}\`);
+        alert(`Failed to complete job: ${err.error || err.statusText}`);
       }
     });
   }
