@@ -1001,6 +1001,36 @@ func (a *AuthClient) GetAllAuthUsers() []map[string]any {
 	return result
 }
 
+// DeleteUser removes a user from the Cognito user pool.
+func (a *AuthClient) DeleteUser(ctx context.Context, username string) error {
+	if username == "" {
+		return errors.New("username required")
+	}
+	if a.local {
+		a.usersMu.Lock()
+		delete(a.users, username)
+		a.usersMu.Unlock()
+		if a.db != nil {
+			_ = a.db.Update(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte("users"))
+				if b != nil {
+					return b.Delete([]byte(username))
+				}
+				return nil
+			})
+		}
+		return nil
+	}
+	_, err := a.client.AdminDeleteUser(ctx, &cognito.AdminDeleteUserInput{
+		UserPoolId: &a.userPoolID,
+		Username:   &username,
+	})
+	if err != nil {
+		return fmt.Errorf("delete cognito user %s: %w", username, err)
+	}
+	return nil
+}
+
 func awsErrString(err error) string {
 	// Most useful: Cognito error code + message
 	var apiErr smithy.APIError

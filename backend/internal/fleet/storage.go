@@ -13,6 +13,7 @@ var bikesRepo repo.BikesRepository
 // It is intentionally tiny so we can set it from main without importing auth here.
 type CognitoGroupManager interface {
 	SetUserGroups(ctx context.Context, username string, groups []string) error
+	DeleteUser(ctx context.Context, username string) error
 }
 
 var cognitoGroups CognitoGroupManager

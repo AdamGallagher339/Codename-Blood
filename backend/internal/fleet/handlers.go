@@ -3,6 +3,7 @@ package fleet
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -493,14 +494,20 @@ func handleDeleteUserRESTful(w http.ResponseWriter, r *http.Request, username st
 		return
 	}
 
-	deleted, err := repoUsers.Delete(r.Context(), username)
+	// Delete from Cognito first
+	if cognitoGroups != nil {
+		if err := cognitoGroups.DeleteUser(r.Context(), username); err != nil {
+			log.Printf("op=DeleteCognitoUser riderId=%s err=%v", username, err)
+			http.Error(w, fmt.Sprintf("failed to delete cognito user: %v", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Then delete from DynamoDB
+	_, err = repoUsers.Delete(r.Context(), username)
 	if err != nil {
 		log.Printf("op=DeleteUser riderId=%s err=%v", username, err)
-		http.Error(w, "failed to delete user", http.StatusInternalServerError)
-		return
-	}
-	if !deleted {
-		http.Error(w, "user not found", http.StatusNotFound)
+		http.Error(w, "failed to delete user from database", http.StatusInternalServerError)
 		return
 	}
 
