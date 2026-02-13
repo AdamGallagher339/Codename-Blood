@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -63,6 +64,17 @@ type TokensResponse struct {
 // NewAuthClient initializes an AuthClient using environment variables:
 // COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, AWS_REGION (optional)
 func NewAuthClient(ctx context.Context) (*AuthClient, error) {
+	// Local/dev mode shortcut (useful for local testing without Cognito).
+	//
+	// Supported flags:
+	// - AUTH_MODE=local
+	// - LOCAL_AUTH=1|true
+	mode := strings.TrimSpace(strings.ToLower(os.Getenv("AUTH_MODE")))
+	localFlag := strings.TrimSpace(strings.ToLower(os.Getenv("LOCAL_AUTH")))
+	if mode == "local" || localFlag == "1" || localFlag == "true" || localFlag == "yes" {
+		return NewLocalAuthClient(), nil
+	}
+
 	userPool := os.Getenv("COGNITO_USER_POOL_ID")
 	clientId := os.Getenv("COGNITO_CLIENT_ID")
 	region := os.Getenv("AWS_REGION")
