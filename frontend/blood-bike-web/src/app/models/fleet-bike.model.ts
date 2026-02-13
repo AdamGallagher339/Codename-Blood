@@ -1,6 +1,9 @@
 export interface FleetBike {
   bikeId: string;
+  make: string;
   model: string;
+  vehicleType: 'car' | 'motorcycle';
+  registration: string;
   locationId: string;
   active: string;
   createdAt: Date;
@@ -21,13 +24,19 @@ export interface ServiceEntry {
 
 export interface CreateFleetBikeDto {
   bikeId: string;
+  make: string;
   model: string;
+  vehicleType: 'car' | 'motorcycle';
+  registration: string;
   locationId: string;
   active: string;
 }
 
 export interface UpdateFleetBikeDto {
+  make?: string;
   model?: string;
+  vehicleType?: 'car' | 'motorcycle';
+  registration?: string;
   locationId?: string;
   active?: string;
 }

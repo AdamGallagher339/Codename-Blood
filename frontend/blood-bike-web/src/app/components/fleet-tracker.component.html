@@ -10,8 +10,23 @@
         <input [(ngModel)]="bikeId" placeholder="BB21-WES" />
       </label>
       <label>
+        <span>Make</span>
+        <input [(ngModel)]="make" placeholder="Honda" />
+      </label>
+      <label>
         <span>Model</span>
         <input [(ngModel)]="model" placeholder="Honda Pan European" />
+      </label>
+      <label>
+        <span>Type</span>
+        <select [(ngModel)]="vehicleType">
+          <option value="motorcycle">Motorcycle</option>
+          <option value="car">Car</option>
+        </select>
+      </label>
+      <label>
+        <span>Registration</span>
+        <input [(ngModel)]="registration" placeholder="12-D-12345" />
       </label>
       <label>
         <span>Location ID</span>
@@ -59,8 +74,23 @@
       <h3>Bike Details</h3>
       <div class="details-grid">
         <label>
+          <span>Make</span>
+          <input [(ngModel)]="editMake" />
+        </label>
+        <label>
           <span>Model</span>
           <input [(ngModel)]="editModel" />
+        </label>
+        <label>
+          <span>Type</span>
+          <select [(ngModel)]="editVehicleType">
+            <option value="motorcycle">Motorcycle</option>
+            <option value="car">Car</option>
+          </select>
+        </label>
+        <label>
+          <span>Registration</span>
+          <input [(ngModel)]="editRegistration" />
         </label>
         <label>
           <span>Location ID</span>

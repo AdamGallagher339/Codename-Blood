@@ -4,7 +4,10 @@ import "time"
 
 type FleetBike struct {
 	BikeID     string    `json:"bikeId" dynamodbav:"BikeID"`
+	Make       string    `json:"make" dynamodbav:"Make"`
 	Model      string    `json:"model" dynamodbav:"Model"`
+	VehicleType string   `json:"vehicleType" dynamodbav:"VehicleType"`
+	Registration string  `json:"registration" dynamodbav:"Registration"`
 	LocationID string    `json:"locationId" dynamodbav:"LocationID"`
 	Active     string    `json:"active" dynamodbav:"Active"`
 	CreatedAt  time.Time `json:"createdAt" dynamodbav:"CreatedAt"`
@@ -23,13 +26,19 @@ type ServiceEntry struct {
 
 type CreateFleetBikeRequest struct {
 	BikeID     string `json:"bikeId"`
+	Make       string `json:"make"`
 	Model      string `json:"model"`
+	VehicleType string `json:"vehicleType"`
+	Registration string `json:"registration"`
 	LocationID string `json:"locationId"`
 	Active     string `json:"active"`
 }
 
 type UpdateFleetBikeRequest struct {
+	Make       *string `json:"make,omitempty"`
 	Model      *string `json:"model,omitempty"`
+	VehicleType *string `json:"vehicleType,omitempty"`
+	Registration *string `json:"registration,omitempty"`
 	LocationID *string `json:"locationId,omitempty"`
 	Active     *string `json:"active,omitempty"`
 }
