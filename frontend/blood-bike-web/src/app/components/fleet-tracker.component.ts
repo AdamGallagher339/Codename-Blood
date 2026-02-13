@@ -35,8 +35,7 @@ export class FleetTrackerComponent {
   vehicleType = signal<'car' | 'motorcycle'>('motorcycle');
   registration = signal('');
   locationId = signal('');
-  activeMode = signal<'off_duty' | 'out_of_service' | 'rider'>('off_duty');
-  activeRiderId = signal('');
+  // Status is auto-set to out_of_service on creation (no user choice)
 
   // Edit bike form
   editMake = signal('');
@@ -83,13 +82,11 @@ export class FleetTrackerComponent {
   }
 
   createBike(): void {
-    const active = this.resolveActiveValue(this.activeMode(), this.activeRiderId());
     if (
       !this.make().trim() ||
       !this.model().trim() ||
       !this.registration().trim() ||
-      !this.locationId().trim() ||
-      !active
+      !this.locationId().trim()
     ) {
       return;
     }
@@ -100,7 +97,7 @@ export class FleetTrackerComponent {
       vehicleType: this.vehicleType(),
       registration: this.registration().trim(),
       locationId: this.locationId().trim(),
-      active
+      active: 'out_of_service'
     });
 
     this.make.set('');
@@ -108,8 +105,7 @@ export class FleetTrackerComponent {
     this.vehicleType.set('motorcycle');
     this.registration.set('');
     this.locationId.set('');
-    this.activeMode.set('off_duty');
-    this.activeRiderId.set('');
+    this.showAddForm.set(false);
   }
 
   saveBike(): void {
@@ -130,8 +126,6 @@ export class FleetTrackerComponent {
     this.fleetService.updateBike(bike.bikeId, {
       make: this.editMake().trim(),
       model: this.editModel().trim(),
-      vehicleType: this.editVehicleType(),
-      registration: this.editRegistration().trim(),
       locationId: this.editLocationId().trim(),
       active,
     });

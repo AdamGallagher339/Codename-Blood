@@ -53,19 +53,8 @@
           <span>Location / Depot</span>
           <input [(ngModel)]="locationId" placeholder="Galway-Depot" />
         </label>
-        <label>
-          <span>Status</span>
-          <select [(ngModel)]="activeMode">
-            <option value="off_duty">Off duty</option>
-            <option value="out_of_service">Out of service</option>
-            <option value="rider">Assigned to rider</option>
-          </select>
-        </label>
-        <label *ngIf="activeMode() === 'rider'">
-          <span>Rider UID</span>
-          <input [(ngModel)]="activeRiderId" placeholder="rider-123" />
-        </label>
       </div>
+      <p class="form-hint">New vehicles are automatically set to <strong>Out of Service</strong> until cleared.</p>
       <div class="form-actions">
         <button class="btn btn-primary" (click)="createBike()">
           ＋ Register Vehicle
@@ -152,14 +141,11 @@
           </label>
           <label>
             <span>Type</span>
-            <select [(ngModel)]="editVehicleType">
-              <option value="motorcycle">🏍️ Motorcycle</option>
-              <option value="car">🚗 Car</option>
-            </select>
+            <input [value]="bike.vehicleType === 'car' ? '🚗 Car' : '🏍️ Motorcycle'" disabled />
           </label>
           <label>
             <span>Registration</span>
-            <input [(ngModel)]="editRegistration" />
+            <input [value]="bike.registration" disabled />
           </label>
           <label>
             <span>Location / Depot</span>

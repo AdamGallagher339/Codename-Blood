@@ -56,7 +56,7 @@ func FleetListOrCreate(w http.ResponseWriter, r *http.Request) {
 		vehicleType := strings.ToLower(strings.TrimSpace(req.VehicleType))
 		registration := strings.TrimSpace(req.Registration)
 		locationID := strings.TrimSpace(req.LocationID)
-		active := strings.TrimSpace(req.Active)
+		active := "out_of_service" // new vehicles always start out of service
 
 		now := time.Now()
 		bike := &FleetBike{
@@ -138,12 +138,7 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 		if req.Make != nil {
 			bike.Make = strings.TrimSpace(*req.Make)
 		}
-		if req.VehicleType != nil {
-			bike.VehicleType = strings.ToLower(strings.TrimSpace(*req.VehicleType))
-		}
-		if req.Registration != nil {
-			bike.Registration = strings.TrimSpace(*req.Registration)
-		}
+		// VehicleType and Registration are immutable after creation
 		if req.LocationID != nil {
 			bike.LocationID = strings.TrimSpace(*req.LocationID)
 		}
