@@ -149,6 +149,20 @@
           <p class="empty" *ngIf="(serviceHistory()[bike.bikeId] || []).length === 0">No service history yet.</p>
         </div>
       </div>
+
+      <div class="danger-zone">
+        <h4>Remove bike</h4>
+        <p>Type the registration to confirm removal.</p>
+        <div class="danger-controls">
+          <input
+            [(ngModel)]="deleteConfirm"
+            placeholder="Enter registration"
+          />
+          <button class="danger" (click)="deleteBike()" [disabled]="!deleteMatchesRegistration()">
+            Remove bike
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="fleet-details empty" *ngIf="!selectedBike()">

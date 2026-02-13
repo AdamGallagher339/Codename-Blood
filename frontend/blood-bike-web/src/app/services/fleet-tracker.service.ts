@@ -112,6 +112,26 @@ export class FleetTrackerService {
       });
   }
 
+  deleteBike(bikeId: string): void {
+    this.http
+      .delete(`/api/fleet/bikes/${bikeId}`)
+      .pipe(
+        catchError((err) => {
+          console.error('Failed to delete bike', err);
+          return of(null);
+        })
+      )
+      .subscribe((result) => {
+        if (result === null) return;
+        this.bikes.update((bikes) => bikes.filter((bike) => bike.bikeId !== bikeId));
+        this.serviceHistory.update((current) => {
+          const next = { ...current };
+          delete next[bikeId];
+          return next;
+        });
+      });
+  }
+
   private loadBikes(): void {
     this.http
       .get<ApiFleetBike[]>('/api/fleet/bikes')

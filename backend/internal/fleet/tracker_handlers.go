@@ -162,6 +162,12 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, bike)
+	case http.MethodDelete:
+		if err := trackerStore.DeleteBike(r.Context(), bikeID); err != nil {
+			http.Error(w, "failed to delete bike", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

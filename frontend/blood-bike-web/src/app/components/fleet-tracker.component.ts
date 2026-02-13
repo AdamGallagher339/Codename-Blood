@@ -40,6 +40,13 @@ export class FleetTrackerComponent {
   editActiveMode = signal<'off_duty' | 'out_of_service' | 'rider'>('off_duty');
   editActiveRiderId = signal('');
 
+  deleteConfirm = signal('');
+  deleteMatchesRegistration = computed(() => {
+    const bike = this.selectedBike();
+    if (!bike) return false;
+    return this.deleteConfirm().trim() === bike.registration;
+  });
+
   // Service history form
   serviceType = signal<FleetServiceType>('oil');
   serviceDate = signal(this.getTodayString());
@@ -62,6 +69,7 @@ export class FleetTrackerComponent {
         this.editActiveMode.set('rider');
         this.editActiveRiderId.set(bike.active);
       }
+      this.deleteConfirm.set('');
       this.fleetService.refreshServiceHistory(bikeId);
     }
   }
@@ -134,6 +142,16 @@ export class FleetTrackerComponent {
 
     this.serviceNotes.set('');
     this.servicePerformedBy.set('');
+  }
+
+  deleteBike(): void {
+    const bike = this.selectedBike();
+    if (!bike) return;
+    if (!this.deleteMatchesRegistration()) return;
+
+    this.fleetService.deleteBike(bike.bikeId);
+    this.selectedBikeId.set(null);
+    this.deleteConfirm.set('');
   }
 
   formatActive(value: string): string {

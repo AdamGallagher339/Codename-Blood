@@ -99,6 +99,16 @@ func (s *TrackerStore) AddServiceEntry(ctx context.Context, entry *ServiceEntry)
 	return err
 }
 
+func (s *TrackerStore) DeleteBike(ctx context.Context, bikeID string) error {
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: &s.bikesTable,
+		Key: map[string]types.AttributeValue{
+			"BikeID": &types.AttributeValueMemberS{Value: bikeID},
+		},
+	})
+	return err
+}
+
 func (s *TrackerStore) ListServiceEntries(ctx context.Context, bikeID string) ([]ServiceEntry, error) {
 	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              &s.serviceTable,
