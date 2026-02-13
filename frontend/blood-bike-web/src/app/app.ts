@@ -119,7 +119,8 @@ export class App implements OnInit {
 
     this.auth.fetchMe().subscribe(() => {
       if (this.auth.isLoggedIn()) {
-        this.enterTracking();
+        this.currentPage = 'home';
+        this.showRoutedView = false;
       } else {
         this.currentPage = 'welcome';
         this.showRoutedView = false;
@@ -404,16 +405,19 @@ export class App implements OnInit {
       .pipe(finalize(() => (this.busy = false)))
       .subscribe({
         next: () => {
-          // Land on tracking after login.
-          this.enterTracking();
-          // populate user information (if fetch fails, AuthService will clear tokens)
+          // populate user information then go to home menu
           this.auth.fetchMe().subscribe({
             next: () => {
+              this.currentPage = 'home';
+              this.showRoutedView = false;
               // restore selected role if available
               const saved = localStorage.getItem('bb_selected_role');
               const roles = this.auth.roles();
               if (saved && roles.includes(saved)) this.selectedRole = saved;
               else if (roles.length > 0) this.selectedRole = roles[0];
+              if (this.auth.hasRole && this.auth.hasRole('BloodBikeAdmin')) {
+                this.loadUsers();
+              }
             },
             error: () => {
               // fetch failed — AuthService may have logged out; ensure we show login
@@ -438,9 +442,10 @@ export class App implements OnInit {
       .subscribe({
         next: () => {
           this.challengeNewPassword = '';
-          this.enterTracking();
           this.auth.fetchMe().subscribe({
             next: () => {
+              this.currentPage = 'home';
+              this.showRoutedView = false;
               const saved = localStorage.getItem('bb_selected_role');
               const roles = this.auth.roles();
               if (saved && roles.includes(saved)) this.selectedRole = saved;

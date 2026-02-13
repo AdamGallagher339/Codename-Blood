@@ -141,33 +141,13 @@ interface Job {
     }
     .accept-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .accept-btn:hover:not(:disabled) { background-color: #0056b3; }
-    .complete-btn {
-      padding: 6px 14px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .status-badge {
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 0.85em;
-      font-weight: 500;
-    }
+    .complete-btn { padding: 6px 14px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 0.85em; font-weight: 500; }
     .status-open { background: #fff3e0; color: #e65100; }
     .status-accepted { background: #e3f2fd; color: #1565c0; }
     .status-completed { background: #e8f5e9; color: #2e7d32; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: left;
-    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     th { background: #f5f5f5; }
   `]
 })

@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, signal, WritableSignal } from '@angular/core';
 import { catchError, map, of, switchMap, tap, throwError } from 'rxjs';
 
 export type AuthPage = 'welcome' | 'login' | 'signup' | 'confirm' | 'home';
@@ -48,7 +48,10 @@ export class AuthService {
   readonly user = signal<MeResponse | null>(null);
   readonly roles = computed(() => this.user()?.roles ?? []);
   readonly username = computed(() => this.user()?.username ?? '');
-  readonly isLoggedIn = computed(() => !!(this.getIdToken() || this.getAccessToken()));
+  private readonly _loggedIn: WritableSignal<boolean> = signal(
+    !!(localStorage.getItem(ID_TOKEN_KEY) || localStorage.getItem(ACCESS_TOKEN_KEY))
+  );
+  readonly isLoggedIn = this._loggedIn.asReadonly();
 
   readonly lastAuthError = signal<string | null>(null);
   readonly pendingChallenge = signal<ChallengeResponse | null>(null);
@@ -72,6 +75,7 @@ export class AuthService {
     localStorage.removeItem('bb_roles');
     this.user.set(null);
     this.lastAuthError.set(null);
+    this._loggedIn.set(false);
   }
 
   hasRole(role: string): boolean {
@@ -103,6 +107,7 @@ export class AuthService {
         if (tokens.accessToken) localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
         if (tokens.idToken) localStorage.setItem(ID_TOKEN_KEY, tokens.idToken);
         if (tokens.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+        this._loggedIn.set(true);
       }),
       map(() => true),
       catchError((err) => {
@@ -136,6 +141,7 @@ export class AuthService {
         if (tokens.idToken) localStorage.setItem(ID_TOKEN_KEY, tokens.idToken);
         if (tokens.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
         this.pendingChallenge.set(null);
+        this._loggedIn.set(true);
       }),
       map(() => true),
       catchError((err) => this.handleAuthError(err))
