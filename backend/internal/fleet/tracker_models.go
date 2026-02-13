@@ -3,12 +3,15 @@ package fleet
 import "time"
 
 type FleetBike struct {
-	BikeID     string    `json:"bikeId" dynamodbav:"BikeID"`
-	Model      string    `json:"model" dynamodbav:"Model"`
-	LocationID string    `json:"locationId" dynamodbav:"LocationID"`
-	Active     string    `json:"active" dynamodbav:"Active"`
-	CreatedAt  time.Time `json:"createdAt" dynamodbav:"CreatedAt"`
-	UpdatedAt  time.Time `json:"updatedAt" dynamodbav:"UpdatedAt"`
+	BikeID       string    `json:"bikeId" dynamodbav:"BikeID"`
+	Make         string    `json:"make" dynamodbav:"Make"`
+	Model        string    `json:"model" dynamodbav:"Model"`
+	VehicleType  string    `json:"vehicleType" dynamodbav:"VehicleType"`
+	Registration string    `json:"registration" dynamodbav:"Registration"`
+	LocationID   string    `json:"locationId" dynamodbav:"LocationID"`
+	Active       string    `json:"active" dynamodbav:"Active"`
+	CreatedAt    time.Time `json:"createdAt" dynamodbav:"CreatedAt"`
+	UpdatedAt    time.Time `json:"updatedAt" dynamodbav:"UpdatedAt"`
 }
 
 type ServiceEntry struct {
@@ -22,16 +25,21 @@ type ServiceEntry struct {
 }
 
 type CreateFleetBikeRequest struct {
-	BikeID     string `json:"bikeId"`
-	Model      string `json:"model"`
-	LocationID string `json:"locationId"`
-	Active     string `json:"active"`
+	Make         string `json:"make"`
+	Model        string `json:"model"`
+	VehicleType  string `json:"vehicleType"`
+	Registration string `json:"registration"`
+	LocationID   string `json:"locationId"`
+	Active       string `json:"active"`
 }
 
 type UpdateFleetBikeRequest struct {
-	Model      *string `json:"model,omitempty"`
-	LocationID *string `json:"locationId,omitempty"`
-	Active     *string `json:"active,omitempty"`
+	Make         *string `json:"make,omitempty"`
+	Model        *string `json:"model,omitempty"`
+	VehicleType  *string `json:"vehicleType,omitempty"`
+	Registration *string `json:"registration,omitempty"`
+	LocationID   *string `json:"locationId,omitempty"`
+	Active       *string `json:"active,omitempty"`
 }
 
 type CreateServiceEntryRequest struct {
@@ -42,9 +50,9 @@ type CreateServiceEntryRequest struct {
 }
 
 var validServiceTypes = map[string]struct{}{
-	"oil": {},
-	"chain": {},
-	"tyres": {},
-	"brakes": {},
+	"oil":     {},
+	"chain":   {},
+	"tyres":   {},
+	"brakes":  {},
 	"coolant": {},
 }

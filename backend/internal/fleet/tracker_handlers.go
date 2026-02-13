@@ -37,19 +37,31 @@ func FleetListOrCreate(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		if err := validateCreateBike(req); err != nil {
+
+		bikeID := newBikeID()
+		if err := validateCreateBike(req, bikeID); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
+		make := strings.TrimSpace(req.Make)
+		model := strings.TrimSpace(req.Model)
+		vehicleType := strings.ToLower(strings.TrimSpace(req.VehicleType))
+		registration := strings.TrimSpace(req.Registration)
+		locationID := strings.TrimSpace(req.LocationID)
+		active := strings.TrimSpace(req.Active)
+
 		now := time.Now()
 		bike := &FleetBike{
-			BikeID:     req.BikeID,
-			Model:      req.Model,
-			LocationID: req.LocationID,
-			Active:     req.Active,
-			CreatedAt:  now,
-			UpdatedAt:  now,
+			BikeID:       bikeID,
+			Make:         make,
+			Model:        model,
+			VehicleType:  vehicleType,
+			Registration: registration,
+			LocationID:   locationID,
+			Active:       active,
+			CreatedAt:    now,
+			UpdatedAt:    now,
 		}
 
 		if err := trackerStore.PutBike(r.Context(), bike); err != nil {
@@ -111,13 +123,22 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 		if req.Model != nil {
 			bike.Model = strings.TrimSpace(*req.Model)
 		}
+		if req.Make != nil {
+			bike.Make = strings.TrimSpace(*req.Make)
+		}
+		if req.VehicleType != nil {
+			bike.VehicleType = strings.ToLower(strings.TrimSpace(*req.VehicleType))
+		}
+		if req.Registration != nil {
+			bike.Registration = strings.TrimSpace(*req.Registration)
+		}
 		if req.LocationID != nil {
 			bike.LocationID = strings.TrimSpace(*req.LocationID)
 		}
 		if req.Active != nil {
 			bike.Active = strings.TrimSpace(*req.Active)
 		}
-		if err := validateBike(*bike); err != nil {
+		if err := validateBike(*bike, false); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -194,28 +215,45 @@ func parseBikePath(path string) (string, string) {
 	return bikeID, parts[1]
 }
 
-func validateCreateBike(req CreateFleetBikeRequest) error {
+func validateCreateBike(req CreateFleetBikeRequest, bikeID string) error {
 	bike := FleetBike{
-		BikeID:     strings.TrimSpace(req.BikeID),
-		Model:      strings.TrimSpace(req.Model),
-		LocationID: strings.TrimSpace(req.LocationID),
-		Active:     strings.TrimSpace(req.Active),
+		BikeID:       strings.TrimSpace(bikeID),
+		Make:         strings.TrimSpace(req.Make),
+		Model:        strings.TrimSpace(req.Model),
+		VehicleType:  strings.ToLower(strings.TrimSpace(req.VehicleType)),
+		Registration: strings.TrimSpace(req.Registration),
+		LocationID:   strings.TrimSpace(req.LocationID),
+		Active:       strings.TrimSpace(req.Active),
 	}
-	return validateBike(bike)
+	return validateBike(bike, true)
 }
 
-func validateBike(bike FleetBike) error {
+func validateBike(bike FleetBike, requireAll bool) error {
 	if bike.BikeID == "" {
 		return errors.New("bikeId required")
 	}
+	if requireAll && bike.Make == "" {
+		return errors.New("make required")
+	}
 	if bike.Model == "" {
 		return errors.New("model required")
+	}
+	if requireAll && bike.Registration == "" {
+		return errors.New("registration required")
+	}
+	if requireAll && bike.VehicleType == "" {
+		return errors.New("vehicleType required")
 	}
 	if bike.LocationID == "" {
 		return errors.New("locationId required")
 	}
 	if bike.Active == "" {
 		return errors.New("active required")
+	}
+	if bike.VehicleType != "" {
+		if bike.VehicleType != "car" && bike.VehicleType != "motorcycle" {
+			return errors.New("vehicleType must be car or motorcycle")
+		}
 	}
 	if bike.Active != "off_duty" && bike.Active != "out_of_service" && !activeUIDRegex.MatchString(bike.Active) {
 		return errors.New("active must be off_duty, out_of_service, or a rider UID")
