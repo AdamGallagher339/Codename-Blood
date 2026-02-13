@@ -9,20 +9,15 @@
       <div class="header-actions">
         <div class="user-pill" *ngIf="auth.user() as me">
           <span class="user-name">{{ me.username || me.email || me.sub }}</span>
-          <ng-container *ngIf="me.roles?.length">
-            <div class="role-bar">
-              <button
-                *ngFor="let r of me.roles"
-                class="role-pill"
-                [class.active]="r === selectedRole"
-                (click)="setRole(r)"
-                title="Switch role"
-              >
-                {{ r }}
-              </button>
-              <button class="role-pill clear" *ngIf="me.roles.length > 1" (click)="setRole(null)">All</button>
-            </div>
-          </ng-container>
+          <div class="role-bar" *ngIf="me.roles?.length">
+            <button
+              *ngFor="let r of me.roles"
+              class="role-chip"
+              [class.active]="r === selectedRole"
+              (click)="setRole(r)"
+            >{{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r }}</button>
+            <button class="role-chip all" *ngIf="me.roles.length > 1" [class.active]="!selectedRole" (click)="setRole(null)">All</button>
+          </div>
         </div>
         <!-- no guest mode: users must be created by admin -->
         <div class="settings-container">
@@ -250,69 +245,92 @@
         <h2>🧑‍💼 Admin: Users</h2>
       </div>
       <div class="page-content">
-        <div class="admin-grid">
-          <div class="auth-card">
+        <div class="admin-layout">
+          <!-- Create account card -->
+          <div class="admin-card create-card">
             <h3>Create account</h3>
-            <label>
-              <span>Username</span>
-              <input [(ngModel)]="adminUsername" placeholder="username" />
-            </label>
-            <label>
-              <span>Email</span>
-              <input [(ngModel)]="adminEmail" type="email" placeholder="you@example.com" />
-            </label>
-            <label>
-              <span>Password</span>
-              <input [(ngModel)]="adminPassword" type="password" placeholder="temporary password" />
-            </label>
-            <label>
-              <span>Roles</span>
-              <div class="roles-buttons">
-                <button class="role-btn" [ngClass]="{'selected': adminRoleSelection['BloodBikeAdmin']}" (click)="toggleRole('BloodBikeAdmin')">BloodBikeAdmin</button>
-                <button class="role-btn" [ngClass]="{'selected': adminRoleSelection['Rider']}" (click)="toggleRole('Rider')">Rider</button>
-                <button class="role-btn" [ngClass]="{'selected': adminRoleSelection['FleetManager']}" (click)="toggleRole('FleetManager')">Fleet Manager</button>
-                <button class="role-btn" [ngClass]="{'selected': adminRoleSelection['Dispatcher']}" (click)="toggleRole('Dispatcher')">Dispatcher</button>
+            <div class="form-stack">
+              <label>
+                <span>Username</span>
+                <input [(ngModel)]="adminUsername" placeholder="username" />
+              </label>
+              <label>
+                <span>Email</span>
+                <input [(ngModel)]="adminEmail" type="email" placeholder="you@example.com" />
+              </label>
+              <label>
+                <span>Password</span>
+                <input [(ngModel)]="adminPassword" type="password" placeholder="temporary password" />
+              </label>
+              <div class="field">
+                <span class="field-label">Roles</span>
+                <div class="roles-grid">
+                  <button class="role-toggle" [class.on]="adminRoleSelection['BloodBikeAdmin']" (click)="toggleRole('BloodBikeAdmin')">Admin</button>
+                  <button class="role-toggle" [class.on]="adminRoleSelection['Rider']" (click)="toggleRole('Rider')">Rider</button>
+                  <button class="role-toggle" [class.on]="adminRoleSelection['FleetManager']" (click)="toggleRole('FleetManager')">Fleet Mgr</button>
+                  <button class="role-toggle" [class.on]="adminRoleSelection['Dispatcher']" (click)="toggleRole('Dispatcher')">Dispatch</button>
+                </div>
               </div>
-            </label>
-            <div class="auth-actions">
-              <button class="primary" [disabled]="adminBusy" (click)="createAccountByAdmin()">{{ adminBusy ? 'Creating…' : 'Create account' }}</button>
+              <button class="btn-create" [disabled]="adminBusy" (click)="createAccountByAdmin()">{{ adminBusy ? 'Creating…' : 'Create account' }}</button>
+              <p *ngIf="adminMessage" class="form-msg">{{ adminMessage }}</p>
             </div>
-            <p *ngIf="adminMessage" class="auth-hint">{{ adminMessage }}</p>
           </div>
 
-          <div class="users-card">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
+          <!-- Manage accounts -->
+          <div class="admin-card users-list-card">
+            <div class="card-header">
               <h3>Manage accounts</h3>
-              <button (click)="reloadAccounts()" style="padding:8px 16px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">↻ Reload Accounts</button>
+              <button class="btn-reload" (click)="reloadAccounts()">↻ Reload</button>
             </div>
-            <div *ngIf="loadUsersBusy">Loading…</div>
-            <table *ngIf="!loadUsersBusy">
-              <thead>
-                <tr><th>Username</th><th>Email</th><th>Status</th><th>Roles</th><th>Actions</th></tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let u of users">
-                  <td>{{ u.riderId }}</td>
-                  <td>{{ u.email }}</td>
-                  <td>{{ u.status }}</td>
-                  <td>
-                    <button *ngFor="let r of allRoles" 
-                            (click)="toggleUserRole(u,r)"
-                            [style.background]="hasRole(u, r) ? '#66bb6a' : '#ffcccc'"
-                            [style.color]="'#000'"
-                            [style.border]="'none'"
-                            [style.padding]="'6px 12px'"
-                            [style.margin]="'4px 4px'"
-                            [style.border-radius]="'4px'"
-                            [style.cursor]="'pointer'"
-                            [style.font-weight]="'500'">
-                      {{ r }}
-                    </button>
-                  </td>
-                  <td><button (click)="saveUserRoles(u)" [disabled]="!isDirty(u)">Save</button> <button (click)="deleteUser(u)" style="background:#d32f2f;margin-left:8px;">Delete</button></td>
-                </tr>
-              </tbody>
-            </table>
+            <div *ngIf="loadUsersBusy" class="loading-msg">Loading…</div>
+
+            <!-- Desktop table -->
+            <div class="users-table-wrap" *ngIf="!loadUsersBusy">
+              <table class="users-table">
+                <thead>
+                  <tr><th>Username</th><th>Email</th><th>Status</th><th>Roles</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let u of users">
+                    <td>{{ u.riderId }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>{{ u.status }}</td>
+                    <td>
+                      <div class="roles-grid">
+                        <button *ngFor="let r of allRoles" class="role-toggle sm" [class.on]="hasRole(u,r)" (click)="toggleUserRole(u,r)">
+                          {{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r }}
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="action-btns">
+                        <button class="btn-save" (click)="saveUserRoles(u)" [disabled]="!isDirty(u)">Save</button>
+                        <button class="btn-delete" (click)="deleteUser(u)">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Mobile cards -->
+            <div class="users-cards" *ngIf="!loadUsersBusy">
+              <div class="user-card" *ngFor="let u of users">
+                <div class="user-card-header">
+                  <strong>{{ u.riderId }}</strong>
+                  <span class="user-email">{{ u.email }}</span>
+                </div>
+                <div class="roles-grid">
+                  <button *ngFor="let r of allRoles" class="role-toggle sm" [class.on]="hasRole(u,r)" (click)="toggleUserRole(u,r)">
+                    {{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r }}
+                  </button>
+                </div>
+                <div class="action-btns">
+                  <button class="btn-save" (click)="saveUserRoles(u)" [disabled]="!isDirty(u)">Save</button>
+                  <button class="btn-delete" (click)="deleteUser(u)">Delete</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
