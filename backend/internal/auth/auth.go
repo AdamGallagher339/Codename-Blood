@@ -2,12 +2,18 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	cognito "github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
+	"github.com/aws/smithy-go"
 	"github.com/golang-jwt/jwt/v5"
 	bolt "go.etcd.io/bbolt"
 )
@@ -27,10 +34,11 @@ const (
 )
 
 type AuthClient struct {
-	client     *cognito.Client
-	region     string
-	userPoolID string
-	clientID   string
+	client       *cognito.Client
+	region       string
+	userPoolID   string
+	clientID     string
+	clientSecret string
 
 	jwks     *keyfunc.JWKS
 	jwksOnce sync.Once
@@ -62,8 +70,20 @@ type TokensResponse struct {
 // NewAuthClient initializes an AuthClient using environment variables:
 // COGNITO_USER_POOL_ID, COGNITO_CLIENT_ID, AWS_REGION (optional)
 func NewAuthClient(ctx context.Context) (*AuthClient, error) {
+	// Local/dev mode shortcut (useful for local testing without Cognito).
+	//
+	// Supported flags:
+	// - AUTH_MODE=local
+	// - LOCAL_AUTH=1|true
+	mode := strings.TrimSpace(strings.ToLower(os.Getenv("AUTH_MODE")))
+	localFlag := strings.TrimSpace(strings.ToLower(os.Getenv("LOCAL_AUTH")))
+	if mode == "local" || localFlag == "1" || localFlag == "true" || localFlag == "yes" {
+		return NewLocalAuthClient(), nil
+	}
+
 	userPool := os.Getenv("COGNITO_USER_POOL_ID")
 	clientId := os.Getenv("COGNITO_CLIENT_ID")
+	clientSecret := os.Getenv("COGNITO_CLIENT_SECRET")
 	region := os.Getenv("AWS_REGION")
 	if userPool == "" || clientId == "" {
 		return nil, errors.New("COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID must be set")
@@ -79,13 +99,102 @@ func NewAuthClient(ctx context.Context) (*AuthClient, error) {
 	if region == "" {
 		return nil, errors.New("AWS region not configured (set AWS_REGION)")
 	}
+	// Ensure the service client uses the same region we record.
+	cfg.Region = region
 
-	return &AuthClient{
-		client:     cognito.NewFromConfig(cfg),
-		region:     region,
-		userPoolID: userPool,
-		clientID:   clientId,
-	}, nil
+	a := &AuthClient{
+		client:       cognito.NewFromConfig(cfg),
+		region:       region,
+		userPoolID:   userPool,
+		clientID:     clientId,
+		clientSecret: clientSecret,
+	}
+	log.Printf("Auth mode local=%v region=%s userPool=%s clientID=%s hasSecret=%v", a.local, a.region, a.userPoolID, a.clientID, a.clientSecret != "")
+	return a, nil
+}
+
+// SetUserGroups sets a user's Cognito groups to match the provided list.
+// This is used by the fleet package to keep roles (groups) in sync with the DB/API.
+func (a *AuthClient) SetUserGroups(ctx context.Context, username string, groups []string) error {
+	if username == "" {
+		return errors.New("username required")
+	}
+
+	// Normalize desired groups (dedupe + stable)
+	desiredSet := map[string]struct{}{}
+	for _, g := range groups {
+		if g == "" {
+			continue
+		}
+		desiredSet[g] = struct{}{}
+	}
+	desired := make([]string, 0, len(desiredSet))
+	for g := range desiredSet {
+		desired = append(desired, g)
+	}
+	sort.Strings(desired)
+
+	if a.local {
+		// Best-effort local mode: update roles in the dev store.
+		a.usersMu.Lock()
+		u, ok := a.users[username]
+		if ok {
+			u.Roles = desired
+			a.users[username] = u
+			_ = a.saveUserToDB(u)
+		}
+		a.usersMu.Unlock()
+		return nil
+	}
+
+	// Fetch current groups.
+	currentSet := map[string]struct{}{}
+	listOut, err := a.client.AdminListGroupsForUser(ctx, &cognito.AdminListGroupsForUserInput{
+		UserPoolId: &a.userPoolID,
+		Username:   &username,
+	})
+	if err != nil {
+		return fmt.Errorf("list cognito groups: %w", err)
+	}
+	for _, g := range listOut.Groups {
+		if g.GroupName != nil && *g.GroupName != "" {
+			currentSet[*g.GroupName] = struct{}{}
+		}
+	}
+
+	// Remove groups not desired.
+	for g := range currentSet {
+		if _, ok := desiredSet[g]; ok {
+			continue
+		}
+		name := g
+		_, err := a.client.AdminRemoveUserFromGroup(ctx, &cognito.AdminRemoveUserFromGroupInput{
+			GroupName:  &name,
+			UserPoolId: &a.userPoolID,
+			Username:   &username,
+		})
+		if err != nil {
+			return fmt.Errorf("remove user from group %s: %w", g, err)
+		}
+	}
+
+	// Add missing desired groups.
+	for _, g := range desired {
+		if _, ok := currentSet[g]; ok {
+			continue
+		}
+		name := g
+		_, err := a.client.AdminAddUserToGroup(ctx, &cognito.AdminAddUserToGroupInput{
+			GroupName:  &name,
+			UserPoolId: &a.userPoolID,
+			Username:   &username,
+		})
+		if err != nil {
+			return fmt.Errorf("add user to group %s: %w", g, err)
+		}
+	}
+
+	return nil
 }
 
 // NewLocalAuthClient returns an AuthClient configured for local development.
@@ -225,14 +334,108 @@ func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Add SECRET_HASH if client has a secret
+	if a.clientSecret != "" {
+		input.SecretHash = awsString(a.computeSecretHash(body.Username))
+	}
+
 	_, err := a.client.SignUp(r.Context(), input)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("signup failed: %v", err), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("signup failed: %s", awsErrString(err)), http.StatusBadRequest)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "signup initiated"})
+}
+
+// AdminCreateUserHandler creates a user via Cognito AdminCreateUser (admin-only).
+// The user is auto-confirmed with a permanent password and added to groups.
+// Expects JSON: { "username": "u", "password": "p", "email": "e", "roles": ["Rider",...] }
+func (a *AuthClient) AdminCreateUserHandler(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Username string   `json:"username"`
+		Password string   `json:"password"`
+		Email    string   `json:"email"`
+		Roles    []string `json:"roles,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.Username == "" || body.Password == "" || body.Email == "" {
+		http.Error(w, "username, password and email required", http.StatusBadRequest)
+		return
+	}
+
+	if a.local {
+		a.usersMu.Lock()
+		defer a.usersMu.Unlock()
+		if _, ok := a.users[body.Username]; ok {
+			http.Error(w, "user exists", http.StatusConflict)
+			return
+		}
+		u := localUser{
+			Username: body.Username,
+			Password: body.Password,
+			Email:    body.Email,
+			Roles:    body.Roles,
+			Sub:      fmt.Sprintf("local-%s", body.Username),
+		}
+		a.users[body.Username] = u
+		_ = a.saveUserToDB(u)
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "user created (local)"})
+		return
+	}
+
+	// 1. Create the user in Cognito (admin API — no confirmation required)
+	createInput := &cognito.AdminCreateUserInput{
+		UserPoolId:    &a.userPoolID,
+		Username:      &body.Username,
+		MessageAction: types.MessageActionTypeSuppress, // Don't send welcome email
+		UserAttributes: []types.AttributeType{
+			{Name: awsString("email"), Value: &body.Email},
+			{Name: awsString("email_verified"), Value: awsString("true")},
+		},
+	}
+	_, err := a.client.AdminCreateUser(r.Context(), createInput)
+	if err != nil {
+		log.Printf("AdminCreateUser error: %s", awsErrString(err))
+		http.Error(w, fmt.Sprintf("create user failed: %s", awsErrString(err)), http.StatusBadRequest)
+		return
+	}
+
+	// 2. Set a permanent password so the user can sign in immediately
+	setPwInput := &cognito.AdminSetUserPasswordInput{
+		UserPoolId: &a.userPoolID,
+		Username:   &body.Username,
+		Password:   &body.Password,
+		Permanent:  true,
+	}
+	_, err = a.client.AdminSetUserPassword(r.Context(), setPwInput)
+	if err != nil {
+		log.Printf("AdminSetUserPassword error: %s", awsErrString(err))
+		http.Error(w, fmt.Sprintf("set password failed: %s", awsErrString(err)), http.StatusInternalServerError)
+		return
+	}
+
+	// 3. Add user to Cognito groups for each role
+	for _, role := range body.Roles {
+		groupInput := &cognito.AdminAddUserToGroupInput{
+			UserPoolId: &a.userPoolID,
+			Username:   &body.Username,
+			GroupName:  awsString(role),
+		}
+		_, err = a.client.AdminAddUserToGroup(r.Context(), groupInput)
+		if err != nil {
+			log.Printf("AdminAddUserToGroup role=%s error: %s", role, awsErrString(err))
+			// Continue adding other roles even if one fails
+		}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "user created"})
 }
 
 // ConfirmSignUpHandler expects JSON: { "username": "u", "code": "123456" }
@@ -259,6 +462,12 @@ func (a *AuthClient) ConfirmSignUpHandler(w http.ResponseWriter, r *http.Request
 		Username:         &body.Username,
 		ConfirmationCode: &body.Code,
 	}
+
+	// Add SECRET_HASH if client has a secret
+	if a.clientSecret != "" {
+		input.SecretHash = awsString(a.computeSecretHash(body.Username))
+	}
+
 	_, err := a.client.ConfirmSignUp(r.Context(), input)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("confirm failed: %v", err), http.StatusBadRequest)
@@ -324,13 +533,30 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Add SECRET_HASH if client has a secret
+	if a.clientSecret != "" {
+		hash := a.computeSecretHash(body.Username)
+		input.AuthParameters["SECRET_HASH"] = hash
+		log.Printf("SignIn with SECRET_HASH: username=%s hash=%s", body.Username, hash[:20]+"...")
+	} else {
+		log.Printf("SignIn without SECRET_HASH (no client secret configured)")
+	}
+
 	resp, err := a.client.InitiateAuth(r.Context(), input)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("signin failed: %v", err), http.StatusUnauthorized)
+		fmt.Printf("InitiateAuth err type=%T err=%v\n", err, err)
+		http.Error(w, fmt.Sprintf("signin failed: %s", awsErrString(err)), http.StatusUnauthorized)
 		return
 	}
 	if resp.AuthenticationResult == nil {
-		http.Error(w, "signin requires additional steps", http.StatusConflict)
+		// Cognito returned a challenge (e.g. NEW_PASSWORD_REQUIRED)
+		challengeResp := map[string]any{
+			"challenge":           string(resp.ChallengeName),
+			"session":             resp.Session,
+			"challengeParameters": resp.ChallengeParameters,
+		}
+		log.Printf("Cognito challenge: %s for user %s", resp.ChallengeName, body.Username)
+		writeJSON(w, http.StatusConflict, challengeResp)
 		return
 	}
 
@@ -350,6 +576,83 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 		out.TokenType = *result.TokenType
 	}
 
+	writeJSON(w, http.StatusOK, out)
+}
+
+// RespondToChallengeHandler handles Cognito auth challenges (e.g. NEW_PASSWORD_REQUIRED).
+// Expects JSON: { "username": "u", "session": "...", "challengeName": "NEW_PASSWORD_REQUIRED", "newPassword": "p", "email": "e" }
+func (a *AuthClient) RespondToChallengeHandler(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Username      string `json:"username"`
+		Session       string `json:"session"`
+		ChallengeName string `json:"challengeName"`
+		NewPassword   string `json:"newPassword"`
+		Email         string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.Username == "" || body.Session == "" || body.ChallengeName == "" {
+		http.Error(w, "username, session, and challengeName are required", http.StatusBadRequest)
+		return
+	}
+
+	challengeResponses := map[string]string{
+		"USERNAME":     body.Username,
+		"NEW_PASSWORD": body.NewPassword,
+	}
+
+	// Include required user attributes
+	if body.Email != "" {
+		challengeResponses["userAttributes.email"] = body.Email
+	}
+
+	// Add SECRET_HASH if client has a secret
+	if a.clientSecret != "" {
+		challengeResponses["SECRET_HASH"] = a.computeSecretHash(body.Username)
+	}
+
+	input := &cognito.RespondToAuthChallengeInput{
+		ClientId:           &a.clientID,
+		ChallengeName:      types.ChallengeNameType(body.ChallengeName),
+		Session:            &body.Session,
+		ChallengeResponses: challengeResponses,
+	}
+
+	resp, err := a.client.RespondToAuthChallenge(r.Context(), input)
+	if err != nil {
+		log.Printf("RespondToAuthChallenge error type=%T err=%v", err, err)
+		http.Error(w, fmt.Sprintf("challenge response failed: %s", awsErrString(err)), http.StatusBadRequest)
+		return
+	}
+
+	if resp.AuthenticationResult == nil {
+		// Another challenge required
+		challengeResp := map[string]any{
+			"challenge":           string(resp.ChallengeName),
+			"session":             resp.Session,
+			"challengeParameters": resp.ChallengeParameters,
+		}
+		writeJSON(w, http.StatusConflict, challengeResp)
+		return
+	}
+
+	result := resp.AuthenticationResult
+	out := TokensResponse{}
+	if result.AccessToken != nil {
+		out.AccessToken = *result.AccessToken
+	}
+	if result.IdToken != nil {
+		out.IdToken = *result.IdToken
+	}
+	if result.RefreshToken != nil {
+		out.RefreshToken = *result.RefreshToken
+	}
+	out.ExpiresIn = result.ExpiresIn
+	if result.TokenType != nil {
+		out.TokenType = *result.TokenType
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -472,9 +775,78 @@ func (a *AuthClient) ListUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For Cognito, this would need to call ListUsers API
-	// For now, return empty list
-	writeJSON(w, http.StatusOK, []map[string]any{})
+	// List all users from Cognito User Pool
+	var allUsers []types.UserType
+	var paginationToken *string
+	for {
+		out, err := a.client.ListUsers(r.Context(), &cognito.ListUsersInput{
+			UserPoolId:      &a.userPoolID,
+			PaginationToken: paginationToken,
+		})
+		if err != nil {
+			log.Printf("op=ListUsers err=%v", err)
+			http.Error(w, "failed to list users", http.StatusInternalServerError)
+			return
+		}
+		allUsers = append(allUsers, out.Users...)
+		if out.PaginationToken == nil {
+			break
+		}
+		paginationToken = out.PaginationToken
+	}
+
+	// Build response with group membership for each user
+	list := make([]map[string]any, 0, len(allUsers))
+	for _, u := range allUsers {
+		username := ""
+		if u.Username != nil {
+			username = *u.Username
+		}
+		email := ""
+		sub := ""
+		for _, attr := range u.Attributes {
+			if attr.Name != nil && attr.Value != nil {
+				switch *attr.Name {
+				case "email":
+					email = *attr.Value
+				case "sub":
+					sub = *attr.Value
+				}
+			}
+		}
+
+		// Get groups for this user
+		var roles []string
+		groupsOut, err := a.client.AdminListGroupsForUser(r.Context(), &cognito.AdminListGroupsForUserInput{
+			UserPoolId: &a.userPoolID,
+			Username:   &username,
+		})
+		if err != nil {
+			log.Printf("op=AdminListGroupsForUser user=%s err=%v", username, err)
+		} else {
+			for _, g := range groupsOut.Groups {
+				if g.GroupName != nil {
+					roles = append(roles, *g.GroupName)
+				}
+			}
+		}
+
+		status := ""
+		if u.UserStatus != "" {
+			status = string(u.UserStatus)
+		}
+
+		list = append(list, map[string]any{
+			"username": username,
+			"email":    email,
+			"roles":    roles,
+			"sub":      sub,
+			"status":   status,
+			"enabled":  u.Enabled,
+			"created":  u.UserCreateDate,
+		})
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 func ClaimsFromContext(ctx context.Context) jwt.MapClaims {
@@ -508,6 +880,18 @@ func extractBearer(r *http.Request) (string, error) {
 
 func awsString(s string) *string { return &s }
 
+// computeSecretHash computes the SECRET_HASH required by Cognito when the client has a secret.
+// SECRET_HASH = HMAC-SHA256(client_secret, username + client_id), then base64 encoded
+func (a *AuthClient) computeSecretHash(username string) string {
+	if a.clientSecret == "" {
+		return ""
+	}
+	message := username + a.clientID
+	h := hmac.New(sha256.New, []byte(a.clientSecret))
+	h.Write([]byte(message))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -529,4 +913,13 @@ func (a *AuthClient) GetAllAuthUsers() []map[string]any {
 		})
 	}
 	return result
+}
+
+func awsErrString(err error) string {
+	// Most useful: Cognito error code + message
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		return fmt.Sprintf("%s: %s", apiErr.ErrorCode(), apiErr.ErrorMessage())
+	}
+	return err.Error()
 }

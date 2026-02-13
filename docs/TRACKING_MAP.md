@@ -116,43 +116,14 @@ Retrieve all tracked entities with their status.
 ]
 ```
 
-### WebSocket Endpoint
+### WebSocket Endpoint (disabled)
 
 #### WS `/api/tracking/ws`
-WebSocket connection for real-time location updates.
+This project previously supported WebSockets for real-time updates, but the endpoint is disabled for the Lambda + API Gateway deployment.
 
-**Initial Message (sent to client on connection):**
-```json
-{
-  "type": "initial",
-  "locations": [ ... ]
-}
-```
-
-**Update Message (broadcasted to all clients):**
-```json
-{
-  "type": "update",
-  "location": {
-    "entityId": "bike-001",
-    "entityType": "bike",
-    "latitude": 51.5074,
-    "longitude": -0.1278,
-    ...
-  }
-}
-```
-
-**Client can also send location updates via WebSocket:**
-```json
-{
-  "entityId": "bike-001",
-  "entityType": "bike",
-  "latitude": 51.5074,
-  "longitude": -0.1278,
-  ...
-}
-```
+Use HTTP polling instead:
+- Rider app: `POST /api/tracking/update` every 2–5 seconds
+- Dispatcher map: `GET /api/tracking/locations` every 2–5 seconds
 
 ## Data Flow
 
@@ -161,11 +132,9 @@ WebSocket connection for real-time location updates.
    - Backend validates coordinates and entity information
    - Location is stored in memory and broadcasted to all WebSocket clients
 
-2. **Real-Time Updates:**
-   - Frontend connects to WebSocket on map load
-   - Receives initial snapshot of all locations
-   - Receives real-time updates as they arrive
-   - Updates map markers with smooth animations
+2. **Near Real-Time Updates (Polling):**
+  - Frontend polls `GET /api/tracking/locations` on an interval
+  - Updates map markers with smooth animations
 
 3. **Stale Data Handling:**
    - Locations older than 5 minutes are marked as stale

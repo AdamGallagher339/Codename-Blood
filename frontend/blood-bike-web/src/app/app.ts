@@ -37,6 +37,10 @@ export class App implements OnInit {
   confirmUsername = '';
   confirmCode = '';
 
+  // Challenge (e.g. NEW_PASSWORD_REQUIRED) form state
+  challengeNewPassword = '';
+  challengeEmail = '';
+
   // Admin create-user form
   adminUsername = '';
   adminEmail = '';
@@ -65,7 +69,6 @@ export class App implements OnInit {
     { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager'] },
     { id: 'events', title: 'Events', icon: '📆', roles: [] },
     { id: 'community-events', title: 'Community Events', icon: '🎉', roles: [] },
-    { id: 'settings', title: 'Settings', icon: '⚙️', roles: [] },
     { id: 'admin-roles', title: 'Admin: Users', icon: '🧑‍💼', roles: ['BloodBikeAdmin'] }
   ];
 
@@ -143,23 +146,24 @@ export class App implements OnInit {
       console.log('User is not BloodBikeAdmin, skipping loadUsers');
       return;
     }
-    console.log('loadUsers: Fetching users from API');
+    console.log('loadUsers: Fetching users from Cognito');
     this.loadUsersBusy = true;
     
-    // Attach Authorization header using proper HttpHeaders
     const token = this.auth.getIdToken() || this.auth.getAccessToken();
     const headers = new HttpHeaders({
       'Authorization': `Bearer ${token}`
     });
     
-    this.http.get('/api/users', { headers }).subscribe({
+    this.http.get('/api/auth/users', { headers }).subscribe({
       next: (res: any) => {
         console.log('loadUsers success:', res);
         this.users = (res || []).map((u: any) => ({
-          riderId: u.riderId,
-          name: u.name || u.riderId,
-          roles: new Set((u.tags || u.roles || []) as string[]),
-          originalRoles: new Set((u.tags || u.roles || []) as string[]),
+          riderId: u.username,
+          name: u.username,
+          email: u.email || '',
+          status: u.status || '',
+          roles: new Set((u.roles || []) as string[]),
+          originalRoles: new Set((u.roles || []) as string[]),
         }));
         console.log('Formatted users:', this.users);
         this.loadUsersBusy = false;
@@ -173,35 +177,10 @@ export class App implements OnInit {
   }
 
   reloadAccounts(): void {
-    console.log('Reloading accounts...');
-    this.loadUsersBusy = true;
-    
-    const token = this.auth.getIdToken() || this.auth.getAccessToken();
-    const headers = new HttpHeaders({
-      'Authorization': `Bearer ${token}`
-    });
-    
-    this.http.get('/api/users', { headers }).subscribe({
-      next: (res: any) => {
-        console.log('Accounts loaded successfully:', res);
-        this.users = (res || []).map((u: any) => ({
-          riderId: u.riderId,
-          name: u.name || u.riderId,
-          roles: new Set((u.tags || u.roles || []) as string[]),
-          originalRoles: new Set((u.tags || u.roles || []) as string[]),
-        }));
-        console.log('Formatted users:', this.users);
-        this.loadUsersBusy = false;
-      },
-      error: (err: any) => {
-        console.error('Failed to load accounts:', err);
-        this.users = [];
-        this.loadUsersBusy = false;
-      }
-    });
+    this.loadUsers();
   }
 
-  allRoles: string[] = ['BloodBikeAdmin', 'rider', 'fleet_manager', 'dispatcher'];
+  allRoles: string[] = ['BloodBikeAdmin', 'Rider', 'FleetManager', 'Dispatcher'];
 
   hasRole(user: any, role: string): boolean {
     return user.roles.has(role);
@@ -322,14 +301,23 @@ export class App implements OnInit {
     this.router.navigate(['/']);
   }
 
+  isOnHomePage(): boolean {
+    if (!this.auth.isLoggedIn()) return this.currentPage === 'welcome';
+    return this.currentPage === 'home';
+  }
+
   goHomeOrWelcome(): void {
-    if (this.auth.isLoggedIn()) {
-      this.enterTracking();
-    } else {
+    if (!this.auth.isLoggedIn()) {
       this.currentPage = 'welcome';
       this.showRoutedView = false;
       this.router.navigate(['/']);
+      this.showSettings = false;
+      return;
     }
+
+    this.currentPage = 'home';
+    this.showRoutedView = false;
+    this.router.navigate(['/']);
     this.showSettings = false;
   }
 
@@ -432,40 +420,42 @@ export class App implements OnInit {
               if (!this.auth.isLoggedIn()) this.currentPage = 'login';
             }
           });
+        },
+        error: () => {
+          // If a challenge is pending, switch to the challenge page
+          if (this.auth.pendingChallenge()) {
+            this.currentPage = 'challenge';
+          }
+        }
+      });
+  }
+
+  submitChallenge(): void {
+    this.busy = true;
+    this.auth
+      .respondToChallenge(this.challengeNewPassword, this.challengeEmail)
+      .pipe(finalize(() => (this.busy = false)))
+      .subscribe({
+        next: () => {
+          this.challengeNewPassword = '';
+          this.enterTracking();
+          this.auth.fetchMe().subscribe({
+            next: () => {
+              const saved = localStorage.getItem('bb_selected_role');
+              const roles = this.auth.roles();
+              if (saved && roles.includes(saved)) this.selectedRole = saved;
+              else if (roles.length > 0) this.selectedRole = roles[0];
+            },
+            error: () => {
+              if (!this.auth.isLoggedIn()) this.currentPage = 'login';
+            }
+          });
         }
       });
   }
 
   goBack(): void {
-    // Navigate to appropriate home page based on user roles
-    if (!this.auth.isLoggedIn()) {
-      this.currentPage = 'welcome';
-      this.showRoutedView = false;
-      this.router.navigate(['/']);
-    } else {
-      // For logged-in users, go to their landing page based on role
-      const userRoles = this.auth.roles();
-      const trackingRoles = ['Rider', 'FleetManager', 'Dispatcher'];
-      const canAccessTracking = userRoles.some((role) => trackingRoles.includes(role));
-
-      if (canAccessTracking) {
-        // Go to tracking for operational roles
-        this.currentPage = 'tracking';
-        this.showRoutedView = true;
-        this.router.navigate(['/tracking']);
-      } else if (userRoles.includes('BloodBikeAdmin')) {
-        // Go to admin-roles for admins
-        this.currentPage = 'admin-roles';
-        this.showRoutedView = false;
-        this.router.navigate(['/']);
-      } else {
-        // Default fallback
-        this.currentPage = 'home';
-        this.showRoutedView = false;
-        this.router.navigate(['/']);
-      }
-    }
-    this.showSettings = false;
+    this.goHomeOrWelcome();
   }
 
   private syncFromUrl(url: string): void {
@@ -497,34 +487,33 @@ export class App implements OnInit {
     }
     this.adminBusy = true;
     this.adminMessage = null;
+
+    const token = this.auth.getIdToken() || this.auth.getAccessToken();
+    const headers = new HttpHeaders({ 'Authorization': `Bearer ${token}` });
+
     const payload = {
       username: this.adminUsername.trim(),
       password: this.adminPassword,
       email: this.adminEmail.trim(),
       roles: this.adminRoles
     };
-    console.log('Creating auth user with payload:', payload);
-    // Create auth user (Cognito or local)
-    this.http.post('/api/auth/signup', payload).subscribe({
+
+    // 1. Create Cognito user (admin API — auto-confirmed with permanent password + groups)
+    this.http.post('/api/auth/admin/create-user', payload, { headers }).subscribe({
       next: () => {
-        console.log('Auth user created successfully');
-        // create fleet user record
-        const u = { riderId: this.adminUsername.trim(), name: this.adminUsername.trim() };
-        console.log('Registering fleet user with payload:', u);
-        this.http.post('/api/user/register', u).subscribe({
+        // 2. Create fleet user record in DynamoDB
+        const fleetUser = { riderId: this.adminUsername.trim(), name: this.adminUsername.trim() };
+        this.http.post('/api/user/register', fleetUser, { headers }).subscribe({
           next: () => {
-            console.log('Fleet user registered successfully');
-            // Initialize all selected roles in one call
-            console.log('Initializing roles:', this.adminRoles);
-            this.http.post('/api/user/roles/init', { riderId: this.adminUsername.trim(), roles: this.adminRoles }).subscribe({
+            // 3. Initialize roles in DynamoDB (tags) + sync to Cognito groups
+            this.http.post('/api/user/roles/init', { riderId: this.adminUsername.trim(), roles: this.adminRoles }, { headers }).subscribe({
               next: () => {
-                console.log('User roles initialized successfully');
                 this.adminMessage = 'Account created successfully';
                 this.adminBusy = false;
                 this.adminUsername = '';
                 this.adminEmail = '';
                 this.adminPassword = '';
-                this.adminRoles = ['BloodBikeAdmin']; // Reset to default
+                this.adminRoles = ['BloodBikeAdmin'];
                 this.adminRoleSelection = {
                   'BloodBikeAdmin': true,
                   'Rider': false,
@@ -535,22 +524,24 @@ export class App implements OnInit {
               },
               error: (err) => {
                 console.error('Failed to initialize roles:', err);
-                this.adminMessage = `Created user but failed to assign roles`;
+                this.adminMessage = 'Created user but failed to assign roles in fleet DB';
                 this.adminBusy = false;
+                this.loadUsers();
               }
             });
           },
           error: (err) => {
-            console.error('Fleet user registration error:', {status: err.status, statusText: err.statusText, error: err.error});
+            console.error('Fleet user registration error:', err);
             const errorMsg = err.error?.message || err.error || err.statusText || `HTTP ${err.status}`;
-            this.adminMessage = `Failed to register fleet user: ${errorMsg}`;
+            this.adminMessage = `Created auth user but failed to register fleet profile: ${errorMsg}`;
             this.adminBusy = false;
           }
         });
       },
-      error: (_err) => {
-        console.error('Auth signup error:', {status: _err.status, statusText: _err.statusText, error: _err.error});
-        this.adminMessage = `Account signup failed: ${_err.error?.message || _err.statusText || 'unknown error'}`;
+      error: (err) => {
+        console.error('Admin create user error:', err);
+        const errorMsg = typeof err.error === 'string' ? err.error : (err.error?.message || err.statusText || 'unknown error');
+        this.adminMessage = `Create user failed: ${errorMsg}`;
         this.adminBusy = false;
       }
     });

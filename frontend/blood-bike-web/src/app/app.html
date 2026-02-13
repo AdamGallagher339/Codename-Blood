@@ -51,7 +51,7 @@
             </button>
           </div>
         </div>
-        <div *ngIf="currentPage !== 'home' && currentPage !== 'welcome' && currentPage !== 'tracking'" class="header-actions">
+        <div *ngIf="!isOnHomePage()" class="header-actions">
           <button class="btn-back" (click)="goHomeOrWelcome()" title="Go back">
             ←
           </button>
@@ -104,6 +104,30 @@
           </label>
           <div class="auth-actions">
             <button class="primary" [disabled]="busy" (click)="signIn()">{{ busy ? 'Signing in…' : 'Sign in' }}</button>
+          </div>
+          <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Challenge Page (e.g. NEW_PASSWORD_REQUIRED) -->
+    <div *ngIf="currentPage === 'challenge'" class="page auth-page">
+      <div class="page-header">
+        <h2>Set New Password</h2>
+      </div>
+      <div class="page-content">
+        <div class="auth-card">
+          <p class="auth-hint">Your account requires a new password before you can sign in.</p>
+          <label>
+            <span>Email</span>
+            <input [(ngModel)]="challengeEmail" type="email" placeholder="your email address" autocomplete="email" />
+          </label>
+          <label>
+            <span>New Password</span>
+            <input [(ngModel)]="challengeNewPassword" type="password" placeholder="enter new password" autocomplete="new-password" />
+          </label>
+          <div class="auth-actions">
+            <button class="primary" [disabled]="busy" (click)="submitChallenge()">{{ busy ? 'Setting password…' : 'Set Password & Sign In' }}</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
@@ -264,12 +288,13 @@
             <div *ngIf="loadUsersBusy">Loading…</div>
             <table *ngIf="!loadUsersBusy">
               <thead>
-                <tr><th>Username</th><th>Name</th><th>Roles</th><th>Actions</th></tr>
+                <tr><th>Username</th><th>Email</th><th>Status</th><th>Roles</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 <tr *ngFor="let u of users">
                   <td>{{ u.riderId }}</td>
-                  <td><input [(ngModel)]="u.name" (blur)="http.post('/api/user/register',{ riderId: u.riderId, name: u.name }).subscribe()" /></td>
+                  <td>{{ u.email }}</td>
+                  <td>{{ u.status }}</td>
                   <td>
                     <button *ngFor="let r of allRoles" 
                             (click)="toggleUserRole(u,r)"
