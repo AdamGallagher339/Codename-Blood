@@ -304,13 +304,7 @@ export class App implements OnInit {
 
   isOnHomePage(): boolean {
     if (!this.auth.isLoggedIn()) return this.currentPage === 'welcome';
-    const role = this.selectedRole;
-    const normalized = role ? this.normalizeRole(role) : null;
-    if (normalized === 'bloodbikeadmin') return this.currentPage === 'home';
-    if (normalized === 'dispatcher') return this.currentPage === 'dispatcher';
-    if (normalized === 'fleetmanager') return this.currentPage === 'fleet';
-    if (normalized === 'rider') return this.currentPage === 'tracking';
-    return this.currentPage === 'home' || this.currentPage === 'welcome' || this.currentPage === 'tracking';
+    return this.currentPage === 'home';
   }
 
   goHomeOrWelcome(): void {
@@ -322,30 +316,9 @@ export class App implements OnInit {
       return;
     }
 
-    // Navigate to the home page for the currently selected role
-    const role = this.selectedRole;
-    const normalizedRole = role ? this.normalizeRole(role) : null;
-
-    if (normalizedRole === 'bloodbikeadmin') {
-      this.currentPage = 'home';
-      this.showRoutedView = false;
-      this.router.navigate(['/']);
-    } else if (normalizedRole === 'dispatcher') {
-      this.currentPage = 'dispatcher';
-      this.showRoutedView = true;
-      this.router.navigate(['/dispatcher']);
-    } else if (normalizedRole === 'fleetmanager') {
-      this.currentPage = 'fleet';
-      this.showRoutedView = true;
-      this.router.navigate(['/fleet']);
-    } else if (normalizedRole === 'rider') {
-      this.currentPage = 'tracking';
-      this.showRoutedView = true;
-      this.router.navigate(['/tracking']);
-    } else {
-      // Fallback: use enterTracking for users with tracking access, otherwise home
-      this.enterTracking();
-    }
+    this.currentPage = 'home';
+    this.showRoutedView = false;
+    this.router.navigate(['/']);
     this.showSettings = false;
   }
 
