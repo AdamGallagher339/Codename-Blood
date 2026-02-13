@@ -37,6 +37,10 @@ export class App implements OnInit {
   confirmUsername = '';
   confirmCode = '';
 
+  // Challenge (e.g. NEW_PASSWORD_REQUIRED) form state
+  challengeNewPassword = '';
+  challengeEmail = '';
+
   // Admin create-user form
   adminUsername = '';
   adminEmail = '';
@@ -201,7 +205,7 @@ export class App implements OnInit {
     });
   }
 
-  allRoles: string[] = ['BloodBikeAdmin', 'rider', 'fleet_manager', 'dispatcher'];
+  allRoles: string[] = ['BloodBikeAdmin', 'Rider', 'FleetManager', 'Dispatcher'];
 
   hasRole(user: any, role: string): boolean {
     return user.roles.has(role);
@@ -429,6 +433,36 @@ export class App implements OnInit {
             },
             error: () => {
               // fetch failed — AuthService may have logged out; ensure we show login
+              if (!this.auth.isLoggedIn()) this.currentPage = 'login';
+            }
+          });
+        },
+        error: () => {
+          // If a challenge is pending, switch to the challenge page
+          if (this.auth.pendingChallenge()) {
+            this.currentPage = 'challenge';
+          }
+        }
+      });
+  }
+
+  submitChallenge(): void {
+    this.busy = true;
+    this.auth
+      .respondToChallenge(this.challengeNewPassword, this.challengeEmail)
+      .pipe(finalize(() => (this.busy = false)))
+      .subscribe({
+        next: () => {
+          this.challengeNewPassword = '';
+          this.enterTracking();
+          this.auth.fetchMe().subscribe({
+            next: () => {
+              const saved = localStorage.getItem('bb_selected_role');
+              const roles = this.auth.roles();
+              if (saved && roles.includes(saved)) this.selectedRole = saved;
+              else if (roles.length > 0) this.selectedRole = roles[0];
+            },
+            error: () => {
               if (!this.auth.isLoggedIn()) this.currentPage = 'login';
             }
           });

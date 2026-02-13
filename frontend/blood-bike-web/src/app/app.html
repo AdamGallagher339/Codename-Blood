@@ -110,6 +110,30 @@
       </div>
     </div>
 
+    <!-- Challenge Page (e.g. NEW_PASSWORD_REQUIRED) -->
+    <div *ngIf="currentPage === 'challenge'" class="page auth-page">
+      <div class="page-header">
+        <h2>Set New Password</h2>
+      </div>
+      <div class="page-content">
+        <div class="auth-card">
+          <p class="auth-hint">Your account requires a new password before you can sign in.</p>
+          <label>
+            <span>Email</span>
+            <input [(ngModel)]="challengeEmail" type="email" placeholder="your email address" autocomplete="email" />
+          </label>
+          <label>
+            <span>New Password</span>
+            <input [(ngModel)]="challengeNewPassword" type="password" placeholder="enter new password" autocomplete="new-password" />
+          </label>
+          <div class="auth-actions">
+            <button class="primary" [disabled]="busy" (click)="submitChallenge()">{{ busy ? 'Setting password…' : 'Set Password & Sign In' }}</button>
+          </div>
+          <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Signup Page -->
     <div *ngIf="currentPage === 'signup'" class="page auth-page">
       <div class="page-header">

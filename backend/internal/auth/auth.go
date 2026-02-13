@@ -460,7 +460,14 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if resp.AuthenticationResult == nil {
-		http.Error(w, "signin requires additional steps", http.StatusConflict)
+		// Cognito returned a challenge (e.g. NEW_PASSWORD_REQUIRED)
+		challengeResp := map[string]any{
+			"challenge":           string(resp.ChallengeName),
+			"session":             resp.Session,
+			"challengeParameters": resp.ChallengeParameters,
+		}
+		log.Printf("Cognito challenge: %s for user %s", resp.ChallengeName, body.Username)
+		writeJSON(w, http.StatusConflict, challengeResp)
 		return
 	}
 
@@ -480,6 +487,83 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 		out.TokenType = *result.TokenType
 	}
 
+	writeJSON(w, http.StatusOK, out)
+}
+
+// RespondToChallengeHandler handles Cognito auth challenges (e.g. NEW_PASSWORD_REQUIRED).
+// Expects JSON: { "username": "u", "session": "...", "challengeName": "NEW_PASSWORD_REQUIRED", "newPassword": "p", "email": "e" }
+func (a *AuthClient) RespondToChallengeHandler(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Username      string `json:"username"`
+		Session       string `json:"session"`
+		ChallengeName string `json:"challengeName"`
+		NewPassword   string `json:"newPassword"`
+		Email         string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.Username == "" || body.Session == "" || body.ChallengeName == "" {
+		http.Error(w, "username, session, and challengeName are required", http.StatusBadRequest)
+		return
+	}
+
+	challengeResponses := map[string]string{
+		"USERNAME":     body.Username,
+		"NEW_PASSWORD": body.NewPassword,
+	}
+
+	// Include required user attributes
+	if body.Email != "" {
+		challengeResponses["userAttributes.email"] = body.Email
+	}
+
+	// Add SECRET_HASH if client has a secret
+	if a.clientSecret != "" {
+		challengeResponses["SECRET_HASH"] = a.computeSecretHash(body.Username)
+	}
+
+	input := &cognito.RespondToAuthChallengeInput{
+		ClientId:           &a.clientID,
+		ChallengeName:      types.ChallengeNameType(body.ChallengeName),
+		Session:            &body.Session,
+		ChallengeResponses: challengeResponses,
+	}
+
+	resp, err := a.client.RespondToAuthChallenge(r.Context(), input)
+	if err != nil {
+		log.Printf("RespondToAuthChallenge error type=%T err=%v", err, err)
+		http.Error(w, fmt.Sprintf("challenge response failed: %s", awsErrString(err)), http.StatusBadRequest)
+		return
+	}
+
+	if resp.AuthenticationResult == nil {
+		// Another challenge required
+		challengeResp := map[string]any{
+			"challenge":           string(resp.ChallengeName),
+			"session":             resp.Session,
+			"challengeParameters": resp.ChallengeParameters,
+		}
+		writeJSON(w, http.StatusConflict, challengeResp)
+		return
+	}
+
+	result := resp.AuthenticationResult
+	out := TokensResponse{}
+	if result.AccessToken != nil {
+		out.AccessToken = *result.AccessToken
+	}
+	if result.IdToken != nil {
+		out.IdToken = *result.IdToken
+	}
+	if result.RefreshToken != nil {
+		out.RefreshToken = *result.RefreshToken
+	}
+	out.ExpiresIn = result.ExpiresIn
+	if result.TokenType != nil {
+		out.TokenType = *result.TokenType
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
