@@ -124,6 +124,12 @@ func newServiceID() string {
 	return "svc_" + hex.EncodeToString(b)
 }
 
+func newBikeID() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return "bike_" + hex.EncodeToString(b)
+}
+
 func awsString(value string) *string { return &value }
 
 func awsBool(value bool) *bool { return &value }

@@ -25,7 +25,6 @@ type ServiceEntry struct {
 }
 
 type CreateFleetBikeRequest struct {
-	BikeID       string `json:"bikeId"`
 	Make         string `json:"make"`
 	Model        string `json:"model"`
 	VehicleType  string `json:"vehicleType"`

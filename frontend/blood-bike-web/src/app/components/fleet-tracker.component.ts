@@ -23,7 +23,6 @@ export class FleetTrackerComponent {
   );
 
   // Create bike form
-  bikeId = signal('');
   make = signal('');
   model = signal('');
   vehicleType = signal<'car' | 'motorcycle'>('motorcycle');
@@ -70,7 +69,6 @@ export class FleetTrackerComponent {
   createBike(): void {
     const active = this.resolveActiveValue(this.activeMode(), this.activeRiderId());
     if (
-      !this.bikeId().trim() ||
       !this.make().trim() ||
       !this.model().trim() ||
       !this.registration().trim() ||
@@ -81,7 +79,6 @@ export class FleetTrackerComponent {
     }
 
     this.fleetService.createBike({
-      bikeId: this.bikeId().trim(),
       make: this.make().trim(),
       model: this.model().trim(),
       vehicleType: this.vehicleType(),
@@ -90,7 +87,6 @@ export class FleetTrackerComponent {
       active
     });
 
-    this.bikeId.set('');
     this.make.set('');
     this.model.set('');
     this.vehicleType.set('motorcycle');

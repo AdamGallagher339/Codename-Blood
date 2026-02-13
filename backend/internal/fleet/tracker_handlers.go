@@ -37,12 +37,13 @@ func FleetListOrCreate(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		if err := validateCreateBike(req); err != nil {
+
+		bikeID := newBikeID()
+		if err := validateCreateBike(req, bikeID); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		bikeID := strings.TrimSpace(req.BikeID)
 		make := strings.TrimSpace(req.Make)
 		model := strings.TrimSpace(req.Model)
 		vehicleType := strings.ToLower(strings.TrimSpace(req.VehicleType))
@@ -214,9 +215,9 @@ func parseBikePath(path string) (string, string) {
 	return bikeID, parts[1]
 }
 
-func validateCreateBike(req CreateFleetBikeRequest) error {
+func validateCreateBike(req CreateFleetBikeRequest, bikeID string) error {
 	bike := FleetBike{
-		BikeID:       strings.TrimSpace(req.BikeID),
+		BikeID:       strings.TrimSpace(bikeID),
 		Make:         strings.TrimSpace(req.Make),
 		Model:        strings.TrimSpace(req.Model),
 		VehicleType:  strings.ToLower(strings.TrimSpace(req.VehicleType)),

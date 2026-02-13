@@ -23,7 +23,6 @@ export interface ServiceEntry {
 }
 
 export interface CreateFleetBikeDto {
-  bikeId: string;
   make: string;
   model: string;
   vehicleType: 'car' | 'motorcycle';
