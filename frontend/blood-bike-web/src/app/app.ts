@@ -69,7 +69,6 @@ export class App implements OnInit {
     { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager'] },
     { id: 'events', title: 'Events', icon: '📆', roles: [] },
     { id: 'community-events', title: 'Community Events', icon: '🎉', roles: [] },
-    { id: 'settings', title: 'Settings', icon: '⚙️', roles: [] },
     { id: 'admin-roles', title: 'Admin: Users', icon: '🧑‍💼', roles: ['BloodBikeAdmin'] }
   ];
 

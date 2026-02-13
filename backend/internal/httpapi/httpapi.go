@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/events"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/fleet"
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo/dynamo"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/tracking"
+	"github.com/google/uuid"
 )
 
 // NewHandler builds and returns the HTTP handler for the main backend API.
@@ -115,6 +118,155 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	// --- Events Routes ---
 	mux.HandleFunc("/api/events", withCORS(authClient.RequireAuth(events.ListOrCreate)))
 	mux.HandleFunc("/api/events/", withCORS(authClient.RequireAuth(events.GetUpdateOrDelete)))
+
+	// --- Jobs Routes ---
+	listOrCreateJobs := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if dynamoRepos.Jobs == nil {
+			http.Error(w, "JOBS_TABLE not configured", http.StatusNotImplemented)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			jobs, err := dynamoRepos.Jobs.List(r.Context())
+			if err != nil {
+				log.Printf("op=ListJobs err=%v", err)
+				http.Error(w, "failed to list jobs", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(jobs)
+		case http.MethodPost:
+			var body struct {
+				Title   string `json:"title"`
+				Pickup  string `json:"pickup"`
+				Dropoff string `json:"dropoff"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "invalid JSON", http.StatusBadRequest)
+				return
+			}
+			if body.Title == "" {
+				http.Error(w, "title required", http.StatusBadRequest)
+				return
+			}
+
+			// Extract username from JWT claims
+			claims := auth.ClaimsFromContext(r.Context())
+			createdBy := ""
+			if claims != nil {
+				if u, ok := claims["cognito:username"].(string); ok {
+					createdBy = u
+				} else if u, ok := claims["username"].(string); ok {
+					createdBy = u
+				} else if u, ok := claims["sub"].(string); ok {
+					createdBy = u
+				}
+			}
+
+			now := time.Now().UTC().Format(time.RFC3339)
+			job := &repo.Job{
+				JobID:      uuid.NewString(),
+				Title:      body.Title,
+				Status:     "open",
+				CreatedBy:  createdBy,
+				Pickup:     map[string]any{"address": body.Pickup},
+				Dropoff:    map[string]any{"address": body.Dropoff},
+				Timestamps: map[string]any{"created": now},
+			}
+			if err := dynamoRepos.Jobs.Put(r.Context(), job); err != nil {
+				log.Printf("op=CreateJob err=%v", err)
+				http.Error(w, "failed to create job", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(job)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	jobDetail := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if dynamoRepos.Jobs == nil {
+			http.Error(w, "JOBS_TABLE not configured", http.StatusNotImplemented)
+			return
+		}
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/jobs/"), "/")
+		jobID := parts[0]
+		if jobID == "" {
+			http.Error(w, "job ID required", http.StatusBadRequest)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			job, found, err := dynamoRepos.Jobs.Get(r.Context(), jobID)
+			if err != nil {
+				log.Printf("op=GetJob err=%v", err)
+				http.Error(w, "failed to get job", http.StatusInternalServerError)
+				return
+			}
+			if !found {
+				http.Error(w, "job not found", http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(job)
+		case http.MethodPut:
+			// Accept a job (rider sets acceptedBy + status)
+			var body struct {
+				Status     string `json:"status"`
+				AcceptedBy string `json:"acceptedBy"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				http.Error(w, "invalid JSON", http.StatusBadRequest)
+				return
+			}
+			job, found, err := dynamoRepos.Jobs.Get(r.Context(), jobID)
+			if err != nil {
+				log.Printf("op=UpdateJob err=%v", err)
+				http.Error(w, "failed to get job", http.StatusInternalServerError)
+				return
+			}
+			if !found {
+				http.Error(w, "job not found", http.StatusNotFound)
+				return
+			}
+			if body.Status != "" {
+				job.Status = body.Status
+			}
+			if body.AcceptedBy != "" {
+				job.AcceptedBy = body.AcceptedBy
+			}
+			if job.Timestamps == nil {
+				job.Timestamps = map[string]any{}
+			}
+			job.Timestamps["updated"] = time.Now().UTC().Format(time.RFC3339)
+			if err := dynamoRepos.Jobs.Put(r.Context(), job); err != nil {
+				log.Printf("op=UpdateJob err=%v", err)
+				http.Error(w, "failed to update job", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(job)
+		case http.MethodDelete:
+			deleted, err := dynamoRepos.Jobs.Delete(r.Context(), jobID)
+			if err != nil {
+				log.Printf("op=DeleteJob err=%v", err)
+				http.Error(w, "failed to delete job", http.StatusInternalServerError)
+				return
+			}
+			if !deleted {
+				http.Error(w, "job not found", http.StatusNotFound)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc("/api/jobs", withCORS(listOrCreateJobs))
+	mux.HandleFunc("/api/jobs/", withCORS(jobDetail))
 
 	// --- Tracking Routes ---
 	// HTTP endpoints for location updates

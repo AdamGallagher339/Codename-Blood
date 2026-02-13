@@ -109,6 +109,7 @@ type jobsRepo struct {
 
 type jobItem struct {
 	JobID      string         `dynamodbav:"jobId,omitempty"`
+	Title      string         `dynamodbav:"title,omitempty"`
 	Status     string         `dynamodbav:"status,omitempty"`
 	CreatedBy  string         `dynamodbav:"createdBy,omitempty"`
 	AcceptedBy string         `dynamodbav:"acceptedBy,omitempty"`
@@ -132,7 +133,7 @@ func (r *jobsRepo) List(ctx context.Context) ([]repo.Job, error) {
 	}
 	jobs := make([]repo.Job, 0, len(items))
 	for _, it := range items {
-		jobs = append(jobs, repo.Job{JobID: it.JobID, Status: it.Status, CreatedBy: it.CreatedBy, AcceptedBy: it.AcceptedBy, Pickup: it.Pickup, Dropoff: it.Dropoff, Timestamps: it.Timestamps})
+		jobs = append(jobs, repo.Job{JobID: it.JobID, Title: it.Title, Status: it.Status, CreatedBy: it.CreatedBy, AcceptedBy: it.AcceptedBy, Pickup: it.Pickup, Dropoff: it.Dropoff, Timestamps: it.Timestamps})
 	}
 	return jobs, nil
 }
@@ -156,7 +157,7 @@ func (r *jobsRepo) Get(ctx context.Context, jobID string) (*repo.Job, bool, erro
 	if err := attributevalue.UnmarshalMap(out.Item, &it); err != nil {
 		return nil, false, err
 	}
-	return &repo.Job{JobID: it.JobID, Status: it.Status, CreatedBy: it.CreatedBy, AcceptedBy: it.AcceptedBy, Pickup: it.Pickup, Dropoff: it.Dropoff, Timestamps: it.Timestamps}, true, nil
+	return &repo.Job{JobID: it.JobID, Title: it.Title, Status: it.Status, CreatedBy: it.CreatedBy, AcceptedBy: it.AcceptedBy, Pickup: it.Pickup, Dropoff: it.Dropoff, Timestamps: it.Timestamps}, true, nil
 }
 
 func (r *jobsRepo) Put(ctx context.Context, j *repo.Job) error {
@@ -170,7 +171,7 @@ func (r *jobsRepo) Put(ctx context.Context, j *repo.Job) error {
 	if err != nil {
 		return err
 	}
-	it := jobItem{JobID: j.JobID, Status: j.Status, CreatedBy: j.CreatedBy, AcceptedBy: j.AcceptedBy, Pickup: j.Pickup, Dropoff: j.Dropoff, Timestamps: j.Timestamps}
+	it := jobItem{JobID: j.JobID, Title: j.Title, Status: j.Status, CreatedBy: j.CreatedBy, AcceptedBy: j.AcceptedBy, Pickup: j.Pickup, Dropoff: j.Dropoff, Timestamps: j.Timestamps}
 	item, err := attributevalue.MarshalMap(it)
 	if err != nil {
 		return err

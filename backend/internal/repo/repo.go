@@ -64,6 +64,7 @@ type DepotsRepository interface {
 
 type Job struct {
 	JobID      string         `json:"jobId"`
+	Title      string         `json:"title,omitempty"`
 	Status     string         `json:"status,omitempty"`
 	CreatedBy  string         `json:"createdBy,omitempty"`
 	AcceptedBy string         `json:"acceptedBy,omitempty"`
