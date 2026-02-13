@@ -26,7 +26,7 @@ export class FleetTrackerComponent {
   showAddForm = signal(false);
   activeTab = signal<'details' | 'service' | 'remove'>('details');
   activeBikeCount = computed(() =>
-    this.bikes().filter(b => b.active !== 'off_duty' && b.active !== 'out_of_service').length
+    this.bikes().filter(b => b.active !== 'out_of_service').length
   );
 
   // Create bike form
@@ -43,8 +43,7 @@ export class FleetTrackerComponent {
   editVehicleType = signal<'car' | 'motorcycle'>('motorcycle');
   editRegistration = signal('');
   editLocationId = signal('');
-  editActiveMode = signal<'off_duty' | 'out_of_service' | 'rider'>('off_duty');
-  editActiveRiderId = signal('');
+  editActiveMode = signal<'ready' | 'out_of_service'>('out_of_service');
 
   deleteConfirm = signal('');
   deleteMatchesRegistration = computed(() => {
@@ -68,12 +67,10 @@ export class FleetTrackerComponent {
       this.editVehicleType.set(bike.vehicleType);
       this.editRegistration.set(bike.registration);
       this.editLocationId.set(bike.locationId);
-      if (bike.active === 'off_duty' || bike.active === 'out_of_service') {
-        this.editActiveMode.set(bike.active);
-        this.editActiveRiderId.set('');
+      if (bike.active === 'out_of_service') {
+        this.editActiveMode.set('out_of_service');
       } else {
-        this.editActiveMode.set('rider');
-        this.editActiveRiderId.set(bike.active);
+        this.editActiveMode.set('ready');
       }
       this.deleteConfirm.set('');
       this.activeTab.set('details');
@@ -112,22 +109,8 @@ export class FleetTrackerComponent {
     const bike = this.selectedBike();
     if (!bike) return;
 
-    const active = this.resolveActiveValue(this.editActiveMode(), this.editActiveRiderId());
-    if (
-      !this.editMake().trim() ||
-      !this.editModel().trim() ||
-      !this.editRegistration().trim() ||
-      !this.editLocationId().trim() ||
-      !active
-    ) {
-      return;
-    }
-
     this.fleetService.updateBike(bike.bikeId, {
-      make: this.editMake().trim(),
-      model: this.editModel().trim(),
-      locationId: this.editLocationId().trim(),
-      active,
+      active: this.editActiveMode(),
     });
   }
 
@@ -161,16 +144,11 @@ export class FleetTrackerComponent {
   }
 
   formatActive(value: string): string {
-    if (value === 'off_duty') return 'Off duty';
+    if (value === 'ready') return 'Ready';
     if (value === 'out_of_service') return 'Out of service';
+    // legacy off_duty values
+    if (value === 'off_duty') return 'Ready';
     return `Rider ${value}`;
-  }
-
-  private resolveActiveValue(mode: 'off_duty' | 'out_of_service' | 'rider', riderId: string): string {
-    if (mode === 'rider') {
-      return riderId.trim();
-    }
-    return mode;
   }
 
   private getTodayString(): string {

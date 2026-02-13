@@ -89,7 +89,7 @@
           </div>
           <div class="bike-card-right">
             <span class="status-dot"
-              [class.status-active]="bike.active !== 'off_duty' && bike.active !== 'out_of_service'"
+              [class.status-active]="bike.active === 'ready' || (bike.active !== 'out_of_service' && bike.active !== 'off_duty')"
               [class.status-off]="bike.active === 'off_duty'"
               [class.status-oos]="bike.active === 'out_of_service'"
             ></span>
@@ -115,7 +115,7 @@
           <span class="banner-reg">{{ bike.registration }}</span>
         </div>
         <span class="status-pill"
-          [class.status-active]="bike.active !== 'off_duty' && bike.active !== 'out_of_service'"
+          [class.status-active]="bike.active === 'ready' || (bike.active !== 'out_of_service' && bike.active !== 'off_duty')"
           [class.status-off]="bike.active === 'off_duty'"
           [class.status-oos]="bike.active === 'out_of_service'"
         >{{ formatActive(bike.active) }}</span>
@@ -133,11 +133,11 @@
         <div class="details-grid">
           <label>
             <span>Make</span>
-            <input [(ngModel)]="editMake" />
+            <input [value]="bike.make" disabled />
           </label>
           <label>
             <span>Model</span>
-            <input [(ngModel)]="editModel" />
+            <input [value]="bike.model" disabled />
           </label>
           <label>
             <span>Type</span>
@@ -149,19 +149,14 @@
           </label>
           <label>
             <span>Location / Depot</span>
-            <input [(ngModel)]="editLocationId" />
+            <input [value]="bike.locationId" disabled />
           </label>
           <label>
             <span>Status</span>
             <select [(ngModel)]="editActiveMode">
-              <option value="off_duty">Off duty</option>
+              <option value="ready">Ready</option>
               <option value="out_of_service">Out of service</option>
-              <option value="rider">Assigned to rider</option>
             </select>
-          </label>
-          <label *ngIf="editActiveMode() === 'rider'">
-            <span>Rider UID</span>
-            <input [(ngModel)]="editActiveRiderId" />
           </label>
         </div>
         <div class="form-actions">

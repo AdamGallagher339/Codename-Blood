@@ -137,24 +137,14 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if req.Model != nil {
-			bike.Model = strings.TrimSpace(*req.Model)
-		}
-		if req.Make != nil {
-			bike.Make = strings.TrimSpace(*req.Make)
-		}
-		// VehicleType and Registration are immutable after creation
-		if req.LocationID != nil {
-			bike.LocationID = strings.TrimSpace(*req.LocationID)
-		}
-		if trackerStore != nil {
-			if err := ensureUniqueRegistration(r.Context(), bike.Registration, bike.BikeID); err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+		// Make, Model, VehicleType, Registration, and LocationID are immutable after creation
+		if req.Active != nil {
+			active := strings.TrimSpace(*req.Active)
+			if active != "ready" && active != "out_of_service" {
+				http.Error(w, "active must be ready or out_of_service", http.StatusBadRequest)
 				return
 			}
-		}
-		if req.Active != nil {
-			bike.Active = strings.TrimSpace(*req.Active)
+			bike.Active = active
 		}
 		if err := validateBike(*bike, false); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -306,8 +296,8 @@ func validateBike(bike FleetBike, requireAll bool) error {
 			return errors.New("vehicleType must be car or motorcycle")
 		}
 	}
-	if bike.Active != "off_duty" && bike.Active != "out_of_service" && !activeUIDRegex.MatchString(bike.Active) {
-		return errors.New("active must be off_duty, out_of_service, or a rider UID")
+	if bike.Active != "ready" && bike.Active != "out_of_service" && !activeUIDRegex.MatchString(bike.Active) {
+		return errors.New("active must be ready, out_of_service, or a rider UID")
 	}
 	return nil
 }
