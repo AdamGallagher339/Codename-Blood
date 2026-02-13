@@ -112,6 +112,24 @@ export class FleetTrackerService {
       });
   }
 
+  deleteServiceEntry(bikeId: string, serviceId: string): void {
+    this.http
+      .post(`/api/fleet/bikes/${bikeId}/service-delete`, { serviceId })
+      .pipe(
+        catchError((err) => {
+          console.error('Failed to delete service entry', err);
+          return of(null);
+        })
+      )
+      .subscribe((result) => {
+        if (result === null) return;
+        this.serviceHistory.update((current) => {
+          const entries = current[bikeId] ?? [];
+          return { ...current, [bikeId]: entries.filter((e) => e.serviceId !== serviceId) };
+        });
+      });
+  }
+
   deleteBike(bikeId: string): void {
     this.http
       .post(`/api/fleet/bikes/${bikeId}/delete`, {})

@@ -103,6 +103,11 @@ func FleetBikeDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if action == "service-delete" {
+		handleDeleteServiceEntry(w, r, bikeID)
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		bike, ok, err := trackerStore.GetBike(r.Context(), bikeID)
@@ -176,6 +181,25 @@ func handleDeleteBike(w http.ResponseWriter, r *http.Request, bikeID string) {
 	}
 	if err := trackerStore.DeleteBike(r.Context(), bikeID); err != nil {
 		http.Error(w, "failed to delete bike", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
+}
+
+func handleDeleteServiceEntry(w http.ResponseWriter, r *http.Request, bikeID string) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ServiceID string `json:"serviceId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.ServiceID) == "" {
+		http.Error(w, "serviceId is required", http.StatusBadRequest)
+		return
+	}
+	if err := trackerStore.DeleteServiceEntry(r.Context(), bikeID, req.ServiceID); err != nil {
+		http.Error(w, "failed to delete service entry", http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})

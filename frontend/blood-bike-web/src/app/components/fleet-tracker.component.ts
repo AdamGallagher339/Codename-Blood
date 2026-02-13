@@ -146,6 +146,10 @@ export class FleetTrackerComponent {
     this.servicePerformedBy.set('');
   }
 
+  deleteServiceEntry(bikeId: string, serviceId: string): void {
+    this.fleetService.deleteServiceEntry(bikeId, serviceId);
+  }
+
   deleteBike(): void {
     const bike = this.selectedBike();
     if (!bike) return;

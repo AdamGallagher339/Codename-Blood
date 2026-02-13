@@ -208,6 +208,7 @@
               <div class="timeline-header">
                 <strong>{{ entry.serviceType | titlecase }}</strong>
                 <span class="timeline-date">{{ entry.serviceDate | date: 'mediumDate' }}</span>
+                <button class="btn-remove-entry" title="Remove entry" (click)="deleteServiceEntry(bike.bikeId, entry.serviceId)">&times;</button>
               </div>
               <p *ngIf="entry.notes" class="timeline-notes">{{ entry.notes }}</p>
               <span *ngIf="entry.performedBy" class="timeline-meta">👤 {{ entry.performedBy }}</span>
