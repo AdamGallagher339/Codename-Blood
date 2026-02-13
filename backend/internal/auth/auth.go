@@ -2,9 +2,13 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -29,10 +33,11 @@ const (
 )
 
 type AuthClient struct {
-	client     *cognito.Client
-	region     string
-	userPoolID string
-	clientID   string
+	client       *cognito.Client
+	region       string
+	userPoolID   string
+	clientID     string
+	clientSecret string
 
 	jwks     *keyfunc.JWKS
 	jwksOnce sync.Once
@@ -77,6 +82,7 @@ func NewAuthClient(ctx context.Context) (*AuthClient, error) {
 
 	userPool := os.Getenv("COGNITO_USER_POOL_ID")
 	clientId := os.Getenv("COGNITO_CLIENT_ID")
+	clientSecret := os.Getenv("COGNITO_CLIENT_SECRET")
 	region := os.Getenv("AWS_REGION")
 	if userPool == "" || clientId == "" {
 		return nil, errors.New("COGNITO_USER_POOL_ID and COGNITO_CLIENT_ID must be set")
@@ -95,12 +101,15 @@ func NewAuthClient(ctx context.Context) (*AuthClient, error) {
 	// Ensure the service client uses the same region we record.
 	cfg.Region = region
 
-	return &AuthClient{
-		client:     cognito.NewFromConfig(cfg),
-		region:     region,
-		userPoolID: userPool,
-		clientID:   clientId,
-	}, nil
+	a := &AuthClient{
+		client:       cognito.NewFromConfig(cfg),
+		region:       region,
+		userPoolID:   userPool,
+		clientID:     clientId,
+		clientSecret: clientSecret,
+	}
+	log.Printf("Auth mode local=%v region=%s userPool=%s clientID=%s hasSecret=%v", a.local, a.region, a.userPoolID, a.clientID, a.clientSecret != "")
+	return a, nil
 }
 
 // SetUserGroups sets a user's Cognito groups to match the provided list.
@@ -324,6 +333,11 @@ func (a *AuthClient) SignUpHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Add SECRET_HASH if client has a secret
+	if a.clientSecret != "" {
+		input.SecretHash = awsString(a.computeSecretHash(body.Username))
+	}
+
 	_, err := a.client.SignUp(r.Context(), input)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("signup failed: %v", err), http.StatusBadRequest)
@@ -358,6 +372,12 @@ func (a *AuthClient) ConfirmSignUpHandler(w http.ResponseWriter, r *http.Request
 		Username:         &body.Username,
 		ConfirmationCode: &body.Code,
 	}
+
+	// Add SECRET_HASH if client has a secret
+	if a.clientSecret != "" {
+		input.SecretHash = awsString(a.computeSecretHash(body.Username))
+	}
+
 	_, err := a.client.ConfirmSignUp(r.Context(), input)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("confirm failed: %v", err), http.StatusBadRequest)
@@ -421,6 +441,11 @@ func (a *AuthClient) SignInHandler(w http.ResponseWriter, r *http.Request) {
 			"USERNAME": body.Username,
 			"PASSWORD": body.Password,
 		},
+	}
+
+	// Add SECRET_HASH if client has a secret
+	if a.clientSecret != "" {
+		input.AuthParameters["SECRET_HASH"] = a.computeSecretHash(body.Username)
 	}
 
 	resp, err := a.client.InitiateAuth(r.Context(), input)
@@ -606,6 +631,18 @@ func extractBearer(r *http.Request) (string, error) {
 }
 
 func awsString(s string) *string { return &s }
+
+// computeSecretHash computes the SECRET_HASH required by Cognito when the client has a secret.
+// SECRET_HASH = HMAC-SHA256(client_secret, username + client_id), then base64 encoded
+func (a *AuthClient) computeSecretHash(username string) string {
+	if a.clientSecret == "" {
+		return ""
+	}
+	message := username + a.clientID
+	h := hmac.New(sha256.New, []byte(a.clientSecret))
+	h.Write([]byte(message))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
