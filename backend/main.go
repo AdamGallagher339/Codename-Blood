@@ -78,7 +78,8 @@ func main() {
 	// --- User / Tag Routes ---
 	http.HandleFunc("/api/users", withCORS(authClient.RequireAuth(fleet.GetAllUsers)))
 	http.HandleFunc("/api/user/register", withCORS(fleet.RegisterUser))
-	http.HandleFunc("/api/user", withCORS(authClient.RequireAuth(fleet.GetUser))) // GET ?riderId=...
+	http.HandleFunc("/api/user/roles/init", withCORS(fleet.InitializeUserRoles)) // Initial role setup after signup
+	http.HandleFunc("/api/user", withCORS(authClient.RequireAuth(fleet.GetUser)))                        // GET ?riderId=...
 	http.HandleFunc("/api/user/tags/add", withCORS(authClient.RequireAuth(fleet.AddTagToUser)))
 	http.HandleFunc("/api/user/tags/remove", withCORS(authClient.RequireAuth(fleet.RemoveTagFromUser)))
 

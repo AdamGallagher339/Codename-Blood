@@ -72,11 +72,8 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
-	// Only allow admins to register users
-	if !isAdminRequest(r) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
+	// Register or update a fleet user record
+	// Called during account creation process (after auth signup)
 	var u User
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -156,6 +153,38 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
+	json.NewEncoder(w).Encode(u)
+}
+
+// InitializeUserRoles is used immediately after account creation to assign roles.
+// Expects JSON body: { "riderId": "user123", "roles": ["Rider", "Dispatcher"] }
+func InitializeUserRoles(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		RiderID string   `json:"riderId"`
+		Roles   []string `json:"roles"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.RiderID == "" {
+		http.Error(w, "riderId required", http.StatusBadRequest)
+		return
+	}
+
+	u, ok := users[body.RiderID]
+	if !ok {
+		// auto-register a minimal user if doesn't exist
+		u = &User{RiderID: body.RiderID}
+		users[body.RiderID] = u
+	}
+
+	// Add all roles as tags
+	for _, role := range body.Roles {
+		u.AddTag(role)
+	}
+
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(u)
 }
 

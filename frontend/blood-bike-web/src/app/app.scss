@@ -591,6 +591,39 @@
   }
 }
 
+.roles-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.role-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  background-color: #ffcccc; // light red initially
+  color: #333;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background-color: #ff9999; // darker red on hover
+    border-color: #ff6666;
+  }
+  
+  &.selected {
+    background-color: #66bb6a; // green when selected
+    color: white;
+    border-color: #43a047;
+    
+    &:hover {
+      background-color: #43a047; // darker green on hover
+    }
+  }
+}
+
 @media (max-width: 480px) {
   .app-header {
     .logo {

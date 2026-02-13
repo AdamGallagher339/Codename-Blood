@@ -243,11 +243,11 @@
             </label>
             <label>
               <span>Roles</span>
-              <div class="roles-checkboxes">
-                <label><input type="checkbox" [checked]="adminRoles.includes('BloodBikeAdmin')" (change)="toggleAdminRole('BloodBikeAdmin')"> BloodBikeAdmin</label>
-                <label><input type="checkbox" [checked]="adminRoles.includes('Rider')" (change)="toggleAdminRole('Rider')"> Rider</label>
-                <label><input type="checkbox" [checked]="adminRoles.includes('FleetManager')" (change)="toggleAdminRole('FleetManager')"> Fleet Manager</label>
-                <label><input type="checkbox" [checked]="adminRoles.includes('Dispatcher')" (change)="toggleAdminRole('Dispatcher')"> Dispatcher</label>
+              <div class="roles-buttons">
+                <button class="role-btn" [ngClass]="{'selected': adminRoleSelection['BloodBikeAdmin']}" (click)="toggleRole('BloodBikeAdmin')">BloodBikeAdmin</button>
+                <button class="role-btn" [ngClass]="{'selected': adminRoleSelection['Rider']}" (click)="toggleRole('Rider')">Rider</button>
+                <button class="role-btn" [ngClass]="{'selected': adminRoleSelection['FleetManager']}" (click)="toggleRole('FleetManager')">Fleet Manager</button>
+                <button class="role-btn" [ngClass]="{'selected': adminRoleSelection['Dispatcher']}" (click)="toggleRole('Dispatcher')">Dispatcher</button>
               </div>
             </label>
             <div class="auth-actions">

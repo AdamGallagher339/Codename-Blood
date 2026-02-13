@@ -44,6 +44,12 @@ export class App implements OnInit {
   adminPassword = '';
   adminRole = 'BloodBikeAdmin';
   adminRoles: string[] = ['BloodBikeAdmin'];
+  adminRoleSelection: { [key: string]: boolean } = {
+    'BloodBikeAdmin': true,
+    'Rider': false,
+    'FleetManager': false,
+    'Dispatcher': false
+  };
 
   // Manage users (admin)
   users: Array<any> = [];
@@ -204,6 +210,19 @@ export class App implements OnInit {
     } else {
       this.adminRoles.push(role);
     }
+  }
+
+  syncAdminRoles(): void {
+    // Sync from adminRoleSelection to adminRoles array
+    this.adminRoles = Object.keys(this.adminRoleSelection)
+      .filter(role => this.adminRoleSelection[role]);
+    console.log('Admin roles updated:', this.adminRoles);
+  }
+
+  toggleRole(role: string): void {
+    // Toggle role selection and sync to array
+    this.adminRoleSelection[role] = !this.adminRoleSelection[role];
+    this.syncAdminRoles();
   }
 
   get footerPages(): Array<{ id: string; title: string; icon: string; roles: string[] }> {
@@ -415,30 +434,31 @@ export class App implements OnInit {
         this.http.post('/api/user/register', u).subscribe({
           next: () => {
             console.log('Fleet user registered successfully');
-            // add all selected role tags to user record
-            const roleTags = this.adminRoles.slice(); // Make a copy
-            const addTagsRecursively = (index: number) => {
-              if (index >= roleTags.length) {
+            // Initialize all selected roles in one call
+            console.log('Initializing roles:', this.adminRoles);
+            this.http.post('/api/user/roles/init', { riderId: this.adminUsername.trim(), roles: this.adminRoles }).subscribe({
+              next: () => {
+                console.log('User roles initialized successfully');
                 this.adminMessage = 'Account created successfully';
                 this.adminBusy = false;
                 this.adminUsername = '';
                 this.adminEmail = '';
                 this.adminPassword = '';
                 this.adminRoles = ['BloodBikeAdmin']; // Reset to default
+                this.adminRoleSelection = {
+                  'BloodBikeAdmin': true,
+                  'Rider': false,
+                  'FleetManager': false,
+                  'Dispatcher': false
+                };
                 this.loadUsers();
-                return;
+              },
+              error: (err) => {
+                console.error('Failed to initialize roles:', err);
+                this.adminMessage = `Created user but failed to assign roles`;
+                this.adminBusy = false;
               }
-              const tag = roleTags[index];
-              this.http.post('/api/user/tags/add', { riderId: this.adminUsername.trim(), tag }).subscribe({
-                next: () => addTagsRecursively(index + 1),
-                error: (err) => {
-                  console.error('Failed to add tag:', tag, err);
-                  this.adminMessage = `Created user but failed to add role ${tag}`;
-                  this.adminBusy = false;
-                }
-              });
-            };
-            addTagsRecursively(0);
+            });
           },
           error: (err) => {
             console.error('Fleet user registration error:', {status: err.status, statusText: err.statusText, error: err.error});
