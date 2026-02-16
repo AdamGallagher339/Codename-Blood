@@ -184,9 +184,15 @@ export class InfraStack extends Stack {
         functionName: 'BackendApi',
         architecture: lambda.Architecture.X86_64,
         environment: {
+          // AWS
+          AWS_REGION: this.region,
+
           // Cognito
           COGNITO_USER_POOL_ID: userPool.userPoolId,
           COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
+          // Only needed if the Cognito client is created with generateSecret: true.
+          // Currently empty because the client has generateSecret: false.
+          COGNITO_CLIENT_SECRET: '',
 
           // DynamoDB tables (main backend)
           USERS_TABLE: usersTable.tableName,
