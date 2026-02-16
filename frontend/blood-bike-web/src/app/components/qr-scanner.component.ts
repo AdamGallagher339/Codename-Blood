@@ -1,7 +1,7 @@
 import { Component, signal, ViewChild, ElementRef, OnDestroy, Output, EventEmitter, Input, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 
 @Component({
   selector: 'app-qr-scanner',
@@ -18,7 +18,7 @@ export class QrScannerComponent implements OnDestroy {
   scanResult = signal<string | null>(null);
   error = signal<string | null>(null);
 
-  private scanner: Html5QrcodeScanner | null = null;
+  private scanner: Html5Qrcode | null = null;
   private lastScanTime = 0;
   private debounceInterval = 500; // ms
 
@@ -41,20 +41,18 @@ export class QrScannerComponent implements OnDestroy {
     this.cdr.detectChanges();
     
     setTimeout(() => {
-      // Initialize scanner with correct types
-      const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        remoteServerLogLevel: 'ERROR' as const,
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-      };
+      this.scanner = new Html5Qrcode('qr-reader');
 
-      this.scanner = new Html5QrcodeScanner('qr-reader', config, false);
-
-      this.scanner.render(
+      this.scanner.start(
+        { facingMode: 'environment' },   // rear camera for scanning physical QR codes
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText: string) => this.onScanSuccess(decodedText),
         (error: string) => this.onScanError(error)
-      );
+      ).catch((err: unknown) => {
+        console.error('Failed to start scanner:', err);
+        this.error.set('Failed to start camera. Please check permissions and try again.');
+        this.isScanning.set(false);
+      });
     }, 0);
   }
 
@@ -92,7 +90,7 @@ export class QrScannerComponent implements OnDestroy {
 
   stopScan(): void {
     if (this.scanner) {
-      this.scanner.clear().catch((err: unknown) => {
+      this.scanner.stop().catch((err: unknown) => {
         console.log('Error stopping scanner:', err);
       });
       this.scanner = null;
