@@ -63,7 +63,7 @@ export class App implements OnInit {
 
   private readonly allPages: Array<{ id: string; title: string; icon: string; roles: string[] }> = [
     { id: 'tracking', title: 'Map', icon: '🗺️', roles: ['Rider', 'FleetManager', 'Dispatcher'] },
-    { id: 'scan', title: 'QR Scanner', icon: '📱', roles: ['Rider', 'FleetManager'] },
+    { id: 'scan', title: 'QR Test', icon: '📱', roles: ['BloodBikeAdmin'] },
     { id: 'jobs', title: 'Jobs', icon: '📋', roles: ['Rider'] },
     { id: 'dispatcher', title: 'Dispatcher', icon: '📞', roles: ['Dispatcher'] },
     { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager'] },
