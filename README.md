@@ -13,28 +13,114 @@ Blood Bike fleet + events tooling with live GPS tracking.
 
 ## Prerequisites
 
-### Required (run backend + frontend locally)
+### Required
 
-- Go (this repo currently targets Go `1.25.4`)
-- Node.js + npm (LTS recommended)
+| Tool | Version | Install |
+|------|---------|---------|
+| **Go** | `1.25.4` | [go.dev/dl](https://go.dev/dl/) |
+| **Node.js** | LTS (v24+) | [nodejs.org](https://nodejs.org/) or via `nvm install --lts` |
+| **npm** | Bundled with Node | Comes with Node.js |
 
 ### Optional
 
-- AWS credentials configured (only needed for Cognito auth routes and/or infra)
-- AWS CLI (only needed for infra workflows)
+| Tool | Purpose |
+|------|---------|
+| **AWS CLI** | Infra workflows & deploying CDK stacks |
+| **AWS credentials** | Required only for Cognito auth routes, DynamoDB-backed stores, and infra |
 
-## Run Locally (Backend + Frontend)
+Verify your installs:
+
+```bash
+go version        # go1.25.4 or later
+node --version    # v24.x or later
+npm --version     # 11.x or later
+```
+
+---
+
+## Setup
+
+### 1) Clone the repo
+
+```bash
+git clone https://github.com/AdamGallagher339/Codename-Blood.git
+cd Codename-Blood
+```
+
+### 2) Configure environment variables
+
+The backend loads a `.env` file automatically on startup (via `godotenv`).
+An example file is provided at `backend/.env.example` — copy it and fill in any values you need:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Open `backend/.env` and set the variables relevant to your setup:
+
+#### Authentication
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AUTH_MODE` | No | Set to `local` to skip Cognito and use local dev JWTs |
+| `LOCAL_AUTH` | No | Set to `true` to enable local auth (alternative flag) |
+| `LOCAL_AUTH_SECRET` | No | Custom secret for signing local dev JWTs (a default is used if unset) |
+| `AWS_REGION` | For Cognito | AWS region for Cognito (e.g. `eu-north-1`) |
+| `COGNITO_USER_POOL_ID` | For Cognito | Cognito User Pool ID |
+| `COGNITO_CLIENT_ID` | For Cognito | Cognito App Client ID |
+| `COGNITO_CLIENT_SECRET` | For Cognito | Cognito App Client Secret |
+
+#### DynamoDB tables (main backend)
+
+These are only needed if you want the DynamoDB-backed data stores instead of the in-memory defaults:
+
+| Variable | Description |
+|----------|-------------|
+| `USERS_TABLE` | DynamoDB table name for users |
+| `BIKES_TABLE` | DynamoDB table name for bikes |
+| `DEPOTS_TABLE` | DynamoDB table name for depots |
+| `JOBS_TABLE` | DynamoDB table name for jobs |
+
+#### DynamoDB tables (fleet tracker)
+
+| Variable | Description |
+|----------|-------------|
+| `FLEET_BIKES_TABLE` | DynamoDB table name for fleet bikes |
+| `FLEET_SERVICE_TABLE` | DynamoDB table name for fleet service records |
+
+#### DynamoDB tables (Lambda)
+
+| Variable | Description |
+|----------|-------------|
+| `MOTORCYCLES_TABLE` | DynamoDB table name used by Lambda functions |
+
+> **Tip:** For local-only development without AWS, you can leave all DynamoDB and Cognito variables empty. The backend will fall back to in-memory stores and `AUTH_MODE=local` will let you authenticate without Cognito.
+
+### 3) Install dependencies
+
+```bash
+# Backend (Go modules)
+cd backend
+go mod download
+
+# Frontend (npm packages)
+cd ../frontend/blood-bike-web
+npm install
+```
+
+---
+
+## Run Locally
 
 You will run two processes:
 
-- Backend API: `http://localhost:8080`
-- Frontend (Angular dev server): `http://localhost:4200` (proxies `/api` to the backend)
+- **Backend API:** `http://localhost:8080`
+- **Frontend (Angular dev server):** `http://localhost:4200` (proxies `/api` → backend)
 
 ### 1) Start the backend (Go)
 
 ```bash
 cd backend
-go mod download
 go run .
 ```
 
@@ -50,7 +136,6 @@ In a second terminal:
 
 ```bash
 cd frontend/blood-bike-web
-npm install
 npm run start
 ```
 
@@ -81,38 +166,17 @@ ENTITY_ID=bike-002 ENTITY_TYPE=bike ./simulate-tracking.sh
 
 See [docs/TRACKING_MAP.md](docs/TRACKING_MAP.md) for detailed documentation.
 
-## Environment Variables
-
-### Backend (optional Cognito auth)
-
-If these are not set, the backend will still run, but the Cognito auth routes won’t be enabled:
-
-- `COGNITO_USER_POOL_ID`
-- `COGNITO_CLIENT_ID`
-- `AWS_REGION`
-
-Example:
-
-```bash
-export AWS_REGION=eu-west-1
-export COGNITO_USER_POOL_ID=eu-west-1_XXXXXXX
-export COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-### Fleet Tracker (DynamoDB)
-
-The fleet tracker endpoints use DynamoDB. Set these to enable `/api/fleet/*` routes:
-
-- `FLEET_BIKES_TABLE`
-- `FLEET_SERVICE_TABLE`
+---
 
 ## Infra (optional)
 
-Infrastructure code is in `infra/` (AWS CDK). This is not required to run the app locally.
+Infrastructure code is in `infra/` (AWS CDK). This is **not** required to run the app locally.
 
 ```bash
 cd infra
 npm install
+npx cdk synth   # synthesize CloudFormation template
+npx cdk deploy  # deploy to AWS (requires credentials)
 ```
 
 ## API Documentation
