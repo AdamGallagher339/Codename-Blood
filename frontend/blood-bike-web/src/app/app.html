@@ -15,7 +15,7 @@
               class="role-chip"
               [class.active]="r === selectedRole"
               (click)="setRole(r)"
-            >{{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r }}</button>
+            >{{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r === 'HR' ? 'HR' : r }}</button>
             <button class="role-chip all" *ngIf="me.roles.length > 1" [class.active]="!selectedRole" (click)="setRole(null)">All</button>
           </div>
         </div>
@@ -265,6 +265,7 @@
                   <button class="role-toggle" [class.on]="adminRoleSelection['Rider']" (click)="toggleRole('Rider')">Rider</button>
                   <button class="role-toggle" [class.on]="adminRoleSelection['FleetManager']" (click)="toggleRole('FleetManager')">Fleet Mgr</button>
                   <button class="role-toggle" [class.on]="adminRoleSelection['Dispatcher']" (click)="toggleRole('Dispatcher')">Dispatch</button>
+                  <button class="role-toggle" [class.on]="adminRoleSelection['HR']" (click)="toggleRole('HR')">HR</button>
                 </div>
               </div>
               <button class="btn-create" [disabled]="adminBusy" (click)="createAccountByAdmin()">{{ adminBusy ? 'Creating…' : 'Create account' }}</button>
@@ -294,7 +295,7 @@
                     <td>
                       <div class="roles-grid">
                         <button *ngFor="let r of allRoles" class="role-toggle sm" [class.on]="hasRole(u,r)" (click)="toggleUserRole(u,r)">
-                          {{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r }}
+                          {{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r === 'HR' ? 'HR' : r }}
                         </button>
                       </div>
                     </td>
@@ -318,7 +319,7 @@
                 </div>
                 <div class="roles-grid">
                   <button *ngFor="let r of allRoles" class="role-toggle sm" [class.on]="hasRole(u,r)" (click)="toggleUserRole(u,r)">
-                    {{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r }}
+                    {{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r === 'HR' ? 'HR' : r }}
                   </button>
                 </div>
                 <div class="action-btns">

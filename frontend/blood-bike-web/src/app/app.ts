@@ -51,7 +51,8 @@ export class App implements OnInit {
     'BloodBikeAdmin': true,
     'Rider': false,
     'FleetManager': false,
-    'Dispatcher': false
+    'Dispatcher': false,
+    'HR': false
   };
 
   // Manage users (admin)
@@ -62,6 +63,8 @@ export class App implements OnInit {
   adminMessage: string | null = null;
 
   private readonly allPages: Array<{ id: string; title: string; icon: string; roles: string[] }> = [
+    { id: 'applications', title: 'Applications', icon: '📋', roles: ['HR'] },
+    { id: 'trainings', title: 'Trainings', icon: '🎓', roles: ['HR'] },
     { id: 'tracking', title: 'Map', icon: '🗺️', roles: ['Rider', 'FleetManager', 'Dispatcher'] },
     { id: 'scan', title: 'QR Test', icon: '📱', roles: ['BloodBikeAdmin'] },
     { id: 'jobs', title: 'Jobs', icon: '📋', roles: ['Rider'] },
@@ -82,6 +85,8 @@ export class App implements OnInit {
     'events',
     'active-riders',
     'my-availability',
+    'applications',
+    'trainings',
     'settings',
     'access-denied'
   ]);
@@ -183,7 +188,7 @@ export class App implements OnInit {
     this.loadUsers();
   }
 
-  allRoles: string[] = ['BloodBikeAdmin', 'Rider', 'FleetManager', 'Dispatcher'];
+  allRoles: string[] = ['BloodBikeAdmin', 'Rider', 'FleetManager', 'Dispatcher', 'HR'];
 
   hasRole(user: any, role: string): boolean {
     return user.roles.has(role);

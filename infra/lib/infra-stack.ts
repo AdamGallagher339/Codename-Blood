@@ -146,6 +146,11 @@ export class InfraStack extends Stack {
       groupName: 'FleetManager',
       description: 'Fleet managers',
     });
+    new cognito.CfnUserPoolGroup(this, 'GroupHR', {
+      userPoolId: userPool.userPoolId,
+      groupName: 'HR',
+      description: 'Human Resources',
+    });
 
     const api = new apigw.RestApi(this, 'FleetApi', {
         restApiName: 'BloodBike Fleet API',

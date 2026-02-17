@@ -11,6 +11,8 @@ import { AccessDeniedComponent } from './components/access-denied.component';
 import { BlankComponent } from './components/blank.component';
 import { ActiveRidersComponent } from './components/active-riders.component';
 import { RiderAvailabilityComponent } from './components/rider-availability.component';
+import { ApplicationsComponent } from './components/applications.component';
+import { TrainingsComponent } from './components/trainings.component';
 
 export const routes: Routes = [
   // Dashboard / Maps (available to Rider, Fleet Manager, Dispatcher)
@@ -33,6 +35,12 @@ export const routes: Routes = [
 
   // Rider Availability – riders set their own status
   { path: 'my-availability', component: RiderAvailabilityComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider'] } },
+
+  // HR – Applications
+  { path: 'applications', component: ApplicationsComponent, canActivate: [hasRoleGuard], data: { roles: ['HR'] } },
+
+  // HR – Trainings
+  { path: 'trainings', component: TrainingsComponent, canActivate: [hasRoleGuard], data: { roles: ['HR'] } },
 
   // Events (available to all authenticated users)
   { path: 'events', component: EventsPageComponent },
