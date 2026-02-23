@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/analytics"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/events"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/fleet"
@@ -718,6 +719,11 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	// Riders tracking endpoint (FleetManager role required)
 	mux.HandleFunc("/api/tracking/riders", withCORS(requireAuthAndRole("FleetManager", tracking.HandleGetRiders)))
 	mux.HandleFunc("/api/tracking/riders/ws", withCORS(requireAuthAndRole("FleetManager", tracking.HandleRidersWebSocket)))
+
+	// --- Analytics Routes ---
+	// GET /api/analytics/          → list of tracked rider IDs (FleetManager/Dispatcher)
+	// GET /api/analytics/{riderId} → speed + distance summary for that rider
+	mux.HandleFunc("/api/analytics/", withCORS(authClient.RequireAuth(analytics.HandleGetAnalytics)))
 
 	// Geocoding proxy — forwards to Nominatim with a proper server-side User-Agent
 	mux.HandleFunc("/api/geocode", withCORS(authClient.RequireAuth(handleGeocode)))

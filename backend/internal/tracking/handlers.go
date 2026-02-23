@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/analytics"
 	"github.com/gorilla/websocket"
 )
 
@@ -74,6 +75,11 @@ func HandleLocationUpdate(w http.ResponseWriter, r *http.Request) {
 
 	// Store and broadcast the update
 	GlobalStore.UpdateLocation(update)
+
+	// Feed analytics for rider entities
+	if update.EntityType == "rider" {
+		analytics.GlobalStore.Record(update.EntityID, update.Latitude, update.Longitude, update.Speed, update.Timestamp)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
