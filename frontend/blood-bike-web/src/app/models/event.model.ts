@@ -6,6 +6,8 @@ export interface Event {
   startTime: string;
   endTime: string;
   location: string;
+  lat?: number;
+  lng?: number;
   type: EventType;
   priority: EventPriority;
   assignedRiders?: string[];
@@ -44,6 +46,8 @@ export interface CreateEventDto {
   startTime: string;
   endTime: string;
   location: string;
+  lat?: number;
+  lng?: number;
   type: EventType;
   priority: EventPriority;
   assignedRiders?: string[];
