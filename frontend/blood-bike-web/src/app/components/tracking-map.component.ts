@@ -1,7 +1,10 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, inject, effect, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, inject, effect, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import * as L from 'leaflet';
+import 'leaflet-routing-machine';
+import { firstValueFrom } from 'rxjs';
 import { LocationTrackingService } from '../services/location-tracking.service';
 import { LocationUpdate } from '../models/location.model';
 import { EventService } from '../services/event.service';
@@ -12,7 +15,7 @@ import { Subscription } from 'rxjs';
 @Component({
   selector: 'app-tracking-map',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './tracking-map.component.html',
   styleUrls: ['./tracking-map.component.scss']
 })
@@ -32,6 +35,31 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   private jobMarkers: Map<string, L.Marker> = new Map();      // pickup (green)
   private jobDropoffMarkers: Map<string, L.Marker> = new Map(); // delivery (red) — role-scoped
   private jobRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  // ── Routing (Dispatcher / FleetManager only) ──────────────────────────────
+  /** LRM control currently drawn on the map — only one at a time */
+  private routingControl: any | null = null;
+  /** Entity ID of the rider being routed from */
+  routingRiderId = signal<string | null>(null);
+  /** Display name shown in the panel */
+  routingRiderName = signal<string | null>(null);
+  /** Resolved destination LatLng used for live route updates */
+  private destLatLng: L.LatLng | null = null;
+  /** Free-text destination the user typed */
+  destSearch = '';
+  /** True while OSRM / Nominatim request is pending */
+  isRouteLoading = signal(false);
+  /** Error message from the last routing attempt */
+  routeError = signal<string | null>(null);
+  /** Calculated route distance in km */
+  routeDistance = signal<number | null>(null);
+  /** Calculated route time in minutes */
+  routeTime = signal<number | null>(null);
+  /** True for roles that may generate routes */
+  readonly canRoute = computed(() =>
+    ['FleetManager', 'Dispatcher', 'BloodBikeAdmin'].some(r => this.authService.hasRole(r))
+  );
+  // ────────────────────────────────────────────────────────────────────────────
 
   // Set to true in ngOnDestroy so all pending timers know to abort
   private destroyed = false;
@@ -170,6 +198,9 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnInit(): void {
+    // Expose a stable window function so Leaflet popup buttons can trigger routing
+    (window as any).routeToRider = (entityId: string) => this.routeToRider(entityId);
+
     // Subscribe to connection status
     this.subscriptions.push(
       this.locationService.getConnectionStatus().subscribe(status => {
@@ -205,6 +236,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy(): void {
+    // Clean up routing control and window binding
+    this.clearRoute();
+    delete (window as any).routeToRider;
+
     // Signal all pending timers (animateMarker, etc.) to abort immediately
     this.destroyed = true;
 
@@ -459,7 +494,15 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       
       // Update popup content
       marker.setPopupContent(this.createPopupContent(location));
-      
+
+      // Live-update route origin when this rider is the active routing source
+      if (this.routingControl && this.routingRiderId() === location.entityId && this.destLatLng) {
+        this.routingControl.setWaypoints([
+          L.latLng(location.latitude, location.longitude),
+          this.destLatLng
+        ]);
+      }
+
       // Update selected location if this is the selected entity
       if (this.selectedEntityId === location.entityId) {
         this.selectedLocation = location;
@@ -501,12 +544,18 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /**
-   * Create popup content for a marker
+   * Create popup content for a marker.
+   * For rider markers, dispatchers and managers get a "Get Directions" button.
    */
   private createPopupContent(location: LocationUpdate): string {
     const lastUpdate = new Date(location.updatedAt).toLocaleString();
     const isStale = this.locationService.isLocationStale(location);
-    
+
+    // Show directions button only to authorised roles on rider markers
+    const directionsBtn = location.entityType === 'rider' && this.canRoute()
+      ? `<button class="popup-directions-btn" onclick="window.routeToRider('${location.entityId}')">🗺️ Get Directions</button>`
+      : '';
+
     return `
       <div class="marker-popup">
         <h4>${location.entityType}: ${location.entityId}</h4>
@@ -517,6 +566,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
         ${location.accuracy !== undefined ? `<p><strong>Accuracy:</strong> ${location.accuracy.toFixed(0)}m</p>` : ''}
         <p><strong>Last Update:</strong><br>${lastUpdate}</p>
         ${isStale ? '<p class="stale-warning">⚠️ Location data is stale</p>' : ''}
+        ${directionsBtn}
       </div>
     `;
   }
@@ -679,6 +729,142 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       </div>
     `;
   }
+
+  // ── Routing methods ──────────────────────────────────────────────────────────
+
+  /**
+   * Start routing from a rider's current location.
+   * Called via window.routeToRider from Leaflet popup buttons.
+   */
+  routeToRider(entityId: string): void {
+    const location = this.locations.find(l => l.entityId === entityId);
+    if (!location) return;
+    this.routingRiderId.set(entityId);
+    this.routingRiderName.set(entityId);
+    // If a destination is already resolved from a previous search, build immediately
+    if (this.destLatLng) {
+      this.buildRoute(location.latitude, location.longitude, this.destLatLng.lat, this.destLatLng.lng);
+    }
+  }
+
+  /**
+   * Geocode destSearch via Nominatim (Ireland-scoped) then draw the route.
+   */
+  async geocodeAndRoute(): Promise<void> {
+    const riderId = this.routingRiderId();
+    if (!riderId || !this.destSearch.trim()) return;
+
+    this.isRouteLoading.set(true);
+    this.routeError.set(null);
+
+    // Nominatim reverse geocode, bounded to Ireland
+    const url =
+      `https://nominatim.openstreetmap.org/search` +
+      `?q=${encodeURIComponent(this.destSearch)}` +
+      `&format=json&limit=1&countrycodes=ie` +
+      `&bounded=1&viewbox=-10.75,55.45,-5.35,51.35`;
+
+    try {
+      const results = await firstValueFrom(this.http.get<any[]>(url));
+      if (!results || results.length === 0) {
+        this.routeError.set('Address not found in Ireland. Try a more specific search.');
+        this.isRouteLoading.set(false);
+        return;
+      }
+      const destLat = parseFloat(results[0].lat);
+      const destLng = parseFloat(results[0].lon);
+      this.destLatLng = L.latLng(destLat, destLng);
+
+      const riderLoc = this.locations.find(l => l.entityId === riderId);
+      if (riderLoc) {
+        this.buildRoute(riderLoc.latitude, riderLoc.longitude, destLat, destLng);
+      } else {
+        this.isRouteLoading.set(false);
+      }
+    } catch {
+      this.routeError.set('Geocoding failed. Please try again.');
+      this.isRouteLoading.set(false);
+    }
+  }
+
+  /**
+   * Create (or replace) the LRM routing control.
+   * Uses the free public OSRM service — no API key required.
+   * Prevents stacking by removing any existing control first.
+   */
+  private buildRoute(riderLat: number, riderLng: number, destLat: number, destLng: number): void {
+    if (!this.map) return;
+
+    // Remove previous route to prevent stacking
+    if (this.routingControl) {
+      this.routingControl.remove();
+      this.routingControl = null;
+    }
+
+    this.isRouteLoading.set(true);
+    this.routeError.set(null);
+    this.routeDistance.set(null);
+    this.routeTime.set(null);
+
+    // Build the LRM control using the free OSRM public endpoint
+    this.routingControl = (L as any).Routing.control({
+      waypoints: [
+        L.latLng(riderLat, riderLng),
+        L.latLng(destLat, destLng)
+      ],
+      router: (L as any).Routing.osrmv1({
+        serviceUrl: 'https://router.project-osrm.org/route/v1'
+      }),
+      lineOptions: {
+        styles: [{ color: '#E31837', weight: 5, opacity: 0.85 }],
+        extendToWaypoints: true,
+        missingRouteTolerance: 10
+      },
+      // Hide the default step-by-step sidebar — we show our own compact summary
+      show: false,
+      collapsible: false,
+      routeWhileDragging: false,
+      addWaypoints: false,
+      fitSelectedRoutes: true,
+      // Suppress LRM default A/B pin markers — we already have rider markers
+      createMarker: () => null
+    });
+
+    this.routingControl.on('routesfound', (e: any) => {
+      const summary = e.routes[0].summary;
+      // Convert metres → km (1 decimal place) and seconds → minutes
+      this.routeDistance.set(Math.round(summary.totalDistance / 100) / 10);
+      this.routeTime.set(Math.round(summary.totalTime / 60));
+      this.isRouteLoading.set(false);
+    });
+
+    this.routingControl.on('routingerror', () => {
+      this.routeError.set('No route found. The destination may not be road-accessible.');
+      this.isRouteLoading.set(false);
+    });
+
+    this.routingControl.addTo(this.map);
+  }
+
+  /**
+   * Remove the active route from the map and reset all routing state.
+   */
+  clearRoute(): void {
+    if (this.routingControl) {
+      this.routingControl.remove();
+      this.routingControl = null;
+    }
+    this.routingRiderId.set(null);
+    this.routingRiderName.set(null);
+    this.routeDistance.set(null);
+    this.routeTime.set(null);
+    this.routeError.set(null);
+    this.isRouteLoading.set(false);
+    this.destLatLng = null;
+    this.destSearch = '';
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   /** Load jobs from the API and place green markers for those with a pinned pickup location. */
   loadJobMarkers(): void {
