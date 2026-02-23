@@ -11,3 +11,4 @@ backend/backend
 # Local dev auth store
 data/users.db
 data/users.db
+data/push.db

@@ -545,7 +545,6 @@ func isAdminRequest(r *http.Request) bool {
 	return false
 }
 
-
 func ptr[T any](v T) *T {
 	return &v
 }
