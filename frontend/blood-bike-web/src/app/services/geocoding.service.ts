@@ -18,24 +18,15 @@ interface NominatimResult {
 @Injectable({ providedIn: 'root' })
 export class GeocodingService {
   private http = inject(HttpClient);
-  private nominatimUrl = 'https://nominatim.openstreetmap.org/search';
 
   /**
-   * Geocode a place name or address to lat/lng using OpenStreetMap Nominatim.
-   * Returns null if no result found.
+   * Geocode a place name or address to lat/lng.
+   * Proxied through the backend to avoid Nominatim's browser request policy.
    */
   geocode(query: string): Observable<GeocodedLocation | null> {
-    const params = {
-      q: query,
-      format: 'json',
-      limit: '1',
-      countrycodes: 'ie'
-    };
-
     return this.http
-      .get<NominatimResult[]>(this.nominatimUrl, {
-        params,
-        headers: { 'Accept-Language': 'en' }
+      .get<NominatimResult[]>('/api/geocode', {
+        params: { q: query }
       })
       .pipe(
         map(results => {

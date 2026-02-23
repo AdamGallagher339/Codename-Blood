@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,6 +20,43 @@ import (
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/tracking"
 	"github.com/google/uuid"
 )
+
+// handleGeocode proxies geocoding requests to Nominatim with a valid server-side User-Agent.
+// Nominatim blocks direct browser requests, so the frontend must go through this endpoint.
+func handleGeocode(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		http.Error(w, "missing query parameter 'q'", http.StatusBadRequest)
+		return
+	}
+
+	nominatimURL := "https://nominatim.openstreetmap.org/search?" + url.Values{
+		"q":            {q},
+		"format":       {"json"},
+		"limit":        {"1"},
+		"countrycodes": {"ie"},
+	}.Encode()
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, nominatimURL, nil)
+	if err != nil {
+		http.Error(w, "geocode request failed", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("User-Agent", "CodenameBloood/1.0 (blood-bike dispatch system; contact@example.com)")
+	req.Header.Set("Accept-Language", "en")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "geocode upstream error", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
+}
 
 // NewHandler builds and returns the HTTP handler for the main backend API.
 //
@@ -496,6 +535,9 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	// Riders tracking endpoint (FleetManager role required)
 	mux.HandleFunc("/api/tracking/riders", withCORS(requireAuthAndRole("FleetManager", tracking.HandleGetRiders)))
 	mux.HandleFunc("/api/tracking/riders/ws", withCORS(requireAuthAndRole("FleetManager", tracking.HandleRidersWebSocket)))
+
+	// Geocoding proxy — forwards to Nominatim with a proper server-side User-Agent
+	mux.HandleFunc("/api/geocode", withCORS(authClient.RequireAuth(handleGeocode)))
 
 	// WebSocket endpoint for real-time location updates
 	// Note: API Gateway REST proxy does not support WebSocket upgrades.
