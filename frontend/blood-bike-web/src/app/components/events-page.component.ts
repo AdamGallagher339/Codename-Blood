@@ -31,12 +31,34 @@ export class EventsPageComponent {
   upcomingEvents = computed(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     return this.events()
       .filter(event => new Date(event.date) >= today)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 10);
   });
+
+  /** Top 3 soonest upcoming events shown before the calendar/list view */
+  soonestEvents = computed(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return this.events()
+      .filter(event => new Date(event.date) >= today)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(0, 3);
+  });
+
+  daysUntil(date: Date): string {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const diff = Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Tomorrow';
+    return `In ${diff} days`;
+  }
   
   onDateSelected(date: Date): void {
     this.selectedDate.set(date);

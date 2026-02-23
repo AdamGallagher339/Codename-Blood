@@ -14,6 +14,39 @@
     </div>
   </div>
   
+  <!-- Happening Soon Banner -->
+  <div class="happening-soon" *ngIf="soonestEvents().length > 0">
+    <div class="soon-header">
+      <div class="soon-title">
+        <span class="soon-icon">🔔</span>
+        <span>{{ soonestEvents().length === 1 ? '1 event' : soonestEvents().length + ' events' }} happening soon</span>
+      </div>
+      <button class="btn-view-all" (click)="viewMode.set('list')">
+        View all ›
+      </button>
+    </div>
+    <div class="soon-cards">
+      <div
+        *ngFor="let event of soonestEvents()"
+        class="soon-card"
+        [class]="getPriorityClass(event.priority)"
+      >
+        <div class="soon-card-date">
+          <span class="soon-day-label">{{ daysUntil(event.date) }}</span>
+          <span class="soon-date-text">{{ formatDate(event.date) }}</span>
+        </div>
+        <div class="soon-card-body">
+          <span class="soon-card-icon">{{ getEventTypeIcon(event.type) }}</span>
+          <div class="soon-card-info">
+            <strong>{{ event.title }}</strong>
+            <span>{{ formatTime(event.startTime) }} · {{ event.location }}</span>
+          </div>
+          <span class="soon-card-badge">{{ event.priority }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="events-content">
     <!-- Calendar View -->
     <div *ngIf="viewMode() === 'calendar'" class="calendar-section">
