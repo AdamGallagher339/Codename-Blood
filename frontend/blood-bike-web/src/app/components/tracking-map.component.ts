@@ -551,8 +551,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     const lastUpdate = new Date(location.updatedAt).toLocaleString();
     const isStale = this.locationService.isLocationStale(location);
 
-    // Show directions button only to authorised roles on rider markers
-    const directionsBtn = location.entityType === 'rider' && this.canRoute()
+    // Show directions button on ALL rider markers.
+    // The panel itself is already gated behind canRoute(), so non-authorised
+    // users see the button but pressing it has no visible effect.
+    const directionsBtn = location.entityType === 'rider'
       ? `<button class="popup-directions-btn" onclick="window.routeToRider('${location.entityId}')">🗺️ Get Directions</button>`
       : '';
 
@@ -737,6 +739,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
    * Called via window.routeToRider from Leaflet popup buttons.
    */
   routeToRider(entityId: string): void {
+    if (!this.canRoute()) return; // silently ignore if user lacks permission
     const location = this.locations.find(l => l.entityId === entityId);
     if (!location) return;
     this.routingRiderId.set(entityId);
