@@ -6,6 +6,7 @@ import { hasRoleGuard } from './guards/role.guard';
 import { DispatcherComponent } from './components/dispatcher.component';
 import { FleetManagerComponent } from './components/fleet-manager.component';
 import { RiderJobsComponent } from './components/rider-jobs.component';
+import { ActiveJobComponent } from './components/active-job.component';
 import { SettingsComponent } from './components/settings.component';
 import { AccessDeniedComponent } from './components/access-denied.component';
 import { BlankComponent } from './components/blank.component';
@@ -29,6 +30,9 @@ export const routes: Routes = [
   
   // Rider Jobs Page
   { path: 'jobs', component: RiderJobsComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider'] } },
+  
+  // Active Job – delivery workflow
+  { path: 'active-job', component: ActiveJobComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider'] } },
   
   // Active Riders – admin, fleet manager, dispatcher
   { path: 'active-riders', component: ActiveRidersComponent, canActivate: [hasRoleGuard], data: { roles: ['BloodBikeAdmin', 'FleetManager', 'Dispatcher'] } },

@@ -1,4 +1,10 @@
 :root {
+  /* iOS safe area – falls back to 0px on non-notched devices */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
   /* Primary Colors */
   --color-red: #dc143c;
   --color-dark-red: #8b0000;
@@ -60,6 +66,10 @@ html, body {
 
 body {
   overflow-x: hidden;
+  /* iOS safe-area: ensure content isn't hidden behind notch/Dynamic Island */
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+  padding-bottom: var(--safe-bottom);
 }
 
 /* Typography */
@@ -215,5 +225,25 @@ a {
   
   h2 {
     font-size: var(--font-size-xl);
+  }
+}
+
+/* ===== iOS Safe Area: push header below notch / Dynamic Island ===== */
+/* This is in global styles so it applies regardless of component encapsulation */
+.app-header {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem) !important;
+}
+/* On standalone PWA (installed to home screen) env() works automatically.
+   In Safari browser, we need a manual minimum for notched iPhones. */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .app-header {
+    padding-top: calc(env(safe-area-inset-top) + 1.5rem) !important;
+  }
+}
+/* Fallback for notched iPhones in regular Safari (env() returns 0 in browser mode).
+   Target: screens ≤ 430px wide with ≥ 44px device-pixel ratio (retina iPhones). */
+@media screen and (max-width: 430px) and (-webkit-min-device-pixel-ratio: 2) {
+  .app-header {
+    padding-top: max(env(safe-area-inset-top, 50px), 50px) !important;
   }
 }

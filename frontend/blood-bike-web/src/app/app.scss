@@ -17,6 +17,8 @@
   background: linear-gradient(135deg, var(--color-black) 0%, var(--color-dark-gray) 100%);
   color: var(--color-white);
   padding: var(--spacing-lg) var(--spacing-md);
+  /* Push content below the iOS notch / Dynamic Island */
+  padding-top: calc(var(--safe-top, 0px) + var(--spacing-lg));
   box-shadow: var(--shadow-md);
   position: sticky;
   top: 0;
