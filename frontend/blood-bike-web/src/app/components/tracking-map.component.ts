@@ -5,6 +5,7 @@ import * as L from 'leaflet';
 import { LocationTrackingService } from '../services/location-tracking.service';
 import { LocationUpdate } from '../models/location.model';
 import { EventService } from '../services/event.service';
+import { AuthService } from '../services/auth.service';
 import { Event as AppEvent } from '../models/event.model';
 import { Subscription } from 'rxjs';
 
@@ -18,6 +19,7 @@ import { Subscription } from 'rxjs';
 export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   locationService = inject(LocationTrackingService);
   private eventService = inject(EventService);
+  private authService = inject(AuthService);
   private http = inject(HttpClient);
 
   // Events (loaded from service; component subscribes reactively via effect)
@@ -27,7 +29,8 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
   // Jobs with pinned locations
   showJobMarkers = signal(true);
-  private jobMarkers: Map<string, L.Marker> = new Map();
+  private jobMarkers: Map<string, L.Marker> = new Map();      // pickup (green)
+  private jobDropoffMarkers: Map<string, L.Marker> = new Map(); // delivery (red) — role-scoped
 
   // Set to true in ngOnDestroy so all pending timers know to abort
   private destroyed = false;
@@ -132,6 +135,16 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     shadowSize: [41, 41]
   });
 
+  // Icon for job delivery locations (red) — only shown to managers or job acceptor
+  private jobDropoffIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+
   // Build the "you are here" icon with a live speed readout above and rider emoji below.
   private buildMyLocationIcon(speedKph: number | null, accuracyM: number | null = null): L.DivIcon {
     const speedLabel = speedKph !== null && speedKph >= 0
@@ -210,6 +223,8 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     // Clean up job markers
     this.jobMarkers.forEach(m => m.remove());
     this.jobMarkers.clear();
+    this.jobDropoffMarkers.forEach(m => m.remove());
+    this.jobDropoffMarkers.clear();
 
     // Stop all in-progress Leaflet pan/zoom animations BEFORE removing the
     // container — otherwise Leaflet's animation timers fire panBy() on a
@@ -665,30 +680,63 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       jobId: string;
       title: string;
       status: string;
+      acceptedBy?: string;
       pickup: { address?: string; lat?: number; lng?: number };
+      dropoff: { address?: string; lat?: number; lng?: number };
     }
     this.http.get<JobData[]>('/api/jobs').subscribe({
       next: (jobs) => {
         if (!this.map) return;
-        // Remove stale markers for deleted jobs
         const currentIds = new Set(jobs.map(j => j.jobId));
+
+        // Remove markers for deleted jobs
         this.jobMarkers.forEach((m, id) => {
           if (!currentIds.has(id)) { m.remove(); this.jobMarkers.delete(id); }
         });
-        // Add / update
+        this.jobDropoffMarkers.forEach((m, id) => {
+          if (!currentIds.has(id)) { m.remove(); this.jobDropoffMarkers.delete(id); }
+        });
+
+        const isManager = ['FleetManager', 'Dispatcher', 'BloodBikeAdmin']
+          .some(r => this.authService.hasRole(r));
+        const me = this.authService.username();
+
         jobs.forEach(job => {
-          const lat = job.pickup?.lat;
-          const lng = job.pickup?.lng;
-          if (lat == null || lng == null) return;
-          const existing = this.jobMarkers.get(job.jobId);
-          const popup = `<div><h4>🟢 ${job.title}</h4><p><strong>Pickup:</strong> ${job.pickup?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p></div>`;
-          if (existing) {
-            existing.setLatLng([lat, lng]);
-            existing.setPopupContent(popup);
+          // ---- pickup marker (green, always visible) ----
+          const pLat = job.pickup?.lat;
+          const pLng = job.pickup?.lng;
+          if (pLat != null && pLng != null) {
+            const popupP = `<div><h4>🟢 ${job.title}</h4><p><strong>Pickup:</strong> ${job.pickup?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p></div>`;
+            const existingP = this.jobMarkers.get(job.jobId);
+            if (existingP) {
+              existingP.setLatLng([pLat, pLng]);
+              existingP.setPopupContent(popupP);
+            } else {
+              const m = L.marker([pLat, pLng], { icon: this.jobIcon }).bindPopup(popupP);
+              if (this.showJobMarkers()) m.addTo(this.map!);
+              this.jobMarkers.set(job.jobId, m);
+            }
+          }
+
+          // ---- dropoff marker (red, only for managers or job acceptor) ----
+          const dLat = job.dropoff?.lat;
+          const dLng = job.dropoff?.lng;
+          const canSeeDropoff = isManager || (job.acceptedBy && job.acceptedBy === me);
+          if (dLat != null && dLng != null && canSeeDropoff) {
+            const popupD = `<div><h4>📦 ${job.title} — Delivery</h4><p><strong>Drop-off:</strong> ${job.dropoff?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p></div>`;
+            const existingD = this.jobDropoffMarkers.get(job.jobId);
+            if (existingD) {
+              existingD.setLatLng([dLat, dLng]);
+              existingD.setPopupContent(popupD);
+            } else {
+              const m = L.marker([dLat, dLng], { icon: this.jobDropoffIcon }).bindPopup(popupD);
+              if (this.showJobMarkers()) m.addTo(this.map!);
+              this.jobDropoffMarkers.set(job.jobId, m);
+            }
           } else {
-            const marker = L.marker([lat, lng], { icon: this.jobIcon }).bindPopup(popup);
-            if (this.showJobMarkers()) marker.addTo(this.map!);
-            this.jobMarkers.set(job.jobId, marker);
+            // Remove dropoff marker if user lost visibility (job status changed etc.)
+            const existingD = this.jobDropoffMarkers.get(job.jobId);
+            if (existingD) { existingD.remove(); this.jobDropoffMarkers.delete(job.jobId); }
           }
         });
       },
@@ -701,6 +749,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     const show = !this.showJobMarkers();
     this.showJobMarkers.set(show);
     this.jobMarkers.forEach(marker => {
+      if (!this.map) return;
+      if (show) { marker.addTo(this.map); } else { marker.remove(); }
+    });
+    this.jobDropoffMarkers.forEach(marker => {
       if (!this.map) return;
       if (show) { marker.addTo(this.map); } else { marker.remove(); }
     });
