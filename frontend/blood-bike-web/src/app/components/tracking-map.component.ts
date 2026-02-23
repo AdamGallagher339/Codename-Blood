@@ -2,8 +2,9 @@ import { Component, OnInit, OnDestroy, AfterViewInit, inject } from '@angular/co
 import { CommonModule } from '@angular/common';
 import * as L from 'leaflet';
 import { LocationTrackingService } from '../services/location-tracking.service';
+import { GeocodingService } from '../services/geocoding.service';
 import { LocationUpdate } from '../models/location.model';
-import { Subscription } from 'rxjs';
+import { Subscription, forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-tracking-map',
@@ -14,6 +15,7 @@ import { Subscription } from 'rxjs';
 })
 export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   locationService = inject(LocationTrackingService);
+  private geocodingService = inject(GeocodingService);
   
   // Map and markers
   private map: L.Map | null = null;
@@ -158,12 +160,12 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /**
-   * Add hospital markers to the map
+   * Add hospital markers to the map by geocoding names via OpenStreetMap Nominatim.
+   * To add a new hospital, just add an entry to the hospitals array below.
    */
   private addHospitals(): void {
     if (!this.map) return;
 
-    // Hospital icon (red)
     const hospitalIcon = L.icon({
       iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -173,27 +175,41 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       shadowSize: [41, 41]
     });
 
-    // University Hospital Galway - Newcastle Rd
-    const universityHospital = L.marker([53.276816153524535, -9.065837647021125], { icon: hospitalIcon })
-      .addTo(this.map)
-      .bindPopup(`
-        <div class="hospital-marker">
-          <h4>🏥 University Hospital Galway</h4>
-          <p><strong>Address:</strong> Newcastle Rd, Galway, H91 YR71</p>
-          <p><strong>Type:</strong> Major Teaching Hospital</p>
-        </div>
-      `);
+    // Add new hospitals here — no coordinates needed, they are looked up automatically
+    const hospitals: { label: string; query: string; type: string }[] = [
+      {
+        label: 'University Hospital Galway',
+        query: 'University Hospital Galway, Newcastle Road, Galway, Ireland',
+        type: 'Major Teaching Hospital'
+      },
+      {
+        label: 'Merlin Park Regional Hospital',
+        query: 'Merlin Park Regional Hospital, Old Dublin Road, Galway, Ireland',
+        type: 'Regional Hospital'
+      }
+    ];
 
-    // Merlin Park Regional Hospital - Old Dublin Rd
-    const merlinHospital = L.marker([53.27793709289205, -8.988170798854288], { icon: hospitalIcon })
-      .addTo(this.map)
-      .bindPopup(`
-        <div class="hospital-marker">
-          <h4>🏥 Merlin Park Regional Hospital</h4>
-          <p><strong>Address:</strong> Old Dublin Rd, Galway</p>
-          <p><strong>Type:</strong> Regional Hospital</p>
-        </div>
-      `);
+    const map = this.map;
+    const geocodeRequests = hospitals.map(h => this.geocodingService.geocode(h.query));
+
+    forkJoin(geocodeRequests).subscribe(results => {
+      results.forEach((loc, i) => {
+        if (!loc) {
+          console.warn(`Could not geocode: ${hospitals[i].query}`);
+          return;
+        }
+        L.marker([loc.lat, loc.lng], { icon: hospitalIcon })
+          .addTo(map)
+          .bindPopup(`
+            <div class="hospital-marker">
+              <h4>🏥 ${hospitals[i].label}</h4>
+              <p><strong>Address:</strong> ${loc.displayName.split(',').slice(0, 3).join(',')}</p>
+              <p><strong>Type:</strong> ${hospitals[i].type}</p>
+            </div>
+          `);
+        console.log(`Hospital marker added: ${hospitals[i].label} at ${loc.lat}, ${loc.lng}`);
+      });
+    });
   }
 
   /**
