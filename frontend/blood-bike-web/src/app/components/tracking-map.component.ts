@@ -57,6 +57,26 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     popupAnchor: [1, -34],
     shadowSize: [41, 41]
   });
+  
+  // Icon for active riders (blue)
+  private riderIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+  
+  // Icon for stale rider locations (grey)
+  private staleRiderIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
 
   ngOnInit(): void {
     // Subscribe to connection status
@@ -135,10 +155,12 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /**
-   * Connect to location tracking service
+   * Connect to location tracking service and start polling for riders
    */
   private connectToTracking(): void {
     this.locationService.connectWebSocket();
+    // Also start polling for active riders (if user has FleetManager role)
+    this.locationService.startRidersPolling();
   }
 
   /**
@@ -150,13 +172,17 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     const isStale = this.locationService.isLocationStale(location);
     const marker = this.markers.get(location.entityId);
     
+    // Select appropriate icon based on entity type
+    const activeIcon = location.entityType === 'rider' ? this.riderIcon : this.activeIcon;
+    const staleIcon = location.entityType === 'rider' ? this.staleRiderIcon : this.staleIcon;
+    
     if (marker) {
       // Update existing marker with smooth animation
       const newLatLng = L.latLng(location.latitude, location.longitude);
       this.animateMarker(marker, newLatLng);
       
-      // Update icon based on staleness
-      marker.setIcon(isStale ? this.staleIcon : this.activeIcon);
+      // Update icon based on staleness and entity type
+      marker.setIcon(isStale ? staleIcon : activeIcon);
       
       // Update popup content
       marker.setPopupContent(this.createPopupContent(location));
@@ -181,7 +207,13 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.map) return;
     
     const isStale = this.locationService.isLocationStale(location);
-    const icon = isStale ? this.staleIcon : this.activeIcon;
+    // Select appropriate icon based on entity type
+    let icon: L.Icon;
+    if (location.entityType === 'rider') {
+      icon = isStale ? this.staleRiderIcon : this.riderIcon;
+    } else {
+      icon = isStale ? this.staleIcon : this.activeIcon;
+    }
     
     const marker = L.marker([location.latitude, location.longitude], { icon })
       .addTo(this.map)
