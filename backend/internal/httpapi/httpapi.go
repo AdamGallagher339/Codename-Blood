@@ -14,6 +14,7 @@ import (
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/events"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/fleet"
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/push"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo/dynamo"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo/memory"
@@ -196,6 +197,15 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	mux.HandleFunc("/api/events", withCORS(authClient.RequireAuth(events.ListOrCreate)))
 	mux.HandleFunc("/api/events/", withCORS(authClient.RequireAuth(events.GetUpdateOrDelete)))
 
+	// --- Push Notification Store ---
+	var pushStore *push.Store
+	pushStore, err = push.NewStore()
+	if err != nil {
+		log.Println("Push notifications disabled:", err)
+	} else {
+		log.Println("Push notifications enabled")
+	}
+
 	// --- Jobs Routes ---
 	listOrCreateJobs := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if dynamoRepos.Jobs == nil {
@@ -255,6 +265,17 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 				http.Error(w, "failed to create job", http.StatusInternalServerError)
 				return
 			}
+
+			// Send push notification to all subscribed riders
+			if pushStore != nil {
+				pickupAddr := body.Pickup
+				if pickupAddr == "" {
+					pickupAddr = "TBD"
+				}
+				notifBody := fmt.Sprintf("%s — Pickup: %s", body.Title, pickupAddr)
+				go pushStore.NotifyAll("🚨 New Job Posted", notifBody, "/jobs")
+			}
+
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(job)
@@ -545,6 +566,14 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	mux.HandleFunc("/api/tracking/ws", withCORS(authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "websocket tracking disabled; use HTTP polling (GET /api/tracking/locations)", http.StatusNotImplemented)
 	})))
+
+	// --- Push Notification Routes ---
+	if pushStore != nil {
+		mux.HandleFunc("/api/push/vapid-key", withCORS(pushStore.HandleVAPIDPublicKey))
+		mux.HandleFunc("/api/push/subscribe", withCORS(authClient.RequireAuth(pushStore.HandleSubscribe)))
+		mux.HandleFunc("/api/push/unsubscribe", withCORS(authClient.RequireAuth(pushStore.HandleUnsubscribe)))
+		mux.HandleFunc("/api/push/test", withCORS(authClient.RequireAuth(pushStore.HandleTestNotification)))
+	}
 
 	// --- Auth routes (Cognito) ---
 	mux.HandleFunc("/api/auth/signup", withCORS(authClient.SignUpHandler))

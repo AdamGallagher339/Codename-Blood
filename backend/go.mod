@@ -10,13 +10,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.58.0
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.55.0
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.2
-	github.com/golang-jwt/jwt/v5 v5.1.0
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/joho/godotenv v1.5.1
 	go.etcd.io/bbolt v1.4.3
 )
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.41.1 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.4 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.16 // indirect
@@ -33,5 +34,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.4 // indirect
 	github.com/aws/smithy-go v1.24.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 )

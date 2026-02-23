@@ -7,6 +7,7 @@ import { EventsPageComponent } from './components/events-page.component';
 import { FleetTrackerComponent } from './components/fleet-tracker.component';
 import { finalize, filter } from 'rxjs';
 import { AuthService, AuthPage } from './services/auth.service';
+import { PushNotificationService } from './services/push-notification.service';
 
 @Component({
   selector: 'app-root',
@@ -116,7 +117,8 @@ export class App implements OnInit {
   constructor(
     public readonly auth: AuthService,
     private readonly router: Router,
-    public readonly http: HttpClient
+    public readonly http: HttpClient,
+    private readonly pushService: PushNotificationService
   ) {}
 
   ngOnInit(): void {
@@ -146,7 +148,24 @@ export class App implements OnInit {
         // preload users for admin
         this.loadUsers();
       }
+      // Auto-subscribe to push notifications for all logged-in users
+      this.subscribeToPush();
     });
+  }
+
+  /** Subscribe the current user to push notifications */
+  private subscribeToPush(): void {
+    if (!this.auth.isLoggedIn()) return;
+    // Small delay to let the service worker finish registering
+    setTimeout(() => {
+      this.pushService.subscribe().then((ok) => {
+        if (ok) console.log('Push notifications active');
+      });
+      // Navigate on notification click
+      this.pushService.listenForNotificationClicks((url) => {
+        this.router.navigate([url]);
+      });
+    }, 2000);
   }
 
   loadUsers(): void {
@@ -425,6 +444,8 @@ export class App implements OnInit {
               if (this.auth.hasRole && this.auth.hasRole('BloodBikeAdmin')) {
                 this.loadUsers();
               }
+              // Subscribe to push after login
+              this.subscribeToPush();
             },
             error: () => {
               // fetch failed — AuthService may have logged out; ensure we show login
