@@ -499,6 +499,18 @@
   }
 }
 
+.directions-dest-label {
+  font-size: 12px;
+  color: #444;
+  padding: 4px 8px;
+  background: #e8f0fe;
+  border-radius: 4px;
+
+  strong {
+    color: #1a3fb7;
+  }
+}
+
 /* Destination input row */
 .dest-input-group {
   display: flex;

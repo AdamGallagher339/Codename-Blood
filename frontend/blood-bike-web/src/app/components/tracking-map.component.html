@@ -62,27 +62,54 @@
         </button>
       </div>
 
-      <!-- Directions panel — Dispatcher / FleetManager / BloodBikeAdmin only -->
-      <div class="directions-section" *ngIf="canRoute()">
+      <!-- Directions panel — visible to all logged-in users -->
+      <div class="directions-section" *ngIf="authService.isLoggedIn()">
         <h4>🗺️ Directions</h4>
 
-        <!-- Idle state: prompt user to click a rider marker or a waypoint -->
-        <div *ngIf="!routingRiderId()" class="directions-hint">
-          <p>Two ways to start:</p>
-          <ol>
-            <li>Click a <strong>rider marker</strong> → <strong>"🗺️ Get Directions"</strong></li>
-            <li>Click any <strong>📍 waypoint</strong> (hospital, event, job) → <strong>"📍 Set as Destination"</strong></li>
-          </ol>
-          <span *ngIf="destSearch">Destination set: <strong>{{ destSearch }}</strong>. Now click a rider.</span>
+        <!-- Idle: no active route -->
+        <div *ngIf="!routingRiderId() && !routingFromMe()" class="directions-hint">
+          <p>Click any map marker and press <strong>"🧭 Directions to here"</strong> to get turn-by-turn navigation from your location.</p>
+          <p *ngIf="canRoute()">Managers: click a <strong>rider marker</strong> → <strong>"🗺️ Get Directions"</strong> to route from that rider.</p>
         </div>
 
-        <!-- Active routing state -->
-        <div *ngIf="routingRiderId()" class="directions-active">
+        <!-- Active: riding from own GPS -->
+        <div *ngIf="routingFromMe()" class="directions-active">
+          <div class="directions-rider-label">
+            📍 Routing from: <strong>Your Location</strong>
+          </div>
+          <div *ngIf="destSearch" class="directions-dest-label">→ <strong>{{ destSearch }}</strong></div>
+          <div *ngIf="!isWatchingLocation && isRouteLoading()" class="route-error">
+            ⏳ Waiting for your GPS location…
+          </div>
+          <!-- Also allow typing an address destination -->
+          <div class="dest-input-group">
+            <input
+              [(ngModel)]="destSearch"
+              placeholder="Or type a destination address…"
+              class="dest-input"
+              (keydown.enter)="geocodeAndRoute()"
+            />
+            <button
+              (click)="geocodeAndRoute()"
+              class="control-btn dest-go-btn"
+              [disabled]="isRouteLoading() || !destSearch.trim()"
+            >
+              {{ isRouteLoading() ? '⏳' : '→' }}
+            </button>
+          </div>
+          <div *ngIf="routeError()" class="route-error">⚠️ {{ routeError() }}</div>
+          <div *ngIf="routeDistance() !== null && routeTime() !== null" class="route-summary">
+            <span class="route-dist">📏 {{ routeDistance() }} km</span>
+            <span class="route-time">⏱ ~{{ routeTime() }} min</span>
+          </div>
+          <button (click)="clearRoute()" class="control-btn stop-btn clear-route-btn">✕ Clear Route</button>
+        </div>
+
+        <!-- Active: manager flow (routing from a selected rider) -->
+        <div *ngIf="routingRiderId() && !routingFromMe()" class="directions-active">
           <div class="directions-rider-label">
             🏍️ Routing from: <strong>{{ routingRiderName() }}</strong>
           </div>
-
-          <!-- Destination input with search -->
           <div class="dest-input-group">
             <input
               [(ngModel)]="destSearch"
@@ -98,21 +125,12 @@
               {{ isRouteLoading() ? '⏳' : '→' }}
             </button>
           </div>
-
-          <!-- Error message -->
-          <div *ngIf="routeError()" class="route-error">
-            ⚠️ {{ routeError() }}
-          </div>
-
-          <!-- Route summary: distance + ETA -->
+          <div *ngIf="routeError()" class="route-error">⚠️ {{ routeError() }}</div>
           <div *ngIf="routeDistance() !== null && routeTime() !== null" class="route-summary">
             <span class="route-dist">📏 {{ routeDistance() }} km</span>
             <span class="route-time">⏱ ~{{ routeTime() }} min</span>
           </div>
-
-          <button (click)="clearRoute()" class="control-btn stop-btn clear-route-btn">
-            ✕ Clear Route
-          </button>
+          <button (click)="clearRoute()" class="control-btn stop-btn clear-route-btn">✕ Clear Route</button>
         </div>
       </div>
 

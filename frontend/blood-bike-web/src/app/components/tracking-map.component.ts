@@ -22,7 +22,7 @@ import { Subscription } from 'rxjs';
 export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   locationService = inject(LocationTrackingService);
   private eventService = inject(EventService);
-  private authService = inject(AuthService);
+  readonly authService = inject(AuthService);
   private http = inject(HttpClient);
 
   // Events (loaded from service; component subscribes reactively via effect)
@@ -36,16 +36,20 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   private jobDropoffMarkers: Map<string, L.Marker> = new Map(); // delivery (red) — role-scoped
   private jobRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
 
-  // ── Routing (Dispatcher / FleetManager only) ──────────────────────────────
+  // ── Routing ───────────────────────────────────────────────────────────────
   /** LRM control currently drawn on the map — only one at a time */
   private routingControl: any | null = null;
-  /** Entity ID of the rider being routed from */
+  /** Entity ID of the rider being routed from (manager flow) */
   routingRiderId = signal<string | null>(null);
-  /** Display name shown in the panel */
+  /** Display name shown in the panel (manager flow) */
   routingRiderName = signal<string | null>(null);
-  /** Resolved destination LatLng used for live route updates */
+  /** True when the active route originates from the user's own GPS (rider flow) */
+  routingFromMe = signal(false);
+  /** Destination queued while GPS is not yet active; fulfilled on first fix */
+  private pendingDestLatLng: L.LatLng | null = null;
+  /** Resolved destination LatLng */
   private destLatLng: L.LatLng | null = null;
-  /** Free-text destination the user typed */
+  /** Free-text destination label */
   destSearch = '';
   /** True while OSRM / Nominatim request is pending */
   isRouteLoading = signal(false);
@@ -55,7 +59,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   routeDistance = signal<number | null>(null);
   /** Calculated route time in minutes */
   routeTime = signal<number | null>(null);
-  /** True for roles that may generate routes */
+  /** Roles that can use the manager (route-from-rider) flow */
   readonly canRoute = computed(() =>
     ['FleetManager', 'Dispatcher', 'BloodBikeAdmin'].some(r => this.authService.hasRole(r))
   );
@@ -359,7 +363,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
             <h4>🏥 ${h.label}</h4>
             <p><strong>Address:</strong> ${h.address}</p>
             <p><strong>Type:</strong> ${h.type}</p>
-            <button class="popup-directions-btn" onclick="window.setRouteDest(${h.lat},${h.lng},'${h.label.replace(/'/g, "\\'")}')">📍 Set as Destination</button>
+            <button class="popup-directions-btn" onclick="window.setRouteDest(${h.lat},${h.lng},'${h.label.replace(/'/g, "\\'")}')">🧭 Directions to here</button>
           </div>
         `);
     });
@@ -466,6 +470,13 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       }).addTo(this.map);
 
       this.map.flyTo([lat, lng], 16);
+
+      // If a directions request was made before GPS was ready, fulfil it now
+      if (this.pendingDestLatLng) {
+        const dest = this.pendingDestLatLng;
+        this.pendingDestLatLng = null;
+        this.buildRoute(lat, lng, dest.lat, dest.lng);
+      }
     } else {
       // Subsequent updates — move marker, update speed badge, update ring
       this.myLocationMarker.setLatLng([lat, lng]);
@@ -726,7 +737,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     // Encode title for inline onclick — strip single quotes to prevent JS injection
     const safeTitle = event.title.replace(/'/g, '');
     const destBtn = (event.lat != null && event.lng != null)
-      ? `<button class="popup-directions-btn" onclick="window.setRouteDest(${event.lat},${event.lng},'${safeTitle}')">📍 Set as Destination</button>`
+      ? `<button class="popup-directions-btn" onclick="window.setRouteDest(${event.lat},${event.lng},'${safeTitle}')">🧭 Directions to here</button>`
       : '';
     return `
       <div class="event-marker-popup">
@@ -744,23 +755,39 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   // ── Routing methods ──────────────────────────────────────────────────────────
 
   /**
-   * Set a waypoint (hospital / event / job pin) as the routing destination.
+   * Route to a waypoint (hospital / event / job pin).
    * Called via window.setRouteDest from Leaflet popup buttons.
-   * If a rider is already selected, draws the route immediately.
+   *
+   * Smart behaviour:
+   *  - Manager has a rider selected → route from that rider to this dest.
+   *  - Otherwise (rider or no selection) → route from the user's own GPS.
+   *    If GPS isn't active yet, it starts automatically and routes on first fix.
    */
   setRouteDest(lat: number, lng: number, label: string): void {
-    if (!this.canRoute()) return;
-    this.destLatLng  = L.latLng(lat, lng);
-    this.destSearch  = label;
+    this.destLatLng = L.latLng(lat, lng);
+    this.destSearch = label;
     this.routeError.set(null);
+
     const riderId = this.routingRiderId();
-    if (riderId) {
+    if (riderId && this.canRoute()) {
+      // ── Manager flow: route from the selected rider ──
       const riderLoc = this.locations.find(l => l.entityId === riderId);
       if (riderLoc) {
         this.buildRoute(riderLoc.latitude, riderLoc.longitude, lat, lng);
       }
+    } else {
+      // ── Rider / GPS flow: route from user's own location ──
+      this.routingRiderId.set(null);
+      this.routingFromMe.set(true);
+      if (this.myLocationMarker) {
+        const pos = this.myLocationMarker.getLatLng();
+        this.buildRoute(pos.lat, pos.lng, lat, lng);
+      } else {
+        // GPS not yet active — store dest and activate location; route fires on first fix
+        this.pendingDestLatLng = L.latLng(lat, lng);
+        if (!this.isWatchingLocation) this.locateMe();
+      }
     }
-    // If no rider selected yet, the panel hint will guide the user.
   }
 
   /**
@@ -768,12 +795,14 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
    * Called via window.routeToRider from Leaflet popup buttons.
    */
   routeToRider(entityId: string): void {
-    if (!this.canRoute()) return; // silently ignore if user lacks permission
+    if (!this.canRoute()) return;
     const location = this.locations.find(l => l.entityId === entityId);
     if (!location) return;
+    this.routingFromMe.set(false); // switching to manager flow
+    this.pendingDestLatLng = null;
     this.routingRiderId.set(entityId);
     this.routingRiderName.set(entityId);
-    // If a destination is already resolved from a previous search, build immediately
+    // If a destination is already resolved, draw immediately
     if (this.destLatLng) {
       this.buildRoute(location.latitude, location.longitude, this.destLatLng.lat, this.destLatLng.lng);
     }
@@ -783,13 +812,14 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
    * Geocode destSearch via Nominatim (Ireland-scoped) then draw the route.
    */
   async geocodeAndRoute(): Promise<void> {
-    const riderId = this.routingRiderId();
-    if (!riderId || !this.destSearch.trim()) return;
+    const riderId     = this.routingRiderId();
+    const fromMe      = this.routingFromMe();
+    if (!this.destSearch.trim()) return;
+    if (!riderId && !fromMe) return;
 
     this.isRouteLoading.set(true);
     this.routeError.set(null);
 
-    // Nominatim reverse geocode, bounded to Ireland
     const url =
       `https://nominatim.openstreetmap.org/search` +
       `?q=${encodeURIComponent(this.destSearch)}` +
@@ -807,11 +837,25 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       const destLng = parseFloat(results[0].lon);
       this.destLatLng = L.latLng(destLat, destLng);
 
-      const riderLoc = this.locations.find(l => l.entityId === riderId);
-      if (riderLoc) {
-        this.buildRoute(riderLoc.latitude, riderLoc.longitude, destLat, destLng);
-      } else {
-        this.isRouteLoading.set(false);
+      if (fromMe) {
+        // Rider / GPS flow
+        if (this.myLocationMarker) {
+          const pos = this.myLocationMarker.getLatLng();
+          this.buildRoute(pos.lat, pos.lng, destLat, destLng);
+        } else {
+          // GPS not yet active — store dest and start location
+          this.pendingDestLatLng = L.latLng(destLat, destLng);
+          if (!this.isWatchingLocation) this.locateMe();
+          this.isRouteLoading.set(false);
+        }
+      } else if (riderId) {
+        // Manager flow
+        const riderLoc = this.locations.find(l => l.entityId === riderId);
+        if (riderLoc) {
+          this.buildRoute(riderLoc.latitude, riderLoc.longitude, destLat, destLng);
+        } else {
+          this.isRouteLoading.set(false);
+        }
       }
     } catch {
       this.routeError.set('Geocoding failed. Please try again.');
@@ -888,6 +932,8 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     }
     this.routingRiderId.set(null);
     this.routingRiderName.set(null);
+    this.routingFromMe.set(false);
+    this.pendingDestLatLng = null;
     this.routeDistance.set(null);
     this.routeTime.set(null);
     this.routeError.set(null);
@@ -937,7 +983,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
           const pLng = job.pickup?.lng;
           if (pLat != null && pLng != null && canSee) {
             const safeTitle = job.title.replace(/'/g, '');
-            const popupP = `<div><h4>🟢 ${job.title}</h4><p><strong>Pickup:</strong> ${job.pickup?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p><button class="popup-directions-btn" onclick="window.setRouteDest(${pLat},${pLng},'${safeTitle} — Pickup')">📍 Set as Destination</button></div>`;
+            const popupP = `<div><h4>🟢 ${job.title}</h4><p><strong>Pickup:</strong> ${job.pickup?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p><button class="popup-directions-btn" onclick="window.setRouteDest(${pLat},${pLng},'${safeTitle} — Pickup')">🧭 Directions to here</button></div>`;
             const existingP = this.jobMarkers.get(job.jobId);
             if (existingP) {
               existingP.setLatLng([pLat, pLng]);
@@ -958,7 +1004,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
           const dLng = job.dropoff?.lng;
           if (dLat != null && dLng != null && canSee) {
             const safeTitle = job.title.replace(/'/g, '');
-            const popupD = `<div><h4>📦 ${job.title} — Delivery</h4><p><strong>Drop-off:</strong> ${job.dropoff?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p><button class="popup-directions-btn" onclick="window.setRouteDest(${dLat},${dLng},'${safeTitle} — Delivery')">📍 Set as Destination</button></div>`;
+            const popupD = `<div><h4>📦 ${job.title} — Delivery</h4><p><strong>Drop-off:</strong> ${job.dropoff?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p><button class="popup-directions-btn" onclick="window.setRouteDest(${dLat},${dLng},'${safeTitle} — Delivery')">🧭 Directions to here</button></div>`;
             const existingD = this.jobDropoffMarkers.get(job.jobId);
             if (existingD) {
               existingD.setLatLng([dLat, dLng]);
