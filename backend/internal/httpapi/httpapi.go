@@ -8,8 +8,13 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
+
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/events"
@@ -136,7 +141,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 			}
 		}
 	}
-	
+
 	// Helper to apply auth + role check together
 	requireAuthAndRole := func(requiredRole string, h http.HandlerFunc) http.HandlerFunc {
 		return authClient.RequireAuth(requireRoleMiddleware(requiredRole)(h))
@@ -312,8 +317,9 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		case http.MethodPut:
 			// Accept a job (rider sets acceptedBy + status)
 			var body struct {
-				Status     string `json:"status"`
-				AcceptedBy string `json:"acceptedBy"`
+				Status        string `json:"status"`
+				AcceptedBy    string `json:"acceptedBy"`
+				SignatureData string `json:"signatureData,omitempty"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -338,7 +344,31 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 			if job.Timestamps == nil {
 				job.Timestamps = map[string]any{}
 			}
-			job.Timestamps["updated"] = time.Now().UTC().Format(time.RFC3339)
+			now := time.Now().UTC()
+			job.Timestamps["updated"] = now.Format(time.RFC3339)
+
+			// Record pickup/delivery timestamps and signature
+			if body.Status == "picked-up" {
+				job.Timestamps["pickedUp"] = now.Format(time.RFC3339)
+				if body.SignatureData != "" {
+					if job.Pickup == nil {
+						job.Pickup = map[string]any{}
+					}
+					job.Pickup["signature"] = body.SignatureData
+					job.Pickup["signedAt"] = now.Format(time.RFC3339)
+				}
+			}
+			if body.Status == "delivered" {
+				job.Timestamps["delivered"] = now.Format(time.RFC3339)
+				if body.SignatureData != "" {
+					if job.Dropoff == nil {
+						job.Dropoff = map[string]any{}
+					}
+					job.Dropoff["signature"] = body.SignatureData
+					job.Dropoff["signedAt"] = now.Format(time.RFC3339)
+				}
+			}
+
 			if err := dynamoRepos.Jobs.Put(r.Context(), job); err != nil {
 				log.Printf("op=UpdateJob err=%v", err)
 				http.Error(w, "failed to update job", http.StatusInternalServerError)
@@ -353,23 +383,40 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 				}
 				rider.Status = "on-job"
 				rider.CurrentJobID = jobID
-				rider.UpdatedAt = time.Now().UTC()
+				rider.UpdatedAt = now
 				if err := dynamoRepos.Users.Put(r.Context(), rider); err != nil {
 					log.Printf("op=UpdateRiderOnAccept rider=%s err=%v", body.AcceptedBy, err)
 				}
 			}
 
-			// When a job is completed/cancelled, set the rider back to available
-			if (body.Status == "completed" || body.Status == "cancelled") && job.AcceptedBy != "" && dynamoRepos.Users != nil {
+			// When a job is delivered/completed/cancelled, set the rider back to available
+			// and notify the dispatcher
+			if (body.Status == "delivered" || body.Status == "completed" || body.Status == "cancelled") && job.AcceptedBy != "" && dynamoRepos.Users != nil {
 				rider, found, _ := dynamoRepos.Users.Get(r.Context(), job.AcceptedBy)
-				if found && rider.Status == "on-job" {
-					rider.Status = "available"
+				if found && (rider.Status == "on-job" || rider.Status == "on-delivery") {
+					// Check if the rider's availability timer has expired
+					newStatus := "available"
+					if rider.AvailableUntil != "" {
+						expiry, err := time.Parse(time.RFC3339, rider.AvailableUntil)
+						if err == nil && now.After(expiry) {
+							newStatus = "offline"
+							rider.AvailableUntil = ""
+						}
+					}
+					rider.Status = newStatus
 					rider.CurrentJobID = ""
-					rider.UpdatedAt = time.Now().UTC()
+					rider.UpdatedAt = now
 					if err := dynamoRepos.Users.Put(r.Context(), rider); err != nil {
 						log.Printf("op=UpdateRiderOnComplete rider=%s err=%v", job.AcceptedBy, err)
 					}
 				}
+			}
+
+			// Send push notification to dispatchers when job is delivered
+			if body.Status == "delivered" && pushStore != nil {
+				riderName := job.AcceptedBy
+				notifBody := fmt.Sprintf("Job \"%s\" has been delivered by %s", job.Title, riderName)
+				go pushStore.NotifyAll("✅ Job Completed", notifBody, "/dispatcher")
 			}
 
 			w.Header().Set("Content-Type", "application/json")
@@ -393,6 +440,106 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 
 	mux.HandleFunc("/api/jobs", withCORS(listOrCreateJobs))
 	mux.HandleFunc("/api/jobs/", withCORS(jobDetail))
+
+	// --- Receipt Email Route ---
+	sendReceipt := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var body struct {
+			JobID          string `json:"jobId"`
+			Type           string `json:"type"` // "pickup" or "delivery"
+			RecipientEmail string `json:"recipientEmail"`
+			RiderName      string `json:"riderName"`
+			SignatureData  string `json:"signatureData"` // base64 PNG
+			JobTitle       string `json:"jobTitle"`
+			PickupAddress  string `json:"pickupAddress"`
+			DropoffAddress string `json:"dropoffAddress"`
+			Timestamp      string `json:"timestamp"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if body.RecipientEmail == "" || body.Type == "" {
+			http.Error(w, "recipientEmail and type required", http.StatusBadRequest)
+			return
+		}
+
+		// Build HTML receipt
+		receiptType := "Pickup Confirmation"
+		if body.Type == "delivery" {
+			receiptType = "Delivery Confirmation"
+		}
+		timestamp := body.Timestamp
+		if timestamp == "" {
+			timestamp = time.Now().UTC().Format(time.RFC3339)
+		}
+
+		html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>%s</title></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: #dc3545; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+    <h1 style="margin: 0;">🏍️ Blood Bike Ireland</h1>
+    <h2 style="margin: 5px 0 0 0;">%s</h2>
+  </div>
+  <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
+    <table style="width: 100%%; border-collapse: collapse;">
+      <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Job Reference:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
+      <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Job Title:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
+      <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Pickup Address:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
+      <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Delivery Address:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
+      <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Rider:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
+      <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">%s Time:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
+    </table>
+    <div style="margin-top: 20px; border-top: 2px solid #dc3545; padding-top: 15px;">
+      <p style="font-weight: bold; margin-bottom: 5px;">Rider Signature:</p>
+      <img src="%s" alt="Signature" style="max-width: 100%%; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />
+    </div>
+    <p style="text-align: center; color: #666; font-size: 12px; margin-top: 20px;">
+      This is an automated receipt from the Blood Bike Ireland dispatch system.
+    </p>
+  </div>
+</body>
+</html>`, receiptType, receiptType, body.JobID, body.JobTitle, body.PickupAddress, body.DropoffAddress, body.RiderName, body.Type, timestamp, body.SignatureData)
+
+		// Send via AWS SES
+		sesClient, err := newSESClient(r.Context())
+		if err != nil {
+			log.Printf("op=SendReceipt err=%v (SES not available, returning receipt HTML)", err)
+			// Fallback: return the HTML so frontend can handle it
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sent":    false,
+				"message": "Email service not configured. Receipt generated.",
+				"html":    html,
+			})
+			return
+		}
+
+		subject := fmt.Sprintf("Blood Bike %s — %s", receiptType, body.JobTitle)
+		err = sendSESEmail(r.Context(), sesClient, body.RecipientEmail, subject, html)
+		if err != nil {
+			log.Printf("op=SendReceipt email=%s err=%v", body.RecipientEmail, err)
+			// Return receipt HTML as fallback
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sent":    false,
+				"message": fmt.Sprintf("Failed to send email: %v. Receipt generated.", err),
+				"html":    html,
+			})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"sent":    true,
+			"message": fmt.Sprintf("Receipt sent to %s", body.RecipientEmail),
+		})
+	})
+	mux.HandleFunc("/api/jobs/receipt", withCORS(sendReceipt))
 
 	// --- Rider Availability Routes ---
 	riderAvailabilityList := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
@@ -552,7 +699,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	mux.HandleFunc("/api/tracking/update", withCORS(authClient.RequireAuth(tracking.HandleLocationUpdate)))
 	mux.HandleFunc("/api/tracking/locations", withCORS(authClient.RequireAuth(tracking.HandleGetLocations)))
 	mux.HandleFunc("/api/tracking/entities", withCORS(authClient.RequireAuth(tracking.HandleGetEntities)))
-	
+
 	// Riders tracking endpoint (FleetManager role required)
 	mux.HandleFunc("/api/tracking/riders", withCORS(requireAuthAndRole("FleetManager", tracking.HandleGetRiders)))
 	mux.HandleFunc("/api/tracking/riders/ws", withCORS(requireAuthAndRole("FleetManager", tracking.HandleRidersWebSocket)))
@@ -600,4 +747,35 @@ func (w *corsResponseWriter) WriteHeader(statusCode int) {
 	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+// --- SES email helpers ---
+
+func newSESClient(ctx context.Context) (*sesv2.Client, error) {
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return sesv2.NewFromConfig(cfg), nil
+}
+
+func sendSESEmail(ctx context.Context, client *sesv2.Client, to, subject, htmlBody string) error {
+	from := os.Getenv("SES_FROM_EMAIL")
+	if from == "" {
+		from = "noreply@bloodbike.app"
+	}
+	input := &sesv2.SendEmailInput{
+		FromEmailAddress: &from,
+		Destination: &sestypes.Destination{
+			ToAddresses: []string{to},
+		},
+		Content: &sestypes.EmailContent{
+			Simple: &sestypes.Message{
+				Subject: &sestypes.Content{Data: &subject},
+				Body:    &sestypes.Body{Html: &sestypes.Content{Data: &htmlBody}},
+			},
+		},
+	}
+	_, err := client.SendEmail(ctx, input)
+	return err
 }

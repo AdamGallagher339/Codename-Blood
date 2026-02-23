@@ -76,8 +76,8 @@ const server = http.createServer((req, res) => {
   serveStatic(req, res);
 });
 
-server.listen(PORT, () => {
-  console.log(`PWA server running at http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`PWA server running at http://0.0.0.0:${PORT}`);
   console.log(`Proxying /api/* → ${BACKEND}`);
   console.log(`Serving static files from ${DIST}`);
 });
