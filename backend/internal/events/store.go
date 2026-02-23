@@ -39,6 +39,8 @@ func List(ctx context.Context) ([]*Event, error) {
 				StartTime:      item.StartTime,
 				EndTime:        item.EndTime,
 				Location:       item.Location,
+				Lat:            item.Lat,
+				Lng:            item.Lng,
 				Type:           EventType(item.Type),
 				Priority:       EventPriority(item.Priority),
 				AssignedRiders: item.AssignedRiders,
@@ -76,6 +78,8 @@ func Get(ctx context.Context, id string) (*Event, bool, error) {
 			StartTime:      item.StartTime,
 			EndTime:        item.EndTime,
 			Location:       item.Location,
+			Lat:            item.Lat,
+			Lng:            item.Lng,
 			Type:           EventType(item.Type),
 			Priority:       EventPriority(item.Priority),
 			AssignedRiders: item.AssignedRiders,
@@ -113,6 +117,8 @@ func Create(ctx context.Context, req CreateEventRequest) (*Event, error) {
 		StartTime:      req.StartTime,
 		EndTime:        req.EndTime,
 		Location:       req.Location,
+		Lat:            req.Lat,
+		Lng:            req.Lng,
 		Type:           req.Type,
 		Priority:       req.Priority,
 		AssignedRiders: req.AssignedRiders,
@@ -130,6 +136,8 @@ func Create(ctx context.Context, req CreateEventRequest) (*Event, error) {
 			StartTime:      e.StartTime,
 			EndTime:        e.EndTime,
 			Location:       e.Location,
+			Lat:            e.Lat,
+			Lng:            e.Lng,
 			Type:           string(e.Type),
 			Priority:       string(e.Priority),
 			AssignedRiders: e.AssignedRiders,
@@ -175,6 +183,12 @@ func Update(ctx context.Context, id string, req UpdateEventRequest) (*Event, err
 	if req.Location != nil {
 		e.Location = *req.Location
 	}
+	if req.Lat != nil {
+		e.Lat = req.Lat
+	}
+	if req.Lng != nil {
+		e.Lng = req.Lng
+	}
 	if req.Type != nil {
 		e.Type = *req.Type
 	}
@@ -199,6 +213,8 @@ func Update(ctx context.Context, id string, req UpdateEventRequest) (*Event, err
 			StartTime:      e.StartTime,
 			EndTime:        e.EndTime,
 			Location:       e.Location,
+			Lat:            e.Lat,
+			Lng:            e.Lng,
 			Type:           string(e.Type),
 			Priority:       string(e.Priority),
 			AssignedRiders: e.AssignedRiders,

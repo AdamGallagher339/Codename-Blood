@@ -90,6 +90,8 @@ type Event struct {
 	StartTime      string    `json:"startTime"`
 	EndTime        string    `json:"endTime"`
 	Location       string    `json:"location"`
+	Lat            *float64  `json:"lat,omitempty"`
+	Lng            *float64  `json:"lng,omitempty"`
 	Type           string    `json:"type"`
 	Priority       string    `json:"priority"`
 	AssignedRiders []string  `json:"assignedRiders,omitempty"`

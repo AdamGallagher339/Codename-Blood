@@ -23,6 +23,8 @@ type Event struct {
 	StartTime      string        `json:"startTime"`
 	EndTime        string        `json:"endTime"`
 	Location       string        `json:"location"`
+	Lat            *float64      `json:"lat,omitempty"`
+	Lng            *float64      `json:"lng,omitempty"`
 	Type           EventType     `json:"type"`
 	Priority       EventPriority `json:"priority"`
 	AssignedRiders []string      `json:"assignedRiders,omitempty"`
@@ -38,6 +40,8 @@ type CreateEventRequest struct {
 	StartTime      string        `json:"startTime"`
 	EndTime        string        `json:"endTime"`
 	Location       string        `json:"location"`
+	Lat            *float64      `json:"lat,omitempty"`
+	Lng            *float64      `json:"lng,omitempty"`
 	Type           EventType     `json:"type"`
 	Priority       EventPriority `json:"priority"`
 	AssignedRiders []string      `json:"assignedRiders,omitempty"`
@@ -50,6 +54,8 @@ type UpdateEventRequest struct {
 	StartTime      *string        `json:"startTime,omitempty"`
 	EndTime        *string        `json:"endTime,omitempty"`
 	Location       *string        `json:"location,omitempty"`
+	Lat            *float64       `json:"lat,omitempty"`
+	Lng            *float64       `json:"lng,omitempty"`
 	Type           *EventType     `json:"type,omitempty"`
 	Priority       *EventPriority `json:"priority,omitempty"`
 	AssignedRiders *[]string      `json:"assignedRiders,omitempty"`
