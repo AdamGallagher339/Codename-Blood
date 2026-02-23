@@ -83,21 +83,21 @@ type JobsRepository interface {
 	Delete(ctx context.Context, jobID string) (bool, error)
 }
 type Event struct {
-	ID             string    `json:"id"`
-	Title          string    `json:"title"`
-	Description    string    `json:"description"`
-	Date           time.Time `json:"date"`
-	StartTime      string    `json:"startTime"`
-	EndTime        string    `json:"endTime"`
-	Location       string    `json:"location"`
-	Lat            *float64  `json:"lat,omitempty"`
-	Lng            *float64  `json:"lng,omitempty"`
-	Type           string    `json:"type"`
-	Priority       string    `json:"priority"`
-	AssignedRiders []string  `json:"assignedRiders,omitempty"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	ID             string    `json:"id"             dynamodbav:"id"`
+	Title          string    `json:"title"          dynamodbav:"title"`
+	Description    string    `json:"description"    dynamodbav:"description"`
+	Date           time.Time `json:"date"           dynamodbav:"date"`
+	StartTime      string    `json:"startTime"      dynamodbav:"startTime"`
+	EndTime        string    `json:"endTime"        dynamodbav:"endTime"`
+	Location       string    `json:"location"       dynamodbav:"location"`
+	Lat            *float64  `json:"lat,omitempty"  dynamodbav:"lat,omitempty"`
+	Lng            *float64  `json:"lng,omitempty"  dynamodbav:"lng,omitempty"`
+	Type           string    `json:"type"           dynamodbav:"type"`
+	Priority       string    `json:"priority"       dynamodbav:"priority"`
+	AssignedRiders []string  `json:"assignedRiders,omitempty" dynamodbav:"assignedRiders,omitempty"`
+	Status         string    `json:"status"         dynamodbav:"status"`
+	CreatedAt      time.Time `json:"createdAt"      dynamodbav:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"      dynamodbav:"updatedAt"`
 }
 
 type EventsRepository interface {

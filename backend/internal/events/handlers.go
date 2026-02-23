@@ -2,6 +2,7 @@ package events
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -18,12 +19,18 @@ func ListOrCreate(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var req CreateEventRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			log.Printf("[events] failed to decode create request: %v", err)
+			http.Error(w, "invalid request body: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		e, err := Create(r.Context(), req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			if isValidationError(err) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			} else {
+				log.Printf("[events] failed to create event: %v", err)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
 			return
 		}
 		writeJSON(w, http.StatusCreated, e)
@@ -64,7 +71,12 @@ func GetUpdateOrDelete(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "event not found", http.StatusNotFound)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			if isValidationError(err) {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+			} else {
+				log.Printf("[events] failed to update event %s: %v", id, err)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
 			return
 		}
 		writeJSON(w, http.StatusOK, e)
@@ -88,4 +100,13 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// isValidationError returns true for user-facing validation errors (title/location required etc.)
+func isValidationError(err error) bool {
+	msg := err.Error()
+	return msg == "title required" ||
+		msg == "location required" ||
+		msg == "startTime and endTime required" ||
+		msg == "not found"
 }
