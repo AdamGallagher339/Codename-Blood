@@ -29,6 +29,13 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   locations: LocationUpdate[] = [];
   selectedLocation: LocationUpdate | null = null;
   showInfo = true;
+
+  // My Location state
+  isWatchingLocation = false;
+  myLocationError: string | null = null;
+  private myLocationMarker: L.Marker | null = null;
+  private myLocationCircle: L.Circle | null = null;
+  private geolocationWatchId: number | null = null;
   
   // Leaflet icon configuration (fix for default icon issue)
   private defaultIcon = L.icon({
@@ -79,6 +86,15 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     shadowSize: [41, 41]
   });
 
+  // "You are here" icon — orange pulsing dot
+  private myLocationIcon = L.divIcon({
+    className: '',
+    html: `<div class="my-location-dot"><div class="my-location-pulse"></div></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+    popupAnchor: [0, -12]
+  });
+
   ngOnInit(): void {
     // Subscribe to connection status
     this.subscriptions.push(
@@ -113,7 +129,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnDestroy(): void {
     // Clean up subscriptions
     this.subscriptions.forEach(sub => sub.unsubscribe());
-    
+
+    // Stop geolocation watch
+    this.stopLocating();
+
     // Disconnect WebSocket
     this.locationService.disconnectWebSocket();
     
@@ -213,6 +232,101 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     this.locationService.connectWebSocket();
     // Also start polling for active riders (if user has FleetManager role)
     this.locationService.startRidersPolling();
+  }
+
+  /**
+   * Start watching the user's own GPS location and show it on the map.
+   */
+  locateMe(): void {
+    if (!navigator.geolocation) {
+      this.myLocationError = 'Geolocation is not supported by your browser.';
+      return;
+    }
+
+    this.myLocationError = null;
+    this.isWatchingLocation = true;
+
+    this.geolocationWatchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        this.updateMyLocationMarker(latitude, longitude, accuracy);
+      },
+      (err) => {
+        this.isWatchingLocation = false;
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            this.myLocationError = 'Location permission denied.';
+            break;
+          case err.POSITION_UNAVAILABLE:
+            this.myLocationError = 'Location unavailable.';
+            break;
+          case err.TIMEOUT:
+            this.myLocationError = 'Location request timed out.';
+            break;
+          default:
+            this.myLocationError = 'Could not get location.';
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+  }
+
+  /**
+   * Stop watching the user's GPS location.
+   */
+  stopLocating(): void {
+    if (this.geolocationWatchId !== null) {
+      navigator.geolocation.clearWatch(this.geolocationWatchId);
+      this.geolocationWatchId = null;
+    }
+    this.isWatchingLocation = false;
+
+    // Remove marker and accuracy circle from map
+    if (this.myLocationMarker) {
+      this.myLocationMarker.remove();
+      this.myLocationMarker = null;
+    }
+    if (this.myLocationCircle) {
+      this.myLocationCircle.remove();
+      this.myLocationCircle = null;
+    }
+  }
+
+  /**
+   * Pan map to the user's current location.
+   */
+  centerOnMe(): void {
+    if (this.myLocationMarker && this.map) {
+      this.map.flyTo(this.myLocationMarker.getLatLng(), 16);
+    }
+  }
+
+  /**
+   * Place or update the "you are here" marker and accuracy circle.
+   */
+  private updateMyLocationMarker(lat: number, lng: number, accuracy: number): void {
+    if (!this.map) return;
+
+    if (!this.myLocationMarker) {
+      // First fix — place marker, draw accuracy ring, fly to location
+      this.myLocationMarker = L.marker([lat, lng], { icon: this.myLocationIcon, zIndexOffset: 1000 })
+        .addTo(this.map)
+        .bindPopup('<strong>📍 You are here</strong>');
+
+      this.myLocationCircle = L.circle([lat, lng], {
+        radius: accuracy,
+        color: '#4A90E2',
+        fillColor: '#4A90E2',
+        fillOpacity: 0.10,
+        weight: 1
+      }).addTo(this.map);
+
+      this.map.flyTo([lat, lng], 16);
+    } else {
+      // Subsequent updates — move marker and ring smoothly
+      this.myLocationMarker.setLatLng([lat, lng]);
+      this.myLocationCircle?.setLatLng([lat, lng]).setRadius(accuracy);
+    }
   }
 
   /**

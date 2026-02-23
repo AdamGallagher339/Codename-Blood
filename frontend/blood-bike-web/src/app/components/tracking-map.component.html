@@ -32,6 +32,20 @@
         <button (click)="clearSelection()" class="control-btn" *ngIf="selectedLocation">
           ✕ Clear Selection
         </button>
+
+        <!-- My Location controls -->
+        <button *ngIf="!isWatchingLocation" (click)="locateMe()" class="control-btn locate-btn">
+          🎯 My Location
+        </button>
+        <ng-container *ngIf="isWatchingLocation">
+          <button (click)="centerOnMe()" class="control-btn locate-btn">
+            📌 Centre on Me
+          </button>
+          <button (click)="stopLocating()" class="control-btn stop-btn">
+            ✕ Stop
+          </button>
+        </ng-container>
+        <div *ngIf="myLocationError" class="location-error">⚠️ {{ myLocationError }}</div>
       </div>
 
       <!-- Active Entities List -->
