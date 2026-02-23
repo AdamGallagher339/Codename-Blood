@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, AfterViewInit, inject, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import * as L from 'leaflet';
 import { LocationTrackingService } from '../services/location-tracking.service';
 import { LocationUpdate } from '../models/location.model';
@@ -17,11 +18,16 @@ import { Subscription } from 'rxjs';
 export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   locationService = inject(LocationTrackingService);
   private eventService = inject(EventService);
+  private http = inject(HttpClient);
 
   // Events (loaded from service; component subscribes reactively via effect)
   events = this.eventService.getEvents();
   showEvents = signal(true);
   private eventMarkers: Map<string, L.Marker> = new Map();
+
+  // Jobs with pinned locations
+  showJobMarkers = signal(true);
+  private jobMarkers: Map<string, L.Marker> = new Map();
 
   // Set to true in ngOnDestroy so all pending timers know to abort
   private destroyed = false;
@@ -116,6 +122,16 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     shadowSize: [41, 41]
   });
 
+  // Icon for job pickup locations (green)
+  private jobIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+
   // Build the "you are here" icon with a live speed readout above and rider emoji below.
   private buildMyLocationIcon(speedKph: number | null, accuracyM: number | null = null): L.DivIcon {
     const speedLabel = speedKph !== null && speedKph >= 0
@@ -191,6 +207,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     this.eventMarkers.forEach(m => m.remove());
     this.eventMarkers.clear();
 
+    // Clean up job markers
+    this.jobMarkers.forEach(m => m.remove());
+    this.jobMarkers.clear();
+
     // Stop all in-progress Leaflet pan/zoom animations BEFORE removing the
     // container — otherwise Leaflet's animation timers fire panBy() on a
     // container that no longer exists, causing the classList crash.
@@ -231,7 +251,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     
     // Add hospital locations
     this.addHospitals();
-    
+
+    // Load jobs with pinned locations
+    this.loadJobMarkers();
+
     console.log('Map initialized');
   }
 
@@ -634,6 +657,53 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
         <p><strong>Status:</strong> ${statusLabel}</p>
       </div>
     `;
+  }
+
+  /** Load jobs from the API and place green markers for those with a pinned pickup location. */
+  loadJobMarkers(): void {
+    interface JobData {
+      jobId: string;
+      title: string;
+      status: string;
+      pickup: { address?: string; lat?: number; lng?: number };
+    }
+    this.http.get<JobData[]>('/api/jobs').subscribe({
+      next: (jobs) => {
+        if (!this.map) return;
+        // Remove stale markers for deleted jobs
+        const currentIds = new Set(jobs.map(j => j.jobId));
+        this.jobMarkers.forEach((m, id) => {
+          if (!currentIds.has(id)) { m.remove(); this.jobMarkers.delete(id); }
+        });
+        // Add / update
+        jobs.forEach(job => {
+          const lat = job.pickup?.lat;
+          const lng = job.pickup?.lng;
+          if (lat == null || lng == null) return;
+          const existing = this.jobMarkers.get(job.jobId);
+          const popup = `<div><h4>🟢 ${job.title}</h4><p><strong>Pickup:</strong> ${job.pickup?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p></div>`;
+          if (existing) {
+            existing.setLatLng([lat, lng]);
+            existing.setPopupContent(popup);
+          } else {
+            const marker = L.marker([lat, lng], { icon: this.jobIcon }).bindPopup(popup);
+            if (this.showJobMarkers()) marker.addTo(this.map!);
+            this.jobMarkers.set(job.jobId, marker);
+          }
+        });
+      },
+      error: () => { /* jobs API not available (no JOBS_TABLE in local dev) */ }
+    });
+  }
+
+  /** Toggle green job markers on/off */
+  toggleJobMarkers(): void {
+    const show = !this.showJobMarkers();
+    this.showJobMarkers.set(show);
+    this.jobMarkers.forEach(marker => {
+      if (!this.map) return;
+      if (show) { marker.addTo(this.map); } else { marker.remove(); }
+    });
   }
 
   /**

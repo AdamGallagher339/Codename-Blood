@@ -53,6 +53,13 @@
           📅 Events ({{ events().length }})
           <span class="toggle-state">{{ showEvents() ? 'ON' : 'OFF' }}</span>
         </button>
+
+        <!-- Job markers toggle -->
+        <button (click)="toggleJobMarkers()" class="control-btn events-btn"
+                [class.events-btn-off]="!showJobMarkers()">
+          🟢 Jobs
+          <span class="toggle-state">{{ showJobMarkers() ? 'ON' : 'OFF' }}</span>
+        </button>
       </div>
 
       <!-- Active Entities List -->
