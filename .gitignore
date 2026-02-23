@@ -12,3 +12,13 @@ backend/backend
 data/users.db
 data/users.db
 data/push.db
+
+# AWS CLI distribution (installed at runtime, not source code)
+aws/dist/
+awscliv2.zip
+
+# Node modules
+node_modules/
+
+# Angular build output
+frontend/blood-bike-web/dist/
