@@ -23,6 +23,9 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   showEvents = signal(true);
   private eventMarkers: Map<string, L.Marker> = new Map();
 
+  // Set to true in ngOnDestroy so all pending timers know to abort
+  private destroyed = false;
+
   // Map and markers
   private map: L.Map | null = null;
   private markers: Map<string, L.Marker> = new Map();
@@ -148,6 +151,8 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   ngAfterViewInit(): void {
     // Initialize map after view is ready
     setTimeout(() => {
+      // Guard: component may have been destroyed during the 100ms delay
+      if (this.destroyed) return;
       this.initializeMap();
       this.connectToTracking();
       // Sync any events that loaded before the map was ready
@@ -156,21 +161,27 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy(): void {
+    // Signal all pending timers (animateMarker, etc.) to abort immediately
+    this.destroyed = true;
+
     // Clean up subscriptions
     this.subscriptions.forEach(sub => sub.unsubscribe());
 
     // Stop geolocation watch
     this.stopLocating();
 
-    // Disconnect WebSocket
+    // Disconnect polling
     this.locationService.disconnectWebSocket();
 
     // Clean up event markers
     this.eventMarkers.forEach(m => m.remove());
     this.eventMarkers.clear();
 
-    // Clean up map
+    // Stop all in-progress Leaflet pan/zoom animations BEFORE removing the
+    // container — otherwise Leaflet's animation timers fire panBy() on a
+    // container that no longer exists, causing the classList crash.
     if (this.map) {
+      this.map.stop();
       this.map.remove();
       this.map = null;
     }
@@ -455,24 +466,28 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     const duration = 1000; // 1 second animation
     const frames = 60;
     const frameDelay = duration / frames;
-    
+
     let frame = 0;
-    
+
     const animate = () => {
+      // Abort if component has been destroyed — prevents the classList crash
+      // caused by Leaflet trying to update a removed map container.
+      if (this.destroyed || !this.map) return;
+
       frame++;
       const progress = frame / frames;
-      
+
       // Linear interpolation
       const lat = currentLatLng.lat + (newLatLng.lat - currentLatLng.lat) * progress;
       const lng = currentLatLng.lng + (newLatLng.lng - currentLatLng.lng) * progress;
-      
+
       marker.setLatLng([lat, lng]);
-      
+
       if (frame < frames) {
         setTimeout(animate, frameDelay);
       }
     };
-    
+
     animate();
   }
 
