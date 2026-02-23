@@ -31,6 +31,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   showJobMarkers = signal(true);
   private jobMarkers: Map<string, L.Marker> = new Map();      // pickup (green)
   private jobDropoffMarkers: Map<string, L.Marker> = new Map(); // delivery (red) — role-scoped
+  private jobRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
 
   // Set to true in ngOnDestroy so all pending timers know to abort
   private destroyed = false;
@@ -225,6 +226,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     this.jobMarkers.clear();
     this.jobDropoffMarkers.forEach(m => m.remove());
     this.jobDropoffMarkers.clear();
+    if (this.jobRefreshIntervalId !== null) {
+      clearInterval(this.jobRefreshIntervalId);
+      this.jobRefreshIntervalId = null;
+    }
 
     // Stop all in-progress Leaflet pan/zoom animations BEFORE removing the
     // container — otherwise Leaflet's animation timers fire panBy() on a
@@ -267,8 +272,9 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     // Add hospital locations
     this.addHospitals();
 
-    // Load jobs with pinned locations
+    // Load jobs with pinned locations and refresh every 30 seconds
     this.loadJobMarkers();
+    this.jobRefreshIntervalId = setInterval(() => this.loadJobMarkers(), 30_000);
 
     console.log('Map initialized');
   }
@@ -702,7 +708,11 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
         const me = this.authService.username();
 
         jobs.forEach(job => {
-          const canSee = isManager || (job.acceptedBy && job.acceptedBy === me);
+          // Completed or cancelled jobs never show pins
+          const isActive = job.status !== 'completed' && job.status !== 'cancelled';
+          const canSee = isActive && (
+            isManager || (!!me && !!job.acceptedBy && job.acceptedBy === me)
+          );
 
           // ---- pickup marker (green) ----
           const pLat = job.pickup?.lat;
