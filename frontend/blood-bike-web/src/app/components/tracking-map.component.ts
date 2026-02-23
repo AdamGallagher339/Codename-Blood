@@ -702,10 +702,12 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
         const me = this.authService.username();
 
         jobs.forEach(job => {
-          // ---- pickup marker (green, always visible) ----
+          const canSee = isManager || (job.acceptedBy && job.acceptedBy === me);
+
+          // ---- pickup marker (green) ----
           const pLat = job.pickup?.lat;
           const pLng = job.pickup?.lng;
-          if (pLat != null && pLng != null) {
+          if (pLat != null && pLng != null && canSee) {
             const popupP = `<div><h4>🟢 ${job.title}</h4><p><strong>Pickup:</strong> ${job.pickup?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p></div>`;
             const existingP = this.jobMarkers.get(job.jobId);
             if (existingP) {
@@ -716,13 +718,16 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
               if (this.showJobMarkers()) m.addTo(this.map!);
               this.jobMarkers.set(job.jobId, m);
             }
+          } else {
+            // Remove pickup marker if user can no longer see this job
+            const existingP = this.jobMarkers.get(job.jobId);
+            if (existingP) { existingP.remove(); this.jobMarkers.delete(job.jobId); }
           }
 
-          // ---- dropoff marker (red, only for managers or job acceptor) ----
+          // ---- dropoff marker (red, same visibility rule) ----
           const dLat = job.dropoff?.lat;
           const dLng = job.dropoff?.lng;
-          const canSeeDropoff = isManager || (job.acceptedBy && job.acceptedBy === me);
-          if (dLat != null && dLng != null && canSeeDropoff) {
+          if (dLat != null && dLng != null && canSee) {
             const popupD = `<div><h4>📦 ${job.title} — Delivery</h4><p><strong>Drop-off:</strong> ${job.dropoff?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p></div>`;
             const existingD = this.jobDropoffMarkers.get(job.jobId);
             if (existingD) {
@@ -734,7 +739,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
               this.jobDropoffMarkers.set(job.jobId, m);
             }
           } else {
-            // Remove dropoff marker if user lost visibility (job status changed etc.)
+            // Remove both markers if user can no longer see this job
             const existingD = this.jobDropoffMarkers.get(job.jobId);
             if (existingD) { existingD.remove(); this.jobDropoffMarkers.delete(job.jobId); }
           }
