@@ -173,25 +173,25 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       shadowSize: [41, 41]
     });
 
-    // University Hospital Galway
-    const universityHospital = L.marker([53.2735, -9.0546], { icon: hospitalIcon })
+    // University Hospital Galway - Newcastle Rd
+    const universityHospital = L.marker([53.2721, -9.0477], { icon: hospitalIcon })
       .addTo(this.map)
       .bindPopup(`
         <div class="hospital-marker">
           <h4>🏥 University Hospital Galway</h4>
-          <p><strong>Location:</strong> Galway, Ireland</p>
+          <p><strong>Address:</strong> Newcastle Rd, Galway, H91 YR71</p>
           <p><strong>Type:</strong> Major Teaching Hospital</p>
         </div>
       `);
 
-    // Merlin Hospital (approximate location in Galway city)
-    const merlinHospital = L.marker([53.2718, -9.0497], { icon: hospitalIcon })
+    // Merlin Park Regional Hospital - Old Dublin Rd
+    const merlinHospital = L.marker([53.2655, -9.0656], { icon: hospitalIcon })
       .addTo(this.map)
       .bindPopup(`
         <div class="hospital-marker">
-          <h4>🏥 Merlin Hospital</h4>
-          <p><strong>Location:</strong> Galway, Ireland</p>
-          <p><strong>Type:</strong> Hospital</p>
+          <h4>🏥 Merlin Park Regional Hospital</h4>
+          <p><strong>Address:</strong> Old Dublin Rd, Galway</p>
+          <p><strong>Type:</strong> Regional Hospital</p>
         </div>
       `);
   }
