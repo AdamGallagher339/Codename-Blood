@@ -117,9 +117,12 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   });
 
   // Build the "you are here" icon with a live speed readout above and rider emoji below.
-  private buildMyLocationIcon(speedKph: number | null): L.DivIcon {
+  private buildMyLocationIcon(speedKph: number | null, accuracyM: number | null = null): L.DivIcon {
     const speedLabel = speedKph !== null && speedKph >= 0
       ? `${Math.round(speedKph)} km/h`
+      : '';
+    const accuracyLabel = accuracyM !== null
+      ? `±${Math.round(accuracyM)}m`
       : '';
     return L.divIcon({
       className: '',
@@ -128,10 +131,11 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
           <div class="my-loc-speed">${speedLabel}</div>
           <div class="my-location-dot"><div class="my-location-pulse"></div></div>
           <div class="my-loc-rider">🏍️</div>
+          ${accuracyLabel ? `<div class="my-loc-accuracy">${accuracyLabel}</div>` : ''}
         </div>`,
-      iconSize: [64, 72],
-      iconAnchor: [32, 38],
-      popupAnchor: [0, -42]
+      iconSize: [64, 80],
+      iconAnchor: [32, 42],
+      popupAnchor: [0, -46]
     });
   }
 
@@ -323,7 +327,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
             this.myLocationError = 'Could not get location.';
         }
       },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
   }
 
@@ -363,7 +367,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   private updateMyLocationMarker(lat: number, lng: number, accuracy: number, speedKph: number | null = null): void {
     if (!this.map) return;
 
-    const icon = this.buildMyLocationIcon(speedKph);
+    const icon = this.buildMyLocationIcon(speedKph, accuracy);
 
     if (!this.myLocationMarker) {
       // First fix — place marker, draw accuracy ring, fly to location
