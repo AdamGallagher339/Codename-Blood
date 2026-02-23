@@ -1,8 +1,9 @@
-import { Component, signal, output } from '@angular/core';
+import { Component, signal, output, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CreateEventDto, EventType, EventPriority } from '../models/event.model';
 import { QrScannerComponent } from './qr-scanner.component';
+import * as L from 'leaflet';
 
 @Component({
   selector: 'app-event-form',
@@ -11,13 +12,14 @@ import { QrScannerComponent } from './qr-scanner.component';
   templateUrl: './event-form.component.html',
   styleUrl: './event-form.component.scss'
 })
-export class EventFormComponent {
+export class EventFormComponent implements OnDestroy {
   showModal = signal(false);
   showScanner = signal(false);
-  
+  showMapPicker = signal(false);
+
   eventCreated = output<CreateEventDto>();
   modalClosed = output<void>();
-  
+
   // Form fields
   title = signal('');
   description = signal('');
@@ -25,8 +27,13 @@ export class EventFormComponent {
   startTime = signal('09:00');
   endTime = signal('10:00');
   location = signal('');
+  lat = signal<number | null>(null);
+  lng = signal<number | null>(null);
   type = signal<EventType>(EventType.DELIVERY);
   priority = signal<EventPriority>(EventPriority.MEDIUM);
+
+  private pickerMap: L.Map | null = null;
+  private pickerMarker: L.Marker | null = null;
   
   eventTypes = [
     { value: EventType.DELIVERY, label: 'Delivery', icon: '🚴' },
@@ -48,11 +55,17 @@ export class EventFormComponent {
     this.resetForm();
     this.showModal.set(true);
   }
-  
+
   close(): void {
     this.showModal.set(false);
     this.showScanner.set(false);
+    this.showMapPicker.set(false);
+    this.destroyPickerMap();
     this.modalClosed.emit();
+  }
+
+  ngOnDestroy(): void {
+    this.destroyPickerMap();
   }
 
   openScanner(): void {
@@ -63,12 +76,90 @@ export class EventFormComponent {
     this.location.set(scannedValue);
     this.showScanner.set(false);
   }
+
+  toggleMapPicker(): void {
+    if (this.showMapPicker()) {
+      this.showMapPicker.set(false);
+      this.destroyPickerMap();
+    } else {
+      this.showMapPicker.set(true);
+      // Defer init until Angular has rendered the container div
+      setTimeout(() => this.initPickerMap(), 50);
+    }
+  }
+
+  clearMapLocation(): void {
+    this.lat.set(null);
+    this.lng.set(null);
+    if (this.pickerMarker && this.pickerMap) {
+      this.pickerMarker.remove();
+      this.pickerMarker = null;
+    }
+  }
+
+  private initPickerMap(): void {
+    const container = document.getElementById('event-map-picker');
+    if (!container || this.pickerMap) return;
+
+    const defaultLat = this.lat() ?? 53.3498;
+    const defaultLng = this.lng() ?? -6.2603;
+
+    this.pickerMap = L.map('event-map-picker', { zoomControl: true }).setView(
+      [defaultLat, defaultLng],
+      10
+    );
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 18
+    }).addTo(this.pickerMap);
+
+    // Place marker if coords already set
+    if (this.lat() !== null && this.lng() !== null) {
+      this.placePickerMarker(this.lat()!, this.lng()!);
+    }
+
+    this.pickerMap.on('click', (e: L.LeafletMouseEvent) => {
+      this.lat.set(parseFloat(e.latlng.lat.toFixed(6)));
+      this.lng.set(parseFloat(e.latlng.lng.toFixed(6)));
+      this.placePickerMarker(e.latlng.lat, e.latlng.lng);
+    });
+  }
+
+  private placePickerMarker(lat: number, lng: number): void {
+    if (!this.pickerMap) return;
+    if (this.pickerMarker) {
+      this.pickerMarker.setLatLng([lat, lng]);
+    } else {
+      this.pickerMarker = L.marker([lat, lng], {
+        icon: L.icon({
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        })
+      }).addTo(this.pickerMap);
+    }
+  }
+
+  private destroyPickerMap(): void {
+    if (this.pickerMarker) {
+      this.pickerMarker.remove();
+      this.pickerMarker = null;
+    }
+    if (this.pickerMap) {
+      this.pickerMap.remove();
+      this.pickerMap = null;
+    }
+  }
   
   submitEvent(): void {
     if (!this.isFormValid()) {
       return;
     }
-    
+
     const eventDto: CreateEventDto = {
       title: this.title(),
       description: this.description(),
@@ -77,9 +168,12 @@ export class EventFormComponent {
       endTime: this.endTime(),
       location: this.location(),
       type: this.type(),
-      priority: this.priority()
+      priority: this.priority(),
+      ...(this.lat() !== null && this.lng() !== null
+        ? { lat: this.lat()!, lng: this.lng()! }
+        : {})
     };
-    
+
     this.eventCreated.emit(eventDto);
     this.close();
   }
@@ -99,6 +193,10 @@ export class EventFormComponent {
     this.startTime.set('09:00');
     this.endTime.set('10:00');
     this.location.set('');
+    this.lat.set(null);
+    this.lng.set(null);
+    this.showMapPicker.set(false);
+    this.destroyPickerMap();
     this.type.set(EventType.DELIVERY);
     this.priority.set(EventPriority.MEDIUM);
   }

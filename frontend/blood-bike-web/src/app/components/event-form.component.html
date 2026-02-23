@@ -92,14 +92,39 @@
               placeholder="Enter location or scan QR code"
               required
             />
-            <button 
-              type="button" 
-              class="btn-icon-secondary" 
+            <button
+              type="button"
+              class="btn-icon-secondary"
               (click)="openScanner()"
               title="Scan QR code for location"
             >
               📷
             </button>
+            <button
+              type="button"
+              class="btn-icon-secondary"
+              [class.btn-icon-active]="showMapPicker()"
+              (click)="toggleMapPicker()"
+              title="Pick location on map"
+            >
+              📍
+            </button>
+          </div>
+
+          <!-- Inline map picker -->
+          <div *ngIf="showMapPicker()" class="map-picker-container">
+            <div class="map-picker-coord-bar">
+              <ng-container *ngIf="lat() !== null && lng() !== null; else noCoord">
+                <span class="coord-badge">
+                  {{ lat()?.toFixed(5) }}, {{ lng()?.toFixed(5) }}
+                </span>
+                <button type="button" class="btn-clear-coord" (click)="clearMapLocation()" title="Clear map pin">✕</button>
+              </ng-container>
+              <ng-template #noCoord>
+                <span class="coord-hint">Click on the map to set a waypoint</span>
+              </ng-template>
+            </div>
+            <div id="event-map-picker" class="map-picker"></div>
           </div>
         </div>
         
