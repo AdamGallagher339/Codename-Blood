@@ -46,6 +46,13 @@
           </button>
         </ng-container>
         <div *ngIf="myLocationError" class="location-error">⚠️ {{ myLocationError }}</div>
+
+        <!-- Event waypoints toggle -->
+        <button (click)="toggleEventMarkers()" class="control-btn events-btn"
+                [class.events-btn-off]="!showEvents()">
+          📅 Events ({{ events().length }})
+          <span class="toggle-state">{{ showEvents() ? 'ON' : 'OFF' }}</span>
+        </button>
       </div>
 
       <!-- Active Entities List -->
@@ -69,6 +76,25 @@
           <div *ngIf="locations.length === 0" class="no-entities">
             No active tracking data
           </div>
+        </div>
+      </div>
+
+      <!-- Events on map -->
+      <div class="entities-section events-section" *ngIf="showEvents()">
+        <h4>📅 Event Waypoints</h4>
+        <div class="entities-list">
+          <ng-container *ngFor="let event of events()">
+            <div class="entity-item event-item" *ngIf="event.lat != null && event.lng != null">
+              <div class="entity-header">
+                <span class="entity-type event-type">{{ event.type }}</span>
+                <span class="entity-id">{{ event.title }}</span>
+              </div>
+              <div class="entity-details">
+                <small>{{ event.location }}</small>
+              </div>
+            </div>
+          </ng-container>
+          <div *ngIf="events().length === 0" class="no-entities">No events</div>
         </div>
       </div>
 

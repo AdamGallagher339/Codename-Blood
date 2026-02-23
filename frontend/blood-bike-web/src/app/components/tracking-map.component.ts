@@ -1,8 +1,10 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, inject, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import * as L from 'leaflet';
 import { LocationTrackingService } from '../services/location-tracking.service';
 import { LocationUpdate } from '../models/location.model';
+import { EventService } from '../services/event.service';
+import { Event as AppEvent } from '../models/event.model';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -14,16 +16,21 @@ import { Subscription } from 'rxjs';
 })
 export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   locationService = inject(LocationTrackingService);
-  
-  
+  private eventService = inject(EventService);
+
+  // Events (loaded from service; component subscribes reactively via effect)
+  events = this.eventService.getEvents();
+  showEvents = signal(true);
+  private eventMarkers: Map<string, L.Marker> = new Map();
+
   // Map and markers
   private map: L.Map | null = null;
   private markers: Map<string, L.Marker> = new Map();
   selectedEntityId: string | null = null;
-  
+
   // Subscriptions
   private subscriptions: Subscription[] = [];
-  
+
   // Component state
   connectionStatus: 'connected' | 'disconnected' | 'connecting' = 'disconnected';
   locations: LocationUpdate[] = [];
@@ -36,6 +43,16 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   private myLocationMarker: L.Marker | null = null;
   private myLocationCircle: L.Circle | null = null;
   private geolocationWatchId: number | null = null;
+
+  constructor() {
+    // Whenever the events signal updates, sync markers onto the map
+    effect(() => {
+      const currentEvents = this.events();
+      if (this.map) {
+        this.syncEventMarkers(currentEvents);
+      }
+    });
+  }
   
   // Leaflet icon configuration (fix for default icon issue)
   private defaultIcon = L.icon({
@@ -86,6 +103,16 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     shadowSize: [41, 41]
   });
 
+  // Icon for event waypoints (orange)
+  private eventIcon = L.icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  });
+
   // "You are here" icon — orange pulsing dot
   private myLocationIcon = L.divIcon({
     className: '',
@@ -123,6 +150,8 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     setTimeout(() => {
       this.initializeMap();
       this.connectToTracking();
+      // Sync any events that loaded before the map was ready
+      this.syncEventMarkers(this.events());
     }, 100);
   }
 
@@ -135,7 +164,11 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Disconnect WebSocket
     this.locationService.disconnectWebSocket();
-    
+
+    // Clean up event markers
+    this.eventMarkers.forEach(m => m.remove());
+    this.eventMarkers.clear();
+
     // Clean up map
     if (this.map) {
       this.map.remove();
@@ -496,6 +529,77 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
    */
   clearSelection(): void {
     this.selectEntity(null);
+  }
+
+  /**
+   * Toggle event waypoints on/off the map
+   */
+  toggleEventMarkers(): void {
+    const show = !this.showEvents();
+    this.showEvents.set(show);
+    this.eventMarkers.forEach(marker => {
+      if (!this.map) return;
+      if (show) {
+        if (!this.map.hasLayer(marker)) marker.addTo(this.map);
+      } else {
+        if (this.map.hasLayer(marker)) marker.remove();
+      }
+    });
+  }
+
+  /**
+   * Sync event markers with current event list (adds new, removes deleted)
+   */
+  private syncEventMarkers(events: AppEvent[]): void {
+    if (!this.map) return;
+
+    const eventsWithCoords = events.filter(e => e.lat != null && e.lng != null);
+    const newIds = new Set(eventsWithCoords.map(e => e.id));
+
+    // Remove markers for events no longer present
+    this.eventMarkers.forEach((marker, id) => {
+      if (!newIds.has(id)) {
+        marker.remove();
+        this.eventMarkers.delete(id);
+      }
+    });
+
+    // Add or update markers
+    eventsWithCoords.forEach(event => {
+      const existing = this.eventMarkers.get(event.id);
+      if (existing) {
+        existing.setLatLng([event.lat!, event.lng!]);
+        existing.setPopupContent(this.createEventPopupContent(event));
+      } else {
+        const marker = L.marker([event.lat!, event.lng!], { icon: this.eventIcon })
+          .bindPopup(this.createEventPopupContent(event));
+        if (this.showEvents()) {
+          marker.addTo(this.map!);
+        }
+        this.eventMarkers.set(event.id, marker);
+      }
+    });
+  }
+
+  /**
+   * Build popup HTML for an event marker
+   */
+  private createEventPopupContent(event: AppEvent): string {
+    const date = new Date(event.date).toLocaleDateString('en-IE', {
+      day: 'numeric', month: 'short', year: 'numeric'
+    });
+    const typeLabel = event.type.charAt(0).toUpperCase() + event.type.slice(1);
+    const statusLabel = event.status.charAt(0).toUpperCase() + event.status.slice(1);
+    return `
+      <div class="event-marker-popup">
+        <h4>📅 ${event.title}</h4>
+        <p><strong>Date:</strong> ${date}</p>
+        <p><strong>Time:</strong> ${event.startTime} – ${event.endTime}</p>
+        <p><strong>Location:</strong> ${event.location}</p>
+        <p><strong>Type:</strong> ${typeLabel}</p>
+        <p><strong>Status:</strong> ${statusLabel}</p>
+      </div>
+    `;
   }
 
   /**
