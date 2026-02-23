@@ -189,17 +189,18 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       }
     ];
 
-    const map = this.map;
     const geocodeRequests = hospitals.map(h => this.geocodingService.geocode(h.query));
 
     forkJoin(geocodeRequests).subscribe(results => {
+      if (!this.map) return; // Guard: component may have been destroyed before response arrived
       results.forEach((loc, i) => {
+        if (!this.map) return;
         if (!loc) {
           console.warn(`Could not geocode: ${hospitals[i].query}`);
           return;
         }
         L.marker([loc.lat, loc.lng], { icon: hospitalIcon })
-          .addTo(map)
+          .addTo(this.map)
           .bindPopup(`
             <div class="hospital-marker">
               <h4>🏥 ${hospitals[i].label}</h4>
