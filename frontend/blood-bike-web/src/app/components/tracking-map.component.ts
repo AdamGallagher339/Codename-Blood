@@ -116,14 +116,24 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     shadowSize: [41, 41]
   });
 
-  // "You are here" icon — orange pulsing dot
-  private myLocationIcon = L.divIcon({
-    className: '',
-    html: `<div class="my-location-dot"><div class="my-location-pulse"></div></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-    popupAnchor: [0, -12]
-  });
+  // Build the "you are here" icon with a live speed readout above and rider emoji below.
+  private buildMyLocationIcon(speedKph: number | null): L.DivIcon {
+    const speedLabel = speedKph !== null && speedKph >= 0
+      ? `${Math.round(speedKph)} km/h`
+      : '';
+    return L.divIcon({
+      className: '',
+      html: `
+        <div class="my-loc-wrapper">
+          <div class="my-loc-speed">${speedLabel}</div>
+          <div class="my-location-dot"><div class="my-location-pulse"></div></div>
+          <div class="my-loc-rider">🏍️</div>
+        </div>`,
+      iconSize: [64, 72],
+      iconAnchor: [32, 38],
+      popupAnchor: [0, -42]
+    });
+  }
 
   ngOnInit(): void {
     // Subscribe to connection status
@@ -292,8 +302,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
     this.geolocationWatchId = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        this.updateMyLocationMarker(latitude, longitude, accuracy);
+        const { latitude, longitude, accuracy, speed } = position.coords;
+        // speed is in m/s; convert to km/h (null if unavailable)
+        const speedKph = speed != null ? speed * 3.6 : null;
+        this.updateMyLocationMarker(latitude, longitude, accuracy, speedKph);
       },
       (err) => {
         this.isWatchingLocation = false;
@@ -348,12 +360,14 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   /**
    * Place or update the "you are here" marker and accuracy circle.
    */
-  private updateMyLocationMarker(lat: number, lng: number, accuracy: number): void {
+  private updateMyLocationMarker(lat: number, lng: number, accuracy: number, speedKph: number | null = null): void {
     if (!this.map) return;
+
+    const icon = this.buildMyLocationIcon(speedKph);
 
     if (!this.myLocationMarker) {
       // First fix — place marker, draw accuracy ring, fly to location
-      this.myLocationMarker = L.marker([lat, lng], { icon: this.myLocationIcon, zIndexOffset: 1000 })
+      this.myLocationMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 })
         .addTo(this.map)
         .bindPopup('<strong>📍 You are here</strong>');
 
@@ -367,8 +381,9 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
       this.map.flyTo([lat, lng], 16);
     } else {
-      // Subsequent updates — move marker and ring smoothly
+      // Subsequent updates — move marker, update speed badge, update ring
       this.myLocationMarker.setLatLng([lat, lng]);
+      this.myLocationMarker.setIcon(icon);
       this.myLocationCircle?.setLatLng([lat, lng]).setRadius(accuracy);
     }
   }
