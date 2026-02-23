@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo"
@@ -244,6 +246,43 @@ func Delete(ctx context.Context, id string) (bool, error) {
 	}
 	delete(fallbackEvents, id)
 	return true, nil
+}
+
+// eventEndTime combines an event's Date and EndTime ("HH:MM") into a single UTC time.
+func eventEndTime(e *Event) (time.Time, error) {
+	if e.EndTime == "" {
+		return time.Time{}, errors.New("no end time")
+	}
+	// Normalize: accept "HH:MM" or "HH:MM:SS"
+	timePart := e.EndTime
+	if len(strings.Split(timePart, ":")) == 2 {
+		timePart += ":00"
+	}
+	dateStr := e.Date.UTC().Format("2006-01-02")
+	return time.Parse("2006-01-02 15:04:05", dateStr+" "+timePart)
+}
+
+// PurgeExpired deletes all events whose end datetime is in the past.
+func PurgeExpired(ctx context.Context) {
+	all, err := List(ctx)
+	if err != nil {
+		log.Printf("[events] purge: failed to list events: %v", err)
+		return
+	}
+	now := time.Now().UTC()
+	for _, e := range all {
+		end, err := eventEndTime(e)
+		if err != nil {
+			continue // skip events with unparseable end time
+		}
+		if now.After(end) {
+			if _, err := Delete(ctx, e.ID); err != nil {
+				log.Printf("[events] purge: failed to delete %s: %v", e.ID, err)
+			} else {
+				log.Printf("[events] purge: deleted expired event %q (ended %s)", e.Title, end.Format(time.RFC3339))
+			}
+		}
+	}
 }
 
 func newID() string {
