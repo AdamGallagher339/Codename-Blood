@@ -109,6 +109,9 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		events.SetGlobalEventsRepository(dynamoRepos.Events)
 	}
 
+	// Start background ticker that deletes events once their end time has passed.
+	events.StartCleanupTicker(ctx)
+
 	trackerStore, err := fleet.NewTrackerStore(ctx)
 	if err != nil {
 		log.Println("fleet tracker not initialized:", err)
