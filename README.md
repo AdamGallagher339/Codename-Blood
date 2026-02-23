@@ -112,42 +112,52 @@ npm install
 
 ## Run Locally
 
-You will run two processes:
+You need two processes running — the Go backend and the frontend server.
+Both must be running for the app to work.
 
-- **Backend API:** `http://localhost:8080`
-- **Frontend (Angular dev server):** `http://localhost:4200` (proxies `/api` → backend)
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **Backend** | `http://localhost:8080` | Go API server |
+| **Frontend** | `http://localhost:4200` | Serves UI, proxies `/api` → backend |
 
-### 1) Start the backend (Go)
+### 1) Start the backend
 
 ```bash
 cd backend
-go run .
+go build -o backend .
+./backend
 ```
 
-Backend health check:
+You should see log output confirming it's listening on `:8080`.
+
+> **Quick check:** `curl http://localhost:8080/api/health`
+
+### 2) Start the frontend
+
+There are two options — pick one:
+
+#### Option A: Production build + PWA server (recommended)
+
+This builds the full Angular app and serves it with push notification and service worker support:
 
 ```bash
-curl http://localhost:8080/api/health
+cd frontend/blood-bike-web
+npm run build:prod
+node serve-pwa.js
 ```
 
-### 2) Start the frontend (Angular)
+#### Option B: Angular dev server (hot reload for development)
 
-In a second terminal:
+Faster iteration with live reload, but no service worker / push notifications:
 
 ```bash
 cd frontend/blood-bike-web
 npm run start
 ```
 
-Open:
+**Open the app:** [http://localhost:4200](http://localhost:4200)
 
-- `http://localhost:4200`
-
-Proxy check (frontend → backend):
-
-```bash
-curl http://localhost:4200/api/health
-```
+> **Proxy check:** `curl http://localhost:4200/api/health` — should return the same response as the backend directly.
 
 ### 3) Test the Live Tracking Map
 
@@ -195,13 +205,17 @@ For complete API documentation, see [docs/TRACKING_MAP.md](docs/TRACKING_MAP.md)
 ```
 ├── backend/              # Go backend API
 │   ├── internal/
-│   │   ├── auth/        # Authentication (Cognito)
+│   │   ├── auth/        # Authentication (Cognito + local dev mode)
 │   │   ├── events/      # Event management
-│   │   ├── fleet/       # Fleet/bike management
+│   │   ├── fleet/       # Fleet/bike/user management
+│   │   ├── httpapi/     # HTTP router, job receipts, SES email
+│   │   ├── push/        # Web push notifications (VAPID)
+│   │   ├── repo/        # Data layer (DynamoDB + in-memory)
 │   │   └── tracking/    # Location tracking (WebSocket + HTTP)
 │   └── main.go
-├── frontend/            # Angular frontend
+├── frontend/            # Angular PWA frontend
 │   └── blood-bike-web/
+│       ├── serve-pwa.js # Production PWA server with API proxy
 │       └── src/app/
 │           ├── components/  # UI components
 │           ├── models/      # TypeScript models
