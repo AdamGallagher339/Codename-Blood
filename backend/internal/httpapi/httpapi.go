@@ -234,9 +234,13 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 			_ = json.NewEncoder(w).Encode(jobs)
 		case http.MethodPost:
 			var body struct {
-				Title   string `json:"title"`
-				Pickup  string `json:"pickup"`
-				Dropoff string `json:"dropoff"`
+				Title      string   `json:"title"`
+				Pickup     string   `json:"pickup"`
+				Dropoff    string   `json:"dropoff"`
+				PickupLat  *float64 `json:"pickupLat,omitempty"`
+				PickupLng  *float64 `json:"pickupLng,omitempty"`
+				DropoffLat *float64 `json:"dropoffLat,omitempty"`
+				DropoffLng *float64 `json:"dropoffLng,omitempty"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -260,14 +264,25 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 				}
 			}
 
+			pickup := map[string]any{"address": body.Pickup}
+			if body.PickupLat != nil && body.PickupLng != nil {
+				pickup["lat"] = *body.PickupLat
+				pickup["lng"] = *body.PickupLng
+			}
+			dropoff := map[string]any{"address": body.Dropoff}
+			if body.DropoffLat != nil && body.DropoffLng != nil {
+				dropoff["lat"] = *body.DropoffLat
+				dropoff["lng"] = *body.DropoffLng
+			}
+
 			now := time.Now().UTC().Format(time.RFC3339)
 			job := &repo.Job{
 				JobID:      uuid.NewString(),
 				Title:      body.Title,
 				Status:     "open",
 				CreatedBy:  createdBy,
-				Pickup:     map[string]any{"address": body.Pickup},
-				Dropoff:    map[string]any{"address": body.Dropoff},
+				Pickup:     pickup,
+				Dropoff:    dropoff,
 				Timestamps: map[string]any{"created": now},
 			}
 			if err := dynamoRepos.Jobs.Put(r.Context(), job); err != nil {
