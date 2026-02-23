@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export interface SpeedPoint {
   timestamp: string;
@@ -23,6 +24,11 @@ export interface RiderSummary {
   dataPoints: number;
 }
 
+export interface RiderOption {
+  id: string;
+  name: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AnalyticsService {
   private readonly http = inject(HttpClient);
@@ -32,8 +38,10 @@ export class AnalyticsService {
     return this.http.get<RiderSummary>(`/api/analytics/${riderId}`);
   }
 
-  /** Returns the list of rider IDs currently tracked (fleet_manager/dispatcher only). */
-  getRiderIds(): Observable<string[]> {
-    return this.http.get<string[]>('/api/analytics/');
+  /** Returns the list of all riders from the availability endpoint. */
+  getRiders(): Observable<RiderOption[]> {
+    return this.http.get<Array<{ riderId: string; name?: string }>>('/api/riders/availability').pipe(
+      map(list => list.map(r => ({ id: r.riderId, name: r.name || r.riderId })))
+    );
   }
 }

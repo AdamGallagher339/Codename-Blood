@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription, interval, switchMap, startWith, catchError, of } from 'rxjs';
-import { AnalyticsService, RiderSummary, SpeedPoint } from '../services/analytics.service';
+import { AnalyticsService, RiderSummary, SpeedPoint, RiderOption } from '../services/analytics.service';
 import { AuthService } from '../services/auth.service';
 
 interface ChartPoint { x: number; y: number }
@@ -23,9 +23,9 @@ interface ChartPoint { x: number; y: number }
         <label for="rider-select">Rider:</label>
         <select id="rider-select" [(ngModel)]="selectedRider" (ngModelChange)="onRiderChange()">
           <option value="">— Select a rider —</option>
-          <option *ngFor="let id of riderIds()" [value]="id">{{ id }}</option>
+          <option *ngFor="let r of riders()" [value]="r.id">{{ r.name }}</option>
         </select>
-        <span class="hint" *ngIf="riderIds().length === 0">No riders being tracked yet</span>
+        <span class="hint" *ngIf="riders().length === 0">No riders found</span>
       </div>
 
       <!-- No data message -->
@@ -245,7 +245,7 @@ export class AnalyticsPageComponent implements OnInit, OnDestroy {
 
   // State
   readonly summary = signal<RiderSummary | null>(null);
-  readonly riderIds = signal<string[]>([]);
+  readonly riders = signal<RiderOption[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly lastRefresh = signal<Date | null>(null);
@@ -262,20 +262,26 @@ export class AnalyticsPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (this.canViewAll()) {
-      // Fetch the list of tracked rider IDs and start polling if we pick a default
-      this.analyticsService.getRiderIds().pipe(
-        catchError(() => of([] as string[]))
-      ).subscribe(ids => {
-        this.riderIds.set(ids);
-        if (ids.length === 1) {
-          this.selectedRider = ids[0];
+      // Populate dropdown from the real riders list, always include self
+      this.analyticsService.getRiders().pipe(
+        catchError(() => of([] as RiderOption[]))
+      ).subscribe(list => {
+        const me = this.auth.username();
+        // Ensure current user is always in the list
+        if (me && !list.find(r => r.id === me)) {
+          list = [{ id: me, name: me }, ...list];
+        }
+        this.riders.set(list);
+        if (list.length === 1) {
+          this.selectedRider = list[0].id;
           this.startPolling();
         }
       });
     } else {
-      // Rider sees their own data
-      this.selectedRider = this.auth.username();
-      this.startPolling();
+      // Rider sees their own data — auto-select, no dropdown shown
+      const me = this.auth.username();
+      this.selectedRider = me;
+      if (me) this.startPolling();
     }
   }
 
