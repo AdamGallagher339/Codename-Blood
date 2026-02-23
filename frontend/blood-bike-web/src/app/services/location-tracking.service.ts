@@ -165,7 +165,44 @@ export class LocationTrackingService {
   }
   
   /**
-   * Check if a location is stale (older than 5 minutes)
+   * Get all active riders' locations via HTTP GET
+   * Requires FleetManager role or higher
+   */
+  getRiders(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.API_BASE}/riders`).pipe(
+      catchError(() => of([]))
+    );
+  }
+  
+  /**
+   * Start polling for active riders' locations (every 3 seconds)
+   * Emits rider locations only via locationUpdates$ stream
+   */
+  startRidersPolling(pollMs = this.defaultPollMs): void {
+    this.stopRidersPolling();
+    
+    this.pollingSub = interval(pollMs).pipe(
+      startWith(0),
+      switchMap(() => this.getRiders()),
+      catchError(() => of([]))
+    ).subscribe(riders => {
+      this.applyPolledLocations(riders);
+    });
+    
+    this.connectionStatus$.next('connected');
+  }
+  
+  /**
+   * Stop polling for riders
+   */
+  stopRidersPolling(): void {
+    if (this.pollingSub) {
+      this.pollingSub.unsubscribe();
+      this.pollingSub = null;
+    }
+  }
+  
+  /**
    */
   isLocationStale(location: LocationUpdate): boolean {
     const now = new Date().getTime();
