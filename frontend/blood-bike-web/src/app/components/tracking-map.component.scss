@@ -82,6 +82,15 @@
     .panel-content {
       display: none;
     }
+
+    .panel-header h3 {
+      display: none;
+    }
+
+    .panel-header {
+      justify-content: center;
+      padding: 12px 8px;
+    }
   }
 }
 
