@@ -339,7 +339,8 @@ export class ReceiptDialogComponent {
         jobTitle: this.job.title,
         pickupAddress: this.job.pickup?.address || '—',
         dropoffAddress: this.job.dropoff?.address || '—',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        dispatcherName: this.job.createdBy || 'Dispatch'
       });
       this.sendResult = result;
       this.step = 'done';

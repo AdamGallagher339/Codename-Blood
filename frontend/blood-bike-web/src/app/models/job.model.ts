@@ -36,6 +36,7 @@ export interface ReceiptRequest {
   pickupAddress: string;
   dropoffAddress: string;
   timestamp: string;
+  dispatcherName: string;
 }
 
 export interface ReceiptResponse {

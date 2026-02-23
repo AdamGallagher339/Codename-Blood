@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -457,6 +458,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 			PickupAddress  string `json:"pickupAddress"`
 			DropoffAddress string `json:"dropoffAddress"`
 			Timestamp      string `json:"timestamp"`
+			DispatcherName string `json:"dispatcherName"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -472,9 +474,23 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		if body.Type == "delivery" {
 			receiptType = "Delivery Confirmation"
 		}
-		timestamp := body.Timestamp
-		if timestamp == "" {
-			timestamp = time.Now().UTC().Format(time.RFC3339)
+		// Format timestamp for display
+		var displayTime string
+		if body.Timestamp != "" {
+			if t, err := time.Parse(time.RFC3339Nano, body.Timestamp); err == nil {
+				displayTime = t.Format("02 Jan 2006, 15:04")
+			} else if t, err := time.Parse(time.RFC3339, body.Timestamp); err == nil {
+				displayTime = t.Format("02 Jan 2006, 15:04")
+			} else {
+				displayTime = body.Timestamp
+			}
+		} else {
+			displayTime = time.Now().UTC().Format("02 Jan 2006, 15:04")
+		}
+
+		dispatcher := body.DispatcherName
+		if dispatcher == "" {
+			dispatcher = "Dispatch"
 		}
 
 		html := fmt.Sprintf(`<!DOCTYPE html>
@@ -487,7 +503,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
   </div>
   <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
     <table style="width: 100%%; border-collapse: collapse;">
-      <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Job Reference:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
+      <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Dispatched By:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
       <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Job Title:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
       <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Pickup Address:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
       <tr><td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #eee;">Delivery Address:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">%s</td></tr>
@@ -496,20 +512,19 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
     </table>
     <div style="margin-top: 20px; border-top: 2px solid #dc3545; padding-top: 15px;">
       <p style="font-weight: bold; margin-bottom: 5px;">Rider Signature:</p>
-      <img src="%s" alt="Signature" style="max-width: 100%%; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />
+      <img src="cid:signature" alt="Signature" style="max-width: 300px; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />
     </div>
     <p style="text-align: center; color: #666; font-size: 12px; margin-top: 20px;">
       This is an automated receipt from the Blood Bike Ireland dispatch system.
     </p>
   </div>
 </body>
-</html>`, receiptType, receiptType, body.JobID, body.JobTitle, body.PickupAddress, body.DropoffAddress, body.RiderName, body.Type, timestamp, body.SignatureData)
+</html>`, receiptType, receiptType, dispatcher, body.JobTitle, body.PickupAddress, body.DropoffAddress, body.RiderName, body.Type, displayTime)
 
 		// Send via AWS SES
 		sesClient, err := newSESClient(r.Context())
 		if err != nil {
 			log.Printf("op=SendReceipt err=%v (SES not available, returning receipt HTML)", err)
-			// Fallback: return the HTML so frontend can handle it
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"sent":    false,
@@ -520,7 +535,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		}
 
 		subject := fmt.Sprintf("Blood Bike %s — %s", receiptType, body.JobTitle)
-		err = sendSESEmail(r.Context(), sesClient, body.RecipientEmail, subject, html)
+		err = sendSESEmailWithSignature(r.Context(), sesClient, body.RecipientEmail, subject, html, body.SignatureData)
 		if err != nil {
 			log.Printf("op=SendReceipt email=%s err=%v", body.RecipientEmail, err)
 			// Return receipt HTML as fallback
@@ -759,20 +774,69 @@ func newSESClient(ctx context.Context) (*sesv2.Client, error) {
 	return sesv2.NewFromConfig(cfg), nil
 }
 
-func sendSESEmail(ctx context.Context, client *sesv2.Client, to, subject, htmlBody string) error {
-	from := os.Getenv("SES_FROM_EMAIL")
-	if from == "" {
-		from = "noreply@bloodbike.app"
+func sendSESEmailWithSignature(ctx context.Context, client *sesv2.Client, to, subject, htmlBody, signatureDataURI string) error {
+	fromEmail := os.Getenv("SES_FROM_EMAIL")
+	if fromEmail == "" {
+		fromEmail = "noreply@bloodbike.app"
 	}
+	fromHeader := fmt.Sprintf("Blood Bike Ireland <%s>", fromEmail)
+	boundary := fmt.Sprintf("----=_Part_%d", time.Now().UnixNano())
+
+	// Extract raw PNG bytes from data URI (data:image/png;base64,XXXXX)
+	var sigBytes []byte
+	if idx := strings.Index(signatureDataURI, ","); idx >= 0 {
+		var err error
+		sigBytes, err = base64.StdEncoding.DecodeString(signatureDataURI[idx+1:])
+		if err != nil {
+			log.Printf("op=SendReceipt warn=bad_signature_base64 err=%v", err)
+		}
+	}
+
+	// Build raw MIME message
+	var msg strings.Builder
+	msg.WriteString(fmt.Sprintf("From: %s\r\n", fromHeader))
+	msg.WriteString(fmt.Sprintf("To: %s\r\n", to))
+	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	msg.WriteString(fmt.Sprintf("Reply-To: %s\r\n", fromEmail))
+	msg.WriteString("MIME-Version: 1.0\r\n")
+	msg.WriteString(fmt.Sprintf("Content-Type: multipart/related; boundary=\"%s\"\r\n", boundary))
+	msg.WriteString("\r\n")
+
+	// HTML part
+	msg.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+	msg.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	msg.WriteString("Content-Transfer-Encoding: 7bit\r\n")
+	msg.WriteString("\r\n")
+	msg.WriteString(htmlBody)
+	msg.WriteString("\r\n")
+
+	// Signature image attachment (inline CID)
+	if len(sigBytes) > 0 {
+		msg.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+		msg.WriteString("Content-Type: image/png; name=\"signature.png\"\r\n")
+		msg.WriteString("Content-Transfer-Encoding: base64\r\n")
+		msg.WriteString("Content-Disposition: inline; filename=\"signature.png\"\r\n")
+		msg.WriteString("Content-ID: <signature>\r\n")
+		msg.WriteString("\r\n")
+		// Write base64 in 76-char lines
+		b64 := base64.StdEncoding.EncodeToString(sigBytes)
+		for i := 0; i < len(b64); i += 76 {
+			end := i + 76
+			if end > len(b64) {
+				end = len(b64)
+			}
+			msg.WriteString(b64[i:end])
+			msg.WriteString("\r\n")
+		}
+	}
+
+	msg.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
+
+	rawMsg := []byte(msg.String())
 	input := &sesv2.SendEmailInput{
-		FromEmailAddress: &from,
-		Destination: &sestypes.Destination{
-			ToAddresses: []string{to},
-		},
 		Content: &sestypes.EmailContent{
-			Simple: &sestypes.Message{
-				Subject: &sestypes.Content{Data: &subject},
-				Body:    &sestypes.Body{Html: &sestypes.Content{Data: &htmlBody}},
+			Raw: &sestypes.RawMessage{
+				Data: rawMsg,
 			},
 		},
 	}
