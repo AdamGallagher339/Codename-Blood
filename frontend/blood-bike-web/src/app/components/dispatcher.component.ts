@@ -46,8 +46,15 @@ interface Job {
           </p>
           <label>
             <span>Delivery Address</span>
-            <input type="text" [(ngModel)]="newJob.dropoff" placeholder="Delivery location" />
+            <div class="input-with-pin">
+              <input type="text" [(ngModel)]="newJob.dropoff" placeholder="Delivery location" />
+              <button type="button" class="btn-pin btn-pin-red" (click)="toggleDropoffMap()">📍 {{ showDropoffMap ? 'Close Map' : 'Pin' }}</button>
+            </div>
           </label>
+          <div *ngIf="showDropoffMap" id="dispatcher-dropoff-map" class="job-map-picker"></div>
+          <p *ngIf="newJob.dropoffLat !== null" class="pin-coords pin-coords-red">📌 {{ newJob.dropoffLat?.toFixed(5) }}, {{ newJob.dropoffLng?.toFixed(5) }}
+            <button type="button" class="btn-clear-pin" (click)="clearDropoffPin()">✕ clear</button>
+          </p>
           <button class="btn-primary" (click)="createJob()" [disabled]="busy || !newJob.title">{{ busy ? 'Creating…' : 'Create Job' }}</button>
           <p *ngIf="message" class="msg" [class.error]="isError">{{ message }}</p>
         </div>
@@ -124,9 +131,12 @@ interface Job {
     .input-with-pin input { flex: 1; }
     .btn-pin { padding: .45rem .9rem; background: #4caf50; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap; }
     .btn-pin:hover { background: #388e3c; }
+    .btn-pin-red { background: #dc143c; }
+    .btn-pin-red:hover { background: #b01030; }
     .btn-clear-pin { background: none; border: none; cursor: pointer; color: #c62828; font-size: .85rem; margin-left: .5rem; }
     .job-map-picker { height: 280px; border-radius: 8px; overflow: hidden; margin-top: .25rem; border: 1px solid #ddd; }
     .pin-coords { margin: .25rem 0 0; font-size: .85rem; color: #2e7d32; font-weight: 600; }
+    .pin-coords-red { color: #b71c1c; }
     .btn-delete { padding: .35rem .75rem; background: #d32f2f; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: .85rem; }
     .msg { margin: 0; padding: .6rem .75rem; border-radius: 8px; background: #e8f5e9; color: #2e7d32; font-size: .9rem; }
     .msg.error { background: #fbe9e7; color: #c62828; }
@@ -158,11 +168,14 @@ interface Job {
   `]
 })
 export class DispatcherComponent implements OnInit, OnDestroy {
-  newJob: { title: string; pickup: string; dropoff: string; pickupLat: number | null; pickupLng: number | null } =
-    { title: '', pickup: '', dropoff: '', pickupLat: null, pickupLng: null };
+  newJob: { title: string; pickup: string; dropoff: string; pickupLat: number | null; pickupLng: number | null; dropoffLat: number | null; dropoffLng: number | null } =
+    { title: '', pickup: '', dropoff: '', pickupLat: null, pickupLng: null, dropoffLat: null, dropoffLng: null };
   showPickupMap = false;
+  showDropoffMap = false;
   private pickupMap: L.Map | null = null;
   private pickupMarker: L.Marker | null = null;
+  private dropoffMap: L.Map | null = null;
+  private dropoffMarker: L.Marker | null = null;
   busy = false;
   loading = false;
   message: string | null = null;
@@ -177,6 +190,7 @@ export class DispatcherComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyPickupMap();
+    this.destroyDropoffMap();
   }
 
   togglePickupMap(): void {
@@ -236,6 +250,60 @@ export class DispatcherComponent implements OnInit, OnDestroy {
     if (this.pickupMap) { this.pickupMap.remove(); this.pickupMap = null; }
   }
 
+  toggleDropoffMap(): void {
+    if (this.showDropoffMap) {
+      this.showDropoffMap = false;
+      this.destroyDropoffMap();
+    } else {
+      this.showDropoffMap = true;
+      setTimeout(() => this.initDropoffMap(), 50);
+    }
+  }
+
+  clearDropoffPin(): void {
+    this.newJob.dropoffLat = null;
+    this.newJob.dropoffLng = null;
+    if (this.dropoffMarker) { this.dropoffMarker.remove(); this.dropoffMarker = null; }
+  }
+
+  private initDropoffMap(): void {
+    const container = document.getElementById('dispatcher-dropoff-map');
+    if (!container || this.dropoffMap) return;
+    const lat = this.newJob.dropoffLat ?? this.newJob.pickupLat ?? 53.2707;
+    const lng = this.newJob.dropoffLng ?? this.newJob.pickupLng ?? -9.0568;
+    this.dropoffMap = L.map('dispatcher-dropoff-map', { zoomControl: true }).setView([lat, lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 18
+    }).addTo(this.dropoffMap);
+    if (this.newJob.dropoffLat !== null && this.newJob.dropoffLng !== null) {
+      this.placeDropoffMarker(this.newJob.dropoffLat, this.newJob.dropoffLng);
+    }
+    this.dropoffMap.on('click', (e: L.LeafletMouseEvent) => {
+      this.newJob.dropoffLat = parseFloat(e.latlng.lat.toFixed(6));
+      this.newJob.dropoffLng = parseFloat(e.latlng.lng.toFixed(6));
+      this.placeDropoffMarker(e.latlng.lat, e.latlng.lng);
+    });
+  }
+
+  private placeDropoffMarker(lat: number, lng: number): void {
+    if (!this.dropoffMap) return;
+    const redIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
+    if (this.dropoffMarker) {
+      this.dropoffMarker.setLatLng([lat, lng]);
+    } else {
+      this.dropoffMarker = L.marker([lat, lng], { icon: redIcon }).addTo(this.dropoffMap);
+    }
+  }
+
+  private destroyDropoffMap(): void {
+    if (this.dropoffMarker) { this.dropoffMarker.remove(); this.dropoffMarker = null; }
+    if (this.dropoffMap) { this.dropoffMap.remove(); this.dropoffMap = null; }
+  }
+
   private getHeaders(): HttpHeaders {
     const token = this.auth.getIdToken() || this.auth.getAccessToken();
     return new HttpHeaders({ 'Authorization': `Bearer ${token}` });
@@ -265,9 +333,11 @@ export class DispatcherComponent implements OnInit, OnDestroy {
         this.message = `Job "${job.title}" created successfully`;
         this.isError = false;
         this.busy = false;
-        this.newJob = { title: '', pickup: '', dropoff: '', pickupLat: null, pickupLng: null };
+        this.newJob = { title: '', pickup: '', dropoff: '', pickupLat: null, pickupLng: null, dropoffLat: null, dropoffLng: null };
         this.showPickupMap = false;
+        this.showDropoffMap = false;
         this.destroyPickupMap();
+        this.destroyDropoffMap();
         this.loadJobs();
       },
       error: (err) => {
