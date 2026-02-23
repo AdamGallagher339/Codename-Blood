@@ -151,7 +151,49 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
       attribution: '© OpenStreetMap contributors'
     }).addTo(this.map);
     
+    // Add hospital locations
+    this.addHospitals();
+    
     console.log('Map initialized');
+  }
+
+  /**
+   * Add hospital markers to the map
+   */
+  private addHospitals(): void {
+    if (!this.map) return;
+
+    // Hospital icon (red)
+    const hospitalIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    });
+
+    // University Hospital Galway
+    const universityHospital = L.marker([53.2735, -9.0546], { icon: hospitalIcon })
+      .addTo(this.map)
+      .bindPopup(`
+        <div class="hospital-marker">
+          <h4>🏥 University Hospital Galway</h4>
+          <p><strong>Location:</strong> Galway, Ireland</p>
+          <p><strong>Type:</strong> Major Teaching Hospital</p>
+        </div>
+      `);
+
+    // Merlin Hospital (approximate location in Galway city)
+    const merlinHospital = L.marker([53.2718, -9.0497], { icon: hospitalIcon })
+      .addTo(this.map)
+      .bindPopup(`
+        <div class="hospital-marker">
+          <h4>🏥 Merlin Hospital</h4>
+          <p><strong>Location:</strong> Galway, Ireland</p>
+          <p><strong>Type:</strong> Hospital</p>
+        </div>
+      `);
   }
 
   /**
