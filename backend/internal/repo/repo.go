@@ -82,3 +82,25 @@ type JobsRepository interface {
 	Put(ctx context.Context, j *Job) error
 	Delete(ctx context.Context, jobID string) (bool, error)
 }
+type Event struct {
+	ID             string    `json:"id"`
+	Title          string    `json:"title"`
+	Description    string    `json:"description"`
+	Date           time.Time `json:"date"`
+	StartTime      string    `json:"startTime"`
+	EndTime        string    `json:"endTime"`
+	Location       string    `json:"location"`
+	Type           string    `json:"type"`
+	Priority       string    `json:"priority"`
+	AssignedRiders []string  `json:"assignedRiders,omitempty"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
+type EventsRepository interface {
+	List(ctx context.Context) ([]Event, error)
+	Get(ctx context.Context, eventID string) (*Event, bool, error)
+	Put(ctx context.Context, e *Event) error
+	Delete(ctx context.Context, eventID string) (bool, error)
+}

@@ -9,14 +9,19 @@ import (
 func ListOrCreate(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, List())
+		items, err := List(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, items)
 	case http.MethodPost:
 		var req CreateEventRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		e, err := Create(req)
+		e, err := Create(r.Context(), req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -37,7 +42,11 @@ func GetUpdateOrDelete(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		e, ok := Get(id)
+		e, ok, err := Get(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		if !ok {
 			http.Error(w, "event not found", http.StatusNotFound)
 			return
@@ -49,7 +58,7 @@ func GetUpdateOrDelete(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
-		e, err := Update(id, req)
+		e, err := Update(r.Context(), id, req)
 		if err != nil {
 			if err.Error() == "not found" {
 				http.Error(w, "event not found", http.StatusNotFound)
@@ -60,7 +69,12 @@ func GetUpdateOrDelete(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, e)
 	case http.MethodDelete:
-		if ok := Delete(id); !ok {
+		ok, err := Delete(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if !ok {
 			http.Error(w, "event not found", http.StatusNotFound)
 			return
 		}

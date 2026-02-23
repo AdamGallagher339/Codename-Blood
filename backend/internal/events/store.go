@@ -1,37 +1,97 @@
 package events
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"sync"
 	"time"
+
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo"
 )
+
+// Global repository for events (set by httpapi)
+var globalEventsRepo repo.EventsRepository
 
 var (
-	mu     sync.RWMutex
-	events = make(map[string]*Event)
+	// Fallback in-memory store
+	fallbackEvents = make(map[string]*Event)
 )
 
-func List() []*Event {
-	mu.RLock()
-	defer mu.RUnlock()
+// SetGlobalEventsRepository sets the global events repository
+func SetGlobalEventsRepository(r repo.EventsRepository) {
+	globalEventsRepo = r
+}
 
-	out := make([]*Event, 0, len(events))
-	for _, e := range events {
+func List(ctx context.Context) ([]*Event, error) {
+	if globalEventsRepo != nil {
+		items, err := globalEventsRepo.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		events := make([]*Event, 0, len(items))
+		for _, item := range items {
+			e := &Event{
+				ID:             item.ID,
+				Title:          item.Title,
+				Description:    item.Description,
+				Date:           item.Date,
+				StartTime:      item.StartTime,
+				EndTime:        item.EndTime,
+				Location:       item.Location,
+				Type:           EventType(item.Type),
+				Priority:       EventPriority(item.Priority),
+				AssignedRiders: item.AssignedRiders,
+				Status:         EventStatus(item.Status),
+				CreatedAt:      item.CreatedAt,
+				UpdatedAt:      item.UpdatedAt,
+			}
+			events = append(events, e)
+		}
+		return events, nil
+	}
+
+	// Fallback: return in-memory events
+	out := make([]*Event, 0, len(fallbackEvents))
+	for _, e := range fallbackEvents {
 		out = append(out, e)
 	}
-	return out
+	return out, nil
 }
 
-func Get(id string) (*Event, bool) {
-	mu.RLock()
-	defer mu.RUnlock()
-	e, ok := events[id]
-	return e, ok
+func Get(ctx context.Context, id string) (*Event, bool, error) {
+	if globalEventsRepo != nil {
+		item, ok, err := globalEventsRepo.Get(ctx, id)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		e := &Event{
+			ID:             item.ID,
+			Title:          item.Title,
+			Description:    item.Description,
+			Date:           item.Date,
+			StartTime:      item.StartTime,
+			EndTime:        item.EndTime,
+			Location:       item.Location,
+			Type:           EventType(item.Type),
+			Priority:       EventPriority(item.Priority),
+			AssignedRiders: item.AssignedRiders,
+			Status:         EventStatus(item.Status),
+			CreatedAt:      item.CreatedAt,
+			UpdatedAt:      item.UpdatedAt,
+		}
+		return e, true, nil
+	}
+
+	// Fallback: return in-memory event
+	e, ok := fallbackEvents[id]
+	return e, ok, nil
 }
 
-func Create(req CreateEventRequest) (*Event, error) {
+func Create(ctx context.Context, req CreateEventRequest) (*Event, error) {
 	if req.Title == "" {
 		return nil, errors.New("title required")
 	}
@@ -61,18 +121,38 @@ func Create(req CreateEventRequest) (*Event, error) {
 		UpdatedAt:      now,
 	}
 
-	mu.Lock()
-	events[id] = e
-	mu.Unlock()
+	if globalEventsRepo != nil {
+		repoItem := &repo.Event{
+			ID:             e.ID,
+			Title:          e.Title,
+			Description:    e.Description,
+			Date:           e.Date,
+			StartTime:      e.StartTime,
+			EndTime:        e.EndTime,
+			Location:       e.Location,
+			Type:           string(e.Type),
+			Priority:       string(e.Priority),
+			AssignedRiders: e.AssignedRiders,
+			Status:         string(e.Status),
+			CreatedAt:      e.CreatedAt,
+			UpdatedAt:      e.UpdatedAt,
+		}
+		if err := globalEventsRepo.Put(ctx, repoItem); err != nil {
+			return nil, err
+		}
+	} else {
+		// Fallback: store in-memory
+		fallbackEvents[id] = e
+	}
 
 	return e, nil
 }
 
-func Update(id string, req UpdateEventRequest) (*Event, error) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	e, ok := events[id]
+func Update(ctx context.Context, id string, req UpdateEventRequest) (*Event, error) {
+	e, ok, err := Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		return nil, errors.New("not found")
 	}
@@ -109,18 +189,45 @@ func Update(id string, req UpdateEventRequest) (*Event, error) {
 	}
 
 	e.UpdatedAt = time.Now()
+
+	if globalEventsRepo != nil {
+		repoItem := &repo.Event{
+			ID:             e.ID,
+			Title:          e.Title,
+			Description:    e.Description,
+			Date:           e.Date,
+			StartTime:      e.StartTime,
+			EndTime:        e.EndTime,
+			Location:       e.Location,
+			Type:           string(e.Type),
+			Priority:       string(e.Priority),
+			AssignedRiders: e.AssignedRiders,
+			Status:         string(e.Status),
+			CreatedAt:      e.CreatedAt,
+			UpdatedAt:      e.UpdatedAt,
+		}
+		if err := globalEventsRepo.Put(ctx, repoItem); err != nil {
+			return nil, err
+		}
+	} else {
+		// Fallback: update in-memory
+		fallbackEvents[id] = e
+	}
+
 	return e, nil
 }
 
-func Delete(id string) bool {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if _, ok := events[id]; !ok {
-		return false
+func Delete(ctx context.Context, id string) (bool, error) {
+	if globalEventsRepo != nil {
+		return globalEventsRepo.Delete(ctx, id)
 	}
-	delete(events, id)
-	return true
+
+	// Fallback: delete in-memory
+	if _, ok := fallbackEvents[id]; !ok {
+		return false, nil
+	}
+	delete(fallbackEvents, id)
+	return true, nil
 }
 
 func newID() string {
@@ -128,3 +235,4 @@ func newID() string {
 	_, _ = rand.Read(b)
 	return "evt_" + hex.EncodeToString(b)
 }
+

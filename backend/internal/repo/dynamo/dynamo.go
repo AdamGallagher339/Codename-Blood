@@ -15,6 +15,7 @@ type Repositories struct {
 	Bikes  repo.BikesRepository
 	Depots repo.DepotsRepository
 	Jobs   repo.JobsRepository
+	Events repo.EventsRepository
 }
 
 type Config struct {
@@ -23,6 +24,7 @@ type Config struct {
 	BikesTable  string
 	DepotsTable string
 	JobsTable   string
+	EventsTable string
 }
 
 func ConfigFromEnv() Config {
@@ -32,6 +34,7 @@ func ConfigFromEnv() Config {
 		BikesTable:  os.Getenv("BIKES_TABLE"),
 		DepotsTable: os.Getenv("DEPOTS_TABLE"),
 		JobsTable:   os.Getenv("JOBS_TABLE"),
+		EventsTable: os.Getenv("EVENTS_TABLE"),
 	}
 }
 
@@ -61,6 +64,9 @@ func New(ctx context.Context, cfg Config) (*Repositories, error) {
 	}
 	if cfg.JobsTable != "" {
 		repos.Jobs = newJobsRepo(ddb, cfg.JobsTable)
+	}
+	if cfg.EventsTable != "" {
+		repos.Events = newEventsRepo(ddb, cfg.EventsTable)
 	}
 
 	return repos, nil
