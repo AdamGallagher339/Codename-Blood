@@ -198,8 +198,9 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnInit(): void {
-    // Expose a stable window function so Leaflet popup buttons can trigger routing
-    (window as any).routeToRider = (entityId: string) => this.routeToRider(entityId);
+    // Expose stable window functions so Leaflet popup buttons can trigger routing
+    (window as any).routeToRider  = (entityId: string) => this.routeToRider(entityId);
+    (window as any).setRouteDest  = (lat: number, lng: number, label: string) => this.setRouteDest(lat, lng, label);
 
     // Subscribe to connection status
     this.subscriptions.push(
@@ -236,9 +237,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy(): void {
-    // Clean up routing control and window binding
+    // Clean up routing control and window bindings
     this.clearRoute();
     delete (window as any).routeToRider;
+    delete (window as any).setRouteDest;
 
     // Signal all pending timers (animateMarker, etc.) to abort immediately
     this.destroyed = true;
@@ -357,6 +359,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
             <h4>🏥 ${h.label}</h4>
             <p><strong>Address:</strong> ${h.address}</p>
             <p><strong>Type:</strong> ${h.type}</p>
+            <button class="popup-directions-btn" onclick="window.setRouteDest(${h.lat},${h.lng},'${h.label.replace(/'/g, "\\'")}')">📍 Set as Destination</button>
           </div>
         `);
     });
@@ -718,8 +721,13 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
     const date = new Date(event.date).toLocaleDateString('en-IE', {
       day: 'numeric', month: 'short', year: 'numeric'
     });
-    const typeLabel = event.type.charAt(0).toUpperCase() + event.type.slice(1);
+    const typeLabel   = event.type.charAt(0).toUpperCase()   + event.type.slice(1);
     const statusLabel = event.status.charAt(0).toUpperCase() + event.status.slice(1);
+    // Encode title for inline onclick — strip single quotes to prevent JS injection
+    const safeTitle = event.title.replace(/'/g, '');
+    const destBtn = (event.lat != null && event.lng != null)
+      ? `<button class="popup-directions-btn" onclick="window.setRouteDest(${event.lat},${event.lng},'${safeTitle}')">📍 Set as Destination</button>`
+      : '';
     return `
       <div class="event-marker-popup">
         <h4>📅 ${event.title}</h4>
@@ -728,11 +736,32 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
         <p><strong>Location:</strong> ${event.location}</p>
         <p><strong>Type:</strong> ${typeLabel}</p>
         <p><strong>Status:</strong> ${statusLabel}</p>
+        ${destBtn}
       </div>
     `;
   }
 
   // ── Routing methods ──────────────────────────────────────────────────────────
+
+  /**
+   * Set a waypoint (hospital / event / job pin) as the routing destination.
+   * Called via window.setRouteDest from Leaflet popup buttons.
+   * If a rider is already selected, draws the route immediately.
+   */
+  setRouteDest(lat: number, lng: number, label: string): void {
+    if (!this.canRoute()) return;
+    this.destLatLng  = L.latLng(lat, lng);
+    this.destSearch  = label;
+    this.routeError.set(null);
+    const riderId = this.routingRiderId();
+    if (riderId) {
+      const riderLoc = this.locations.find(l => l.entityId === riderId);
+      if (riderLoc) {
+        this.buildRoute(riderLoc.latitude, riderLoc.longitude, lat, lng);
+      }
+    }
+    // If no rider selected yet, the panel hint will guide the user.
+  }
 
   /**
    * Start routing from a rider's current location.
@@ -907,7 +936,8 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
           const pLat = job.pickup?.lat;
           const pLng = job.pickup?.lng;
           if (pLat != null && pLng != null && canSee) {
-            const popupP = `<div><h4>🟢 ${job.title}</h4><p><strong>Pickup:</strong> ${job.pickup?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p></div>`;
+            const safeTitle = job.title.replace(/'/g, '');
+            const popupP = `<div><h4>🟢 ${job.title}</h4><p><strong>Pickup:</strong> ${job.pickup?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p><button class="popup-directions-btn" onclick="window.setRouteDest(${pLat},${pLng},'${safeTitle} — Pickup')">📍 Set as Destination</button></div>`;
             const existingP = this.jobMarkers.get(job.jobId);
             if (existingP) {
               existingP.setLatLng([pLat, pLng]);
@@ -927,7 +957,8 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
           const dLat = job.dropoff?.lat;
           const dLng = job.dropoff?.lng;
           if (dLat != null && dLng != null && canSee) {
-            const popupD = `<div><h4>📦 ${job.title} — Delivery</h4><p><strong>Drop-off:</strong> ${job.dropoff?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p></div>`;
+            const safeTitle = job.title.replace(/'/g, '');
+            const popupD = `<div><h4>📦 ${job.title} — Delivery</h4><p><strong>Drop-off:</strong> ${job.dropoff?.address || 'pinned'}</p><p><strong>Status:</strong> ${job.status}</p><button class="popup-directions-btn" onclick="window.setRouteDest(${dLat},${dLng},'${safeTitle} — Delivery')">📍 Set as Destination</button></div>`;
             const existingD = this.jobDropoffMarkers.get(job.jobId);
             if (existingD) {
               existingD.setLatLng([dLat, dLng]);

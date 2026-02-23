@@ -66,10 +66,14 @@
       <div class="directions-section" *ngIf="canRoute()">
         <h4>🗺️ Directions</h4>
 
-        <!-- Idle state: prompt user to click a rider marker -->
+        <!-- Idle state: prompt user to click a rider marker or a waypoint -->
         <div *ngIf="!routingRiderId()" class="directions-hint">
-          Click a rider marker on the map then press
-          <strong>"🗺️ Get Directions"</strong> to begin.
+          <p>Two ways to start:</p>
+          <ol>
+            <li>Click a <strong>rider marker</strong> → <strong>"🗺️ Get Directions"</strong></li>
+            <li>Click any <strong>📍 waypoint</strong> (hospital, event, job) → <strong>"📍 Set as Destination"</strong></li>
+          </ol>
+          <span *ngIf="destSearch">Destination set: <strong>{{ destSearch }}</strong>. Now click a rider.</span>
         </div>
 
         <!-- Active routing state -->
