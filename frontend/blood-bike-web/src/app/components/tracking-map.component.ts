@@ -708,8 +708,8 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
         const me = this.authService.username();
 
         jobs.forEach(job => {
-          // Completed or cancelled jobs never show pins
-          const isActive = job.status !== 'completed' && job.status !== 'cancelled';
+          // Completed, delivered or cancelled jobs never show pins
+          const isActive = job.status !== 'completed' && job.status !== 'delivered' && job.status !== 'cancelled';
           const canSee = isActive && (
             isManager || (!!me && !!job.acceptedBy && job.acceptedBy === me)
           );
