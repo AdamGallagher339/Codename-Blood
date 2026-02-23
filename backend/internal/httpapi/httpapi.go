@@ -57,6 +57,11 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	fleet.SetRepositories(users, bikes)
 	fleet.SetCognitoGroupManager(authClient)
 
+	// Set global events repository if configured
+	if dynamoRepos.Events != nil {
+		events.SetGlobalEventsRepository(dynamoRepos.Events)
+	}
+
 	trackerStore, err := fleet.NewTrackerStore(ctx)
 	if err != nil {
 		log.Println("fleet tracker not initialized:", err)
@@ -76,6 +81,25 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 			rw := &corsResponseWriter{ResponseWriter: w}
 			h(rw, r)
 		}
+	}
+
+	// Middleware to check for required role
+	requireRoleMiddleware := func(requiredRole string) func(http.HandlerFunc) http.HandlerFunc {
+		return func(h http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				roles := authClient.GetUserRoles(r.Context())
+				if !auth.HasRoleOrAbove(roles, requiredRole) {
+					http.Error(w, "insufficient permissions", http.StatusForbidden)
+					return
+				}
+				h(w, r)
+			}
+		}
+	}
+	
+	// Helper to apply auth + role check together
+	requireAuthAndRole := func(requiredRole string, h http.HandlerFunc) http.HandlerFunc {
+		return authClient.RequireAuth(requireRoleMiddleware(requiredRole)(h))
 	}
 
 	// GET /api/users: list from DynamoDB (single source of truth for user profiles).
@@ -468,6 +492,10 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	mux.HandleFunc("/api/tracking/update", withCORS(authClient.RequireAuth(tracking.HandleLocationUpdate)))
 	mux.HandleFunc("/api/tracking/locations", withCORS(authClient.RequireAuth(tracking.HandleGetLocations)))
 	mux.HandleFunc("/api/tracking/entities", withCORS(authClient.RequireAuth(tracking.HandleGetEntities)))
+	
+	// Riders tracking endpoint (FleetManager role required)
+	mux.HandleFunc("/api/tracking/riders", withCORS(requireAuthAndRole("FleetManager", tracking.HandleGetRiders)))
+	mux.HandleFunc("/api/tracking/riders/ws", withCORS(requireAuthAndRole("FleetManager", tracking.HandleRidersWebSocket)))
 
 	// WebSocket endpoint for real-time location updates
 	// Note: API Gateway REST proxy does not support WebSocket upgrades.

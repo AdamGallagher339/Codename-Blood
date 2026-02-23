@@ -1031,6 +1031,39 @@ func (a *AuthClient) DeleteUser(ctx context.Context, username string) error {
 	return nil
 }
 
+// GetUserRoles extracts user roles from context claims
+func (a *AuthClient) GetUserRoles(ctx context.Context) []string {
+	claims, ok := ctx.Value(authClaimsKey).(jwt.MapClaims)
+	if !ok {
+		return []string{}
+	}
+
+	// Try to get roles from cognito:groups claim (Cognito format)
+	if groups, ok := claims["cognito:groups"].([]interface{}); ok {
+		roles := make([]string, len(groups))
+		for i, g := range groups {
+			roles[i] = fmt.Sprintf("%v", g)
+		}
+		return roles
+	}
+
+	// Try to get roles from custom roles claim
+	if rolesInterface, ok := claims["roles"]; ok {
+		switch roles := rolesInterface.(type) {
+		case []interface{}:
+			roleStrs := make([]string, len(roles))
+			for i, r := range roles {
+				roleStrs[i] = fmt.Sprintf("%v", r)
+			}
+			return roleStrs
+		case []string:
+			return roles
+		}
+	}
+
+	return []string{}
+}
+
 func awsErrString(err error) string {
 	// Most useful: Cognito error code + message
 	var apiErr smithy.APIError
@@ -1039,3 +1072,4 @@ func awsErrString(err error) string {
 	}
 	return err.Error()
 }
+
