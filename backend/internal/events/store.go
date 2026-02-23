@@ -248,6 +248,26 @@ func Delete(ctx context.Context, id string) (bool, error) {
 	return true, nil
 }
 
+// StartCleanupTicker runs PurgeExpired immediately and then on a 1-minute tick
+// for as long as ctx is alive. Call once at server startup.
+func StartCleanupTicker(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		// Run once immediately so stale events from a previous run are cleared quickly.
+		PurgeExpired(ctx)
+		for {
+			select {
+			case <-ticker.C:
+				PurgeExpired(ctx)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	log.Println("[events] cleanup ticker started (runs every minute)")
+}
+
 // eventEndTime combines an event's Date and EndTime ("HH:MM") into a single UTC time.
 func eventEndTime(e *Event) (time.Time, error) {
 	if e.EndTime == "" {
