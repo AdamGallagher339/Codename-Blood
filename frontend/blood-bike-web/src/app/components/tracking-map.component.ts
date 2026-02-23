@@ -259,11 +259,11 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /**
-   * Connect to location tracking service and start polling for riders
+   * Connect to location tracking service.
+   * Uses startRidersPolling only — calling connectWebSocket() before it was
+   * redundant because startRidersPolling() cancelled that subscription anyway.
    */
   private connectToTracking(): void {
-    this.locationService.connectWebSocket();
-    // Also start polling for active riders (if user has FleetManager role)
     this.locationService.startRidersPolling();
   }
 
