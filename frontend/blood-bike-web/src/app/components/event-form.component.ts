@@ -101,8 +101,8 @@ export class EventFormComponent implements OnDestroy {
     const container = document.getElementById('event-map-picker');
     if (!container || this.pickerMap) return;
 
-    const defaultLat = this.lat() ?? 53.3498;
-    const defaultLng = this.lng() ?? -6.2603;
+    const defaultLat = this.lat() ?? 53.2707;
+    const defaultLng = this.lng() ?? -9.0568;
 
     this.pickerMap = L.map('event-map-picker', { zoomControl: true }).setView(
       [defaultLat, defaultLng],
