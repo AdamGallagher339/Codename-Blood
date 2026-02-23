@@ -51,6 +51,10 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   private destLatLng: L.LatLng | null = null;
   /** Free-text destination label */
   destSearch = '';
+  /** Nominatim autocomplete suggestions */
+  destSuggestions = signal<Array<{ display: string; lat: number; lng: number }>>([]);
+  /** Debounce timer for suggestion fetching */
+  private suggestionDebounce: ReturnType<typeof setTimeout> | null = null;
   /** True while OSRM / Nominatim request is pending */
   isRouteLoading = signal(false);
   /** Error message from the last routing attempt */
@@ -243,6 +247,7 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   ngOnDestroy(): void {
     // Clean up routing control and window bindings
     this.clearRoute();
+    if (this.suggestionDebounce !== null) clearTimeout(this.suggestionDebounce);
     delete (window as any).routeToRider;
     delete (window as any).setRouteDest;
 
@@ -809,6 +814,72 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   /**
+   * Called on every keystroke in the destination input.
+   * Fetches Nominatim autocomplete suggestions after a 350ms debounce.
+   */
+  onDestInput(): void {
+    if (this.suggestionDebounce !== null) {
+      clearTimeout(this.suggestionDebounce);
+    }
+    const q = this.destSearch.trim();
+    if (q.length < 3) {
+      this.destSuggestions.set([]);
+      return;
+    }
+    this.suggestionDebounce = setTimeout(async () => {
+      const url =
+        `https://nominatim.openstreetmap.org/search` +
+        `?q=${encodeURIComponent(q)}` +
+        `&format=json&limit=5&countrycodes=ie` +
+        `&bounded=1&viewbox=-10.75,55.45,-5.35,51.35`;
+      try {
+        const results = await firstValueFrom(this.http.get<any[]>(url));
+        this.destSuggestions.set(
+          (results ?? []).map(r => ({
+            display: r.display_name as string,
+            lat: parseFloat(r.lat),
+            lng: parseFloat(r.lon)
+          }))
+        );
+      } catch {
+        this.destSuggestions.set([]);
+      }
+    }, 350);
+  }
+
+  /**
+   * Pick a suggestion from the dropdown: fill the input, resolve the route.
+   */
+  selectSuggestion(s: { display: string; lat: number; lng: number }): void {
+    this.destSearch  = s.display;
+    this.destLatLng  = L.latLng(s.lat, s.lng);
+    this.destSuggestions.set([]);
+    this.routeError.set(null);
+
+    const riderId = this.routingRiderId();
+    if (this.routingFromMe()) {
+      if (this.myLocationMarker) {
+        const pos = this.myLocationMarker.getLatLng();
+        this.buildRoute(pos.lat, pos.lng, s.lat, s.lng);
+      } else {
+        this.pendingDestLatLng = L.latLng(s.lat, s.lng);
+        if (!this.isWatchingLocation) this.locateMe();
+      }
+    } else if (riderId) {
+      const riderLoc = this.locations.find(l => l.entityId === riderId);
+      if (riderLoc) this.buildRoute(riderLoc.latitude, riderLoc.longitude, s.lat, s.lng);
+    }
+  }
+
+  /**
+   * Dismiss the suggestion dropdown (called on input blur with a short delay
+   * so mousedown on a suggestion can fire before the list disappears).
+   */
+  dismissSuggestions(): void {
+    setTimeout(() => this.destSuggestions.set([]), 200);
+  }
+
+  /**
    * Geocode destSearch via Nominatim (Ireland-scoped) then draw the route.
    */
   async geocodeAndRoute(): Promise<void> {
@@ -926,6 +997,11 @@ export class TrackingMapComponent implements OnInit, OnDestroy, AfterViewInit {
    * Remove the active route from the map and reset all routing state.
    */
   clearRoute(): void {
+    if (this.suggestionDebounce !== null) {
+      clearTimeout(this.suggestionDebounce);
+      this.suggestionDebounce = null;
+    }
+    this.destSuggestions.set([]);
     if (this.routingControl) {
       this.routingControl.remove();
       this.routingControl = null;

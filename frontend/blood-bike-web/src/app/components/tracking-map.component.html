@@ -66,6 +66,41 @@
       <div class="directions-section" *ngIf="authService.isLoggedIn()">
         <h4>🗺️ Directions</h4>
 
+        <!-- Shared destination input with autocomplete (used by both flows) -->
+        <ng-template #destInputTpl>
+          <div class="dest-input-wrap">
+            <div class="dest-input-group">
+              <input
+                [(ngModel)]="destSearch"
+                placeholder="Search destination…"
+                class="dest-input"
+                autocomplete="off"
+                (input)="onDestInput()"
+                (blur)="dismissSuggestions()"
+                (keydown.enter)="geocodeAndRoute()"
+                (keydown.escape)="destSuggestions.set([])"
+              />
+              <button
+                (click)="geocodeAndRoute()"
+                class="control-btn dest-go-btn"
+                [disabled]="isRouteLoading() || !destSearch.trim()"
+              >
+                {{ isRouteLoading() ? '⏳' : '→' }}
+              </button>
+            </div>
+            <!-- Autocomplete dropdown -->
+            <ul class="dest-suggestions" *ngIf="destSuggestions().length > 0">
+              <li
+                *ngFor="let s of destSuggestions()"
+                class="dest-suggestion-item"
+                (mousedown)="selectSuggestion(s)"
+              >
+                📍 {{ s.display }}
+              </li>
+            </ul>
+          </div>
+        </ng-template>
+
         <!-- Idle: no active route -->
         <div *ngIf="!routingRiderId() && !routingFromMe()" class="directions-hint">
           <p>Click any map marker and press <strong>"🧭 Directions to here"</strong> to get turn-by-turn navigation from your location.</p>
@@ -81,22 +116,7 @@
           <div *ngIf="!isWatchingLocation && isRouteLoading()" class="route-error">
             ⏳ Waiting for your GPS location…
           </div>
-          <!-- Also allow typing an address destination -->
-          <div class="dest-input-group">
-            <input
-              [(ngModel)]="destSearch"
-              placeholder="Or type a destination address…"
-              class="dest-input"
-              (keydown.enter)="geocodeAndRoute()"
-            />
-            <button
-              (click)="geocodeAndRoute()"
-              class="control-btn dest-go-btn"
-              [disabled]="isRouteLoading() || !destSearch.trim()"
-            >
-              {{ isRouteLoading() ? '⏳' : '→' }}
-            </button>
-          </div>
+          <ng-container *ngTemplateOutlet="destInputTpl"></ng-container>
           <div *ngIf="routeError()" class="route-error">⚠️ {{ routeError() }}</div>
           <div *ngIf="routeDistance() !== null && routeTime() !== null" class="route-summary">
             <span class="route-dist">📏 {{ routeDistance() }} km</span>
@@ -110,21 +130,7 @@
           <div class="directions-rider-label">
             🏍️ Routing from: <strong>{{ routingRiderName() }}</strong>
           </div>
-          <div class="dest-input-group">
-            <input
-              [(ngModel)]="destSearch"
-              placeholder="Enter destination address…"
-              class="dest-input"
-              (keydown.enter)="geocodeAndRoute()"
-            />
-            <button
-              (click)="geocodeAndRoute()"
-              class="control-btn dest-go-btn"
-              [disabled]="isRouteLoading() || !destSearch.trim()"
-            >
-              {{ isRouteLoading() ? '⏳' : '→' }}
-            </button>
-          </div>
+          <ng-container *ngTemplateOutlet="destInputTpl"></ng-container>
           <div *ngIf="routeError()" class="route-error">⚠️ {{ routeError() }}</div>
           <div *ngIf="routeDistance() !== null && routeTime() !== null" class="route-summary">
             <span class="route-dist">📏 {{ routeDistance() }} km</span>
