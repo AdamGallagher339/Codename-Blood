@@ -112,8 +112,21 @@ npm install
 
 ## Run Locally
 
-You need two processes running — the Go backend and the frontend server.
-Both must be running for the app to work.
+
+You need two processes running — the Go backend and the frontend server. Both must be running for the app to work.
+
+**Important: Set AWS credentials before running the backend if you want to use AWS features (Cognito, DynamoDB, etc.).**
+
+You can set credentials in your shell before starting the backend:
+
+```bash
+export AWS_ACCESS_KEY_ID=your-access-key-id
+export AWS_SECRET_ACCESS_KEY=your-secret-access-key
+# Optionally, export AWS_SESSION_TOKEN=your-session-token
+```
+
+Or configure them using the AWS CLI (`aws configure`).
+
 
 | Service | URL | Purpose |
 |---------|-----|---------|
@@ -122,11 +135,14 @@ Both must be running for the app to work.
 
 ### 1) Start the backend
 
+
 ```bash
 cd backend
 go build -o backend .
 ./backend
 ```
+
+The backend will automatically pull all AWS environment variables (Cognito, DynamoDB, etc.) from your `.env` file and use the AWS credentials you set above for all AWS operations (active riders, admin, etc.).
 
 You should see log output confirming it's listening on `:8080`.
 
