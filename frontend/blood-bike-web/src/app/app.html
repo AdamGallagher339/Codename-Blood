@@ -76,6 +76,7 @@
           <p class="auth-hint">Sign in with your account credentials. Contact an admin if you need an account.</p>
           <div class="auth-actions">
             <button class="primary" (click)="navigateAuth('login')">Login</button>
+            <button class="secondary" (click)="navigateAuth('apply')">Apply</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
@@ -101,6 +102,60 @@
             <button class="primary" [disabled]="busy" (click)="signIn()">{{ busy ? 'Signing in…' : 'Sign in' }}</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Public Apply Page -->
+    <div *ngIf="currentPage === 'apply'" class="page auth-page">
+      <div class="page-header">
+        <h2>Apply</h2>
+      </div>
+      <div class="page-content">
+        <div class="auth-card">
+          <label>
+            <span>Name</span>
+            <input [(ngModel)]="applyName" placeholder="your full name" />
+          </label>
+          <label>
+            <span>Email</span>
+            <input [(ngModel)]="applyEmail" type="email" placeholder="you@example.com" />
+          </label>
+          <label>
+            <span>Phone number</span>
+            <input [(ngModel)]="applyPhone" placeholder="your contact number" />
+          </label>
+          <label>
+            <span>Years of motorcycle experience</span>
+            <input [(ngModel)]="applyMotorcycleYears" type="number" min="0" placeholder="e.g. 3" />
+          </label>
+          <label>
+            <span>Available free time a week</span>
+            <input [(ngModel)]="applyFreeTime" placeholder="e.g. evenings and weekends" />
+          </label>
+          <label>
+            <span>Has a valid ROSPA Certificate</span>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="rospa" value="yes" [(ngModel)]="applyHasRospa" />
+                <span>Yes</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="rospa" value="no" [(ngModel)]="applyHasRospa" />
+                <span>No</span>
+              </label>
+            </div>
+          </label>
+          <label>
+            <span>Application</span>
+            <textarea [(ngModel)]="applyText" rows="6" placeholder="Tell us about your motivation and availability"></textarea>
+          </label>
+          <div class="auth-actions">
+            <button class="primary" [disabled]="busy" (click)="submitApplication()">{{ busy ? 'Submitting…' : 'Submit application' }}</button>
+            <button class="secondary" [disabled]="busy" (click)="navigateAuth('login')">Back to login</button>
+          </div>
+          <p *ngIf="applyMessage" class="auth-success">{{ applyMessage }}</p>
+          <p *ngIf="applyError" class="auth-error">{{ applyError }}</p>
         </div>
       </div>
     </div>

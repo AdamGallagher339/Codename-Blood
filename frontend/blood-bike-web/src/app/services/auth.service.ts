@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, signal, WritableSignal } from '@angular/core';
 import { catchError, map, of, switchMap, tap, throwError } from 'rxjs';
 
-export type AuthPage = 'welcome' | 'login' | 'signup' | 'confirm' | 'home';
+export type AuthPage = 'welcome' | 'login' | 'apply' | 'signup' | 'confirm' | 'home';
 
 export interface MeResponse {
   sub: string;

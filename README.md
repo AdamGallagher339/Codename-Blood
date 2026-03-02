@@ -49,7 +49,7 @@ cd Codename-Blood
 
 ### 2) Configure environment variables
 
-The backend loads a `.env` file automatically on startup (via `godotenv`).
+The backend loads a `.env` file automatically on startup (via `godotenv`) and can also pull runtime env values from DynamoDB.
 An example file is provided at `backend/.env.example` — copy it and fill in any values you need:
 
 ```bash
@@ -57,6 +57,23 @@ cp backend/.env.example backend/.env
 ```
 
 Open `backend/.env` and set the variables relevant to your setup:
+
+#### App config from DynamoDB (optional, recommended for shared environments)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `APP_CONFIG_ENABLED` | No | Set to `false` to disable DB env pulling (default behavior is enabled) |
+| `APP_CONFIG_TABLE` | No | DynamoDB table containing env config key/value pairs (default: `AppConfig`) |
+
+Expected table item format:
+
+- `key` (String): environment variable name (example: `COGNITO_CLIENT_ID`)
+- `value` (String/Number/Bool): environment variable value
+
+Startup order:
+
+1. Load local `.env`
+2. Pull and overlay values from `APP_CONFIG_TABLE` (if enabled)
 
 #### Authentication
 
@@ -80,6 +97,7 @@ These are only needed if you want the DynamoDB-backed data stores instead of the
 | `BIKES_TABLE` | DynamoDB table name for bikes |
 | `DEPOTS_TABLE` | DynamoDB table name for depots |
 | `JOBS_TABLE` | DynamoDB table name for jobs |
+| `APPLICATIONS_TABLE` | DynamoDB table name for public rider applications |
 
 #### DynamoDB tables (fleet tracker)
 
@@ -142,7 +160,7 @@ go build -o backend .
 ./backend
 ```
 
-The backend will automatically pull all AWS environment variables (Cognito, DynamoDB, etc.) from your `.env` file and use the AWS credentials you set above for all AWS operations (active riders, admin, etc.).
+The backend will automatically pull AWS environment variables (Cognito, DynamoDB, etc.) from startup config (`.env` + optional `APP_CONFIG_TABLE`) and use the AWS credentials you set above for all AWS operations (active riders, admin, etc.).
 
 You should see log output confirming it's listening on `:8080`.
 

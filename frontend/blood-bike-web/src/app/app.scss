@@ -317,6 +317,44 @@
           box-shadow: 0 0 0 3px rgba(220, 20, 60, 0.15);
         }
       }
+
+      textarea {
+        width: 100%;
+        padding: var(--spacing-md);
+        border-radius: var(--border-radius-md);
+        border: var(--border-width) solid var(--color-light-gray);
+        font-size: var(--font-size-base);
+        font-family: inherit;
+        outline: none;
+        resize: vertical;
+
+        &:focus {
+          border-color: var(--color-red);
+          box-shadow: 0 0 0 3px rgba(220, 20, 60, 0.15);
+        }
+      }
+
+      .radio-group {
+        display: flex;
+        gap: var(--spacing-lg);
+      }
+
+      .radio-option {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        margin-bottom: 0;
+
+        input {
+          width: auto;
+          margin: 0;
+        }
+
+        span {
+          margin-bottom: 0;
+          font-weight: 500;
+        }
+      }
     }
   }
 
@@ -372,6 +410,16 @@
     color: var(--color-dark-red);
     background: rgba(220, 20, 60, 0.08);
     border: 1px solid rgba(220, 20, 60, 0.2);
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius-md);
+  }
+
+  .auth-success {
+    margin-top: var(--spacing-md);
+    margin-bottom: 0;
+    color: #176b2b;
+    background: rgba(40, 167, 69, 0.1);
+    border: 1px solid rgba(40, 167, 69, 0.25);
     padding: var(--spacing-md);
     border-radius: var(--border-radius-md);
   }

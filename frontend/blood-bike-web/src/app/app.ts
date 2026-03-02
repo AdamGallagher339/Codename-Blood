@@ -28,6 +28,17 @@ export class App implements OnInit {
   loginUsername = '';
   loginPassword = '';
 
+  // Public application form state
+  applyName = '';
+  applyEmail = '';
+  applyPhone = '';
+  applyMotorcycleYears: number | null = null;
+  applyFreeTime = '';
+  applyHasRospa = 'no';
+  applyText = '';
+  applyMessage: string | null = null;
+  applyError: string | null = null;
+
   // Selected role for UI (users can switch between roles)
   selectedRole: string | null = null;
 
@@ -463,6 +474,52 @@ export class App implements OnInit {
             this.currentPage = 'challenge';
           }
         }
+      });
+  }
+
+  submitApplication(): void {
+    this.applyMessage = null;
+    this.applyError = null;
+
+    const name = this.applyName.trim();
+    const email = this.applyEmail.trim();
+    const phone = this.applyPhone.trim();
+    const freeTime = this.applyFreeTime.trim();
+    const application = this.applyText.trim();
+    const years = this.applyMotorcycleYears;
+
+    if (!name || !email || !phone || years === null || years < 0 || !freeTime || !application) {
+      this.applyError = 'Please complete all fields before submitting.';
+      return;
+    }
+
+    this.busy = true;
+    this.http
+      .post('/api/applications/public', {
+        name,
+        email,
+        phone,
+        motorcycleExperienceYears: years,
+        availableFreeTimePerWeek: freeTime,
+        hasValidRospaCertificate: this.applyHasRospa === 'yes',
+        application,
+      })
+      .pipe(finalize(() => (this.busy = false)))
+      .subscribe({
+        next: () => {
+          this.applyMessage = 'Application submitted. Thank you.';
+          this.applyName = '';
+          this.applyEmail = '';
+          this.applyPhone = '';
+          this.applyMotorcycleYears = null;
+          this.applyFreeTime = '';
+          this.applyHasRospa = 'no';
+          this.applyText = '';
+        },
+        error: (err) => {
+          const msg = typeof err?.error === 'string' ? err.error : (err?.error?.message || 'Failed to submit application.');
+          this.applyError = msg;
+        },
       });
   }
 

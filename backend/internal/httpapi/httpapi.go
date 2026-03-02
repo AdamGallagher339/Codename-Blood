@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -10,10 +11,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
@@ -28,6 +33,21 @@ import (
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/tracking"
 	"github.com/google/uuid"
 )
+
+type PublicApplication struct {
+	ID                        string `json:"id" dynamodbav:"id"`
+	Name                      string `json:"name" dynamodbav:"name"`
+	Email                     string `json:"email" dynamodbav:"email"`
+	Phone                     string `json:"phone" dynamodbav:"phone"`
+	MotorcycleExperienceYears int    `json:"motorcycleExperienceYears" dynamodbav:"motorcycleExperienceYears"`
+	AvailableFreeTimePerWeek  string `json:"availableFreeTimePerWeek" dynamodbav:"availableFreeTimePerWeek"`
+	HasValidRospaCertificate  bool   `json:"hasValidRospaCertificate" dynamodbav:"hasValidRospaCertificate"`
+	Application               string `json:"application" dynamodbav:"application"`
+	ApplicationPDF            string `json:"applicationPdf,omitempty" dynamodbav:"applicationPdf,omitempty"`
+	Status                    string `json:"status" dynamodbav:"status"`
+	SubmittedAt               string `json:"submittedAt" dynamodbav:"submittedAt"`
+	UpdatedAt                 string `json:"updatedAt" dynamodbav:"updatedAt"`
+}
 
 // handleGeocode proxies geocoding requests to Nominatim with a valid server-side User-Agent.
 // Nominatim blocks direct browser requests, so the frontend must go through this endpoint.
@@ -117,6 +137,19 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		log.Println("fleet tracker not initialized:", err)
 	} else {
 		fleet.SetTrackerStore(trackerStore)
+	}
+
+	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	var applicationsDDB *dynamodb.Client
+	if applicationsTable != "" {
+		applicationsCfg, cfgErr := awsconfig.LoadDefaultConfig(ctx)
+		if cfgErr != nil {
+			log.Printf("Applications DynamoDB disabled (config): %v", cfgErr)
+		} else {
+			applicationsDDB = dynamodb.NewFromConfig(applicationsCfg)
+		}
+	} else {
+		log.Println("APPLICATIONS_TABLE not set – public applications storage disabled")
 	}
 
 	withCORS := func(h http.HandlerFunc) http.HandlerFunc {
@@ -761,6 +794,203 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		mux.HandleFunc("/api/push/test", withCORS(authClient.RequireAuth(pushStore.HandleTestNotification)))
 	}
 
+	mux.HandleFunc("/api/applications/public", withCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if applicationsDDB == nil || applicationsTable == "" {
+			http.Error(w, "applications storage not configured", http.StatusNotImplemented)
+			return
+		}
+
+		var req struct {
+			Name                      string `json:"name"`
+			Email                     string `json:"email"`
+			Phone                     string `json:"phone"`
+			MotorcycleExperienceYears int    `json:"motorcycleExperienceYears"`
+			AvailableFreeTimePerWeek  string `json:"availableFreeTimePerWeek"`
+			HasValidRospaCertificate  bool   `json:"hasValidRospaCertificate"`
+			Application               string `json:"application"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		req.Name = strings.TrimSpace(req.Name)
+		req.Email = strings.TrimSpace(req.Email)
+		req.Phone = strings.TrimSpace(req.Phone)
+		req.AvailableFreeTimePerWeek = strings.TrimSpace(req.AvailableFreeTimePerWeek)
+		req.Application = strings.TrimSpace(req.Application)
+
+		if req.Name == "" || req.Email == "" || req.Phone == "" || req.MotorcycleExperienceYears < 0 || req.AvailableFreeTimePerWeek == "" || req.Application == "" {
+			http.Error(w, "missing required fields", http.StatusBadRequest)
+			return
+		}
+
+		applicationPDF := buildApplicationPDFDataURL(req.Name, req.Phone, req.Application)
+
+		now := time.Now().UTC().Format(time.RFC3339)
+
+		entry := PublicApplication{
+			ID:                        uuid.NewString(),
+			Name:                      req.Name,
+			Email:                     req.Email,
+			Phone:                     req.Phone,
+			MotorcycleExperienceYears: req.MotorcycleExperienceYears,
+			AvailableFreeTimePerWeek:  req.AvailableFreeTimePerWeek,
+			HasValidRospaCertificate:  req.HasValidRospaCertificate,
+			Application:               req.Application,
+			ApplicationPDF:            applicationPDF,
+			Status:                    "pending",
+			SubmittedAt:               now,
+			UpdatedAt:                 now,
+		}
+
+		item, marshalErr := attributevalue.MarshalMap(entry)
+		if marshalErr != nil {
+			http.Error(w, "failed to prepare application", http.StatusInternalServerError)
+			return
+		}
+
+		_, putErr := applicationsDDB.PutItem(r.Context(), &dynamodb.PutItemInput{
+			TableName: &applicationsTable,
+			Item:      item,
+		})
+		if putErr != nil {
+			log.Printf("op=CreateApplication err=%v", putErr)
+			http.Error(w, "failed to save application", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": entry.ID})
+	}))
+
+	mux.HandleFunc("/api/applications", withCORS(requireAuthAndRole("HR", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if applicationsDDB == nil || applicationsTable == "" {
+			http.Error(w, "applications storage not configured", http.StatusNotImplemented)
+			return
+		}
+
+		out, scanErr := applicationsDDB.Scan(r.Context(), &dynamodb.ScanInput{TableName: &applicationsTable})
+		if scanErr != nil {
+			log.Printf("op=ListApplications err=%v", scanErr)
+			http.Error(w, "failed to list applications", http.StatusInternalServerError)
+			return
+		}
+
+		apps := make([]PublicApplication, 0, len(out.Items))
+		for _, item := range out.Items {
+			var app PublicApplication
+			if unmarshalErr := attributevalue.UnmarshalMap(item, &app); unmarshalErr == nil {
+				apps = append(apps, app)
+			}
+		}
+		sort.Slice(apps, func(i, j int) bool {
+			return apps[i].SubmittedAt > apps[j].SubmittedAt
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(apps)
+	})))
+
+	mux.HandleFunc("/api/application", withCORS(requireAuthAndRole("HR", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if applicationsDDB == nil || applicationsTable == "" {
+			http.Error(w, "applications storage not configured", http.StatusNotImplemented)
+			return
+		}
+
+		out, scanErr := applicationsDDB.Scan(r.Context(), &dynamodb.ScanInput{TableName: &applicationsTable})
+		if scanErr != nil {
+			log.Printf("op=ListApplications err=%v", scanErr)
+			http.Error(w, "failed to list applications", http.StatusInternalServerError)
+			return
+		}
+
+		apps := make([]PublicApplication, 0, len(out.Items))
+		for _, item := range out.Items {
+			var app PublicApplication
+			if unmarshalErr := attributevalue.UnmarshalMap(item, &app); unmarshalErr == nil {
+				apps = append(apps, app)
+			}
+		}
+		sort.Slice(apps, func(i, j int) bool {
+			return apps[i].SubmittedAt > apps[j].SubmittedAt
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(apps)
+	})))
+
+	mux.HandleFunc("/api/applications/", withCORS(requireAuthAndRole("HR", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if applicationsDDB == nil || applicationsTable == "" {
+			http.Error(w, "applications storage not configured", http.StatusNotImplemented)
+			return
+		}
+
+		path := strings.TrimPrefix(r.URL.Path, "/api/applications/")
+		parts := strings.Split(strings.Trim(path, "/"), "/")
+		if len(parts) != 2 || parts[1] != "status" || parts[0] == "" {
+			http.Error(w, "invalid path", http.StatusBadRequest)
+			return
+		}
+		appID := parts[0]
+
+		var req struct {
+			Status string `json:"status"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		req.Status = strings.ToLower(strings.TrimSpace(req.Status))
+		if req.Status != "approved" && req.Status != "denied" {
+			http.Error(w, "status must be approved or denied", http.StatusBadRequest)
+			return
+		}
+
+		now := time.Now().UTC().Format(time.RFC3339)
+		_, updateErr := applicationsDDB.UpdateItem(r.Context(), &dynamodb.UpdateItemInput{
+			TableName: &applicationsTable,
+			Key: map[string]ddbtypes.AttributeValue{
+				"id": &ddbtypes.AttributeValueMemberS{Value: appID},
+			},
+			UpdateExpression: awsString("SET #status = :status, #updatedAt = :updatedAt"),
+			ExpressionAttributeNames: map[string]string{
+				"#status":    "status",
+				"#updatedAt": "updatedAt",
+			},
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":status":    &ddbtypes.AttributeValueMemberS{Value: req.Status},
+				":updatedAt": &ddbtypes.AttributeValueMemberS{Value: now},
+			},
+			ConditionExpression: awsString("attribute_exists(id)"),
+		})
+		if updateErr != nil {
+			log.Printf("op=UpdateApplicationStatus err=%v", updateErr)
+			http.Error(w, "failed to update application", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": appID, "status": req.Status})
+	})))
+
 	// --- Auth routes (Cognito) ---
 	mux.HandleFunc("/api/auth/signup", withCORS(authClient.SignUpHandler))
 	mux.HandleFunc("/api/auth/confirm", withCORS(authClient.ConfirmSignUpHandler))
@@ -774,6 +1004,115 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	mux.HandleFunc("/api/auth/users", withCORS(authClient.RequireAuth(authClient.ListUsersHandler)))
 
 	return mux, nil
+}
+
+func awsString(value string) *string {
+	return &value
+}
+
+func buildApplicationPDFDataURL(name, phone, application string) string {
+	pdf := buildSimpleApplicationPDF(name, phone, application)
+	return "data:application/pdf;base64," + base64.StdEncoding.EncodeToString(pdf)
+}
+
+func buildSimpleApplicationPDF(name, phone, application string) []byte {
+	textLines := []string{"Volunteer Application", "", "Name: " + name, "Phone: " + phone, "", "Application:"}
+	textLines = append(textLines, wrapPDFText(application, 90)...)
+
+	var content strings.Builder
+	content.WriteString("BT\n")
+	content.WriteString("/F1 12 Tf\n")
+	content.WriteString("50 760 Td\n")
+	content.WriteString("14 TL\n")
+	for idx, line := range textLines {
+		escaped := escapePDFText(line)
+		if idx == 0 {
+			content.WriteString("(" + escaped + ") Tj\n")
+			continue
+		}
+		content.WriteString("T*\n")
+		content.WriteString("(" + escaped + ") Tj\n")
+	}
+	content.WriteString("ET")
+	contentStream := content.String()
+
+	var pdf bytes.Buffer
+	pdf.WriteString("%PDF-1.4\n")
+
+	offsets := make([]int, 6)
+	writeObj := func(id int, body string) {
+		offsets[id] = pdf.Len()
+		pdf.WriteString(fmt.Sprintf("%d 0 obj\n%s\nendobj\n", id, body))
+	}
+
+	writeObj(1, "<< /Type /Catalog /Pages 2 0 R >>")
+	writeObj(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
+	writeObj(3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>")
+	writeObj(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+	writeObj(5, fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(contentStream), contentStream))
+
+	xrefOffset := pdf.Len()
+	pdf.WriteString("xref\n0 6\n")
+	pdf.WriteString("0000000000 65535 f \n")
+	for id := 1; id <= 5; id++ {
+		pdf.WriteString(fmt.Sprintf("%010d 00000 n \n", offsets[id]))
+	}
+	pdf.WriteString("trailer\n")
+	pdf.WriteString("<< /Size 6 /Root 1 0 R >>\n")
+	pdf.WriteString("startxref\n")
+	pdf.WriteString(fmt.Sprintf("%d\n", xrefOffset))
+	pdf.WriteString("%%EOF")
+
+	return pdf.Bytes()
+}
+
+func wrapPDFText(text string, maxLen int) []string {
+	normalized := strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(text), "\r\n", "\n"), "\r", "\n")
+	if normalized == "" {
+		return []string{""}
+	}
+
+	paragraphs := strings.Split(normalized, "\n")
+	lines := make([]string, 0, len(paragraphs))
+
+	for _, paragraph := range paragraphs {
+		paragraph = strings.TrimSpace(paragraph)
+		if paragraph == "" {
+			lines = append(lines, "")
+			continue
+		}
+
+		words := strings.Fields(paragraph)
+		current := ""
+		for _, word := range words {
+			if current == "" {
+				current = word
+				continue
+			}
+			if len(current)+1+len(word) <= maxLen {
+				current += " " + word
+				continue
+			}
+			lines = append(lines, current)
+			current = word
+		}
+		if current != "" {
+			lines = append(lines, current)
+		}
+	}
+
+	if len(lines) == 0 {
+		return []string{""}
+	}
+
+	return lines
+}
+
+func escapePDFText(value string) string {
+	escaped := strings.ReplaceAll(value, "\\", "\\\\")
+	escaped = strings.ReplaceAll(escaped, "(", "\\(")
+	escaped = strings.ReplaceAll(escaped, ")", "\\)")
+	return escaped
 }
 
 // Ensure CORS headers are set for all responses, including errors.

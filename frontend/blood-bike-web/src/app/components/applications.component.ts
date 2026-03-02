@@ -8,10 +8,13 @@ interface Application {
   name: string;
   email: string;
   phone: string;
-  role: string;
-  status: 'pending' | 'reviewed' | 'accepted' | 'rejected';
+  applicationPdf?: string;
+  motorcycleExperienceYears: number;
+  availableFreeTimePerWeek: string;
+  hasValidRospaCertificate: boolean;
+  application: string;
+  status: 'pending' | 'approved' | 'denied';
   submittedAt: string;
-  notes: string;
 }
 
 @Component({
@@ -30,9 +33,8 @@ interface Application {
           <select [(ngModel)]="filterStatus">
             <option value="">All</option>
             <option value="pending">Pending</option>
-            <option value="reviewed">Reviewed</option>
-            <option value="accepted">Accepted</option>
-            <option value="rejected">Rejected</option>
+            <option value="approved">Approved</option>
+            <option value="denied">Denied</option>
           </select>
         </label>
         <label>
@@ -47,9 +49,8 @@ interface Application {
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
               <th>Phone</th>
-              <th>Applied For</th>
+              <th>Full Application</th>
               <th>Date</th>
               <th>Status</th>
               <th>Actions</th>
@@ -58,23 +59,24 @@ interface Application {
           <tbody>
             <tr *ngFor="let app of filteredApplications">
               <td>{{ app.name }}</td>
-              <td>{{ app.email }}</td>
               <td>{{ app.phone }}</td>
-              <td>{{ app.role }}</td>
+              <td>
+                <a *ngIf="getApplicationPdfUrl(app) as pdfUrl" [href]="pdfUrl" target="_blank" rel="noopener noreferrer">View PDF</a>
+                <span *ngIf="!getApplicationPdfUrl(app)">Not provided</span>
+              </td>
               <td>{{ app.submittedAt | date:'short' }}</td>
               <td>
                 <span class="status-badge" [ngClass]="app.status">{{ app.status }}</span>
               </td>
               <td>
                 <div class="action-btns">
-                  <button class="btn-accept" *ngIf="app.status === 'pending' || app.status === 'reviewed'" (click)="updateStatus(app, 'accepted')">Accept</button>
-                  <button class="btn-reject" *ngIf="app.status === 'pending' || app.status === 'reviewed'" (click)="updateStatus(app, 'rejected')">Reject</button>
-                  <button class="btn-review" *ngIf="app.status === 'pending'" (click)="updateStatus(app, 'reviewed')">Mark Reviewed</button>
+                  <button class="btn-accept" *ngIf="app.status === 'pending'" (click)="updateStatus(app, 'approved')">Approve</button>
+                  <button class="btn-reject" *ngIf="app.status === 'pending'" (click)="updateStatus(app, 'denied')">Deny</button>
                 </div>
               </td>
             </tr>
             <tr *ngIf="filteredApplications.length === 0">
-              <td colspan="7" class="empty">No applications found.</td>
+              <td colspan="6" class="empty">No applications found.</td>
             </tr>
           </tbody>
         </table>
@@ -101,9 +103,8 @@ interface Application {
     .status-badge {
       padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; text-transform: capitalize;
       &.pending { background: #fff3cd; color: #856404; }
-      &.reviewed { background: #cce5ff; color: #004085; }
-      &.accepted { background: #d4edda; color: #155724; }
-      &.rejected { background: #f8d7da; color: #721c24; }
+      &.approved { background: #d4edda; color: #155724; }
+      &.denied { background: #f8d7da; color: #721c24; }
     }
 
     .action-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
@@ -112,10 +113,8 @@ interface Application {
     }
     .btn-accept { background: #28a745; color: #fff; }
     .btn-reject { background: #dc3545; color: #fff; }
-    .btn-review { background: #17a2b8; color: #fff; }
     .btn-accept:hover { background: #218838; }
     .btn-reject:hover { background: #c82333; }
-    .btn-review:hover { background: #138496; }
   `]
 })
 export class ApplicationsComponent implements OnInit {
@@ -130,15 +129,25 @@ export class ApplicationsComponent implements OnInit {
   }
 
   loadApplications(): void {
-    // TODO: Replace with real API call when backend endpoint is ready
-    // this.http.get<Application[]>('/api/applications').subscribe(apps => this.applications = apps);
-
-    // Sample data for now
-    this.applications = [
-      { id: '1', name: 'John Murphy', email: 'john@example.com', phone: '087-1234567', role: 'Rider', status: 'pending', submittedAt: new Date().toISOString(), notes: '' },
-      { id: '2', name: 'Sarah O\'Brien', email: 'sarah@example.com', phone: '086-7654321', role: 'Rider', status: 'reviewed', submittedAt: new Date(Date.now() - 86400000).toISOString(), notes: '' },
-      { id: '3', name: 'Michael Walsh', email: 'mike@example.com', phone: '085-1112233', role: 'Dispatcher', status: 'accepted', submittedAt: new Date(Date.now() - 172800000).toISOString(), notes: '' },
-    ];
+    this.http.get<Application[]>('/api/applications').subscribe({
+      next: (apps) => {
+        this.applications = apps ?? [];
+      },
+      error: (err) => {
+        if (err?.status === 404) {
+          this.http.get<Application[]>('/api/application').subscribe({
+            next: (apps) => {
+              this.applications = apps ?? [];
+            },
+            error: () => {
+              this.applications = [];
+            }
+          });
+          return;
+        }
+        this.applications = [];
+      }
+    });
   }
 
   get filteredApplications(): Application[] {
@@ -151,8 +160,25 @@ export class ApplicationsComponent implements OnInit {
   }
 
   updateStatus(app: Application, status: Application['status']): void {
-    app.status = status;
-    // TODO: Persist via API
-    // this.http.put(`/api/applications/${app.id}`, { status }).subscribe();
+    this.http.patch(`/api/applications/${app.id}/status`, { status }).subscribe({
+      next: () => {
+        app.status = status;
+      }
+    });
+  }
+
+  getApplicationPdfUrl(app: Application): string | null {
+    if (app.applicationPdf && this.looksLikePdfUrl(app.applicationPdf)) {
+      return app.applicationPdf;
+    }
+    if (app.application && this.looksLikePdfUrl(app.application)) {
+      return app.application;
+    }
+    return null;
+  }
+
+  private looksLikePdfUrl(value: string): boolean {
+    const trimmed = (value || '').trim().toLowerCase();
+    return trimmed.startsWith('data:application/pdf') || trimmed.endsWith('.pdf') || trimmed.includes('.pdf?') || trimmed.startsWith('http');
   }
 }
