@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 interface Application {
   id: string;
@@ -61,7 +62,7 @@ interface Application {
               <td>{{ app.name }}</td>
               <td>{{ app.phone }}</td>
               <td>
-                <a *ngIf="getApplicationPdfUrl(app) as pdfUrl" [href]="pdfUrl" target="_blank" rel="noopener noreferrer">View PDF</a>
+                <button type="button" *ngIf="getApplicationPdfUrl(app)" (click)="openApplicationPdf(app)">View PDF</button>
                 <span *ngIf="!getApplicationPdfUrl(app)">Not provided</span>
               </td>
               <td>{{ app.submittedAt | date:'short' }}</td>
@@ -80,6 +81,21 @@ interface Application {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="pdf-modal-backdrop" *ngIf="selectedApplicationPdf" (click)="closePdfPopup()">
+        <div class="pdf-modal" (click)="$event.stopPropagation()">
+          <div class="pdf-modal-header">
+            <h2>{{ selectedApplicationName }} — Application PDF</h2>
+            <button type="button" class="btn-close" (click)="closePdfPopup()">✕</button>
+          </div>
+          <div class="pdf-modal-body">
+            <iframe [src]="selectedApplicationPdf" title="Application PDF"></iframe>
+          </div>
+          <div class="pdf-modal-footer">
+            <a *ngIf="selectedApplicationPdfHref" [href]="selectedApplicationPdfHref" target="_blank" rel="noopener noreferrer">Open in new tab</a>
+          </div>
+        </div>
       </div>
     </div>
   `,
@@ -115,14 +131,81 @@ interface Application {
     .btn-reject { background: #dc3545; color: #fff; }
     .btn-accept:hover { background: #218838; }
     .btn-reject:hover { background: #c82333; }
+
+    .pdf-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+
+    .pdf-modal {
+      width: min(1000px, 100%);
+      height: min(90vh, 900px);
+      background: #fff;
+      border-radius: 10px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .pdf-modal-header,
+    .pdf-modal-footer {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .pdf-modal-footer {
+      border-bottom: none;
+      border-top: 1px solid #eee;
+      justify-content: flex-end;
+    }
+
+    .pdf-modal-header h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .btn-close {
+      border: none;
+      background: transparent;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0.25rem;
+    }
+
+    .pdf-modal-body {
+      min-height: 0;
+    }
+
+    .pdf-modal-body iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+      background: #f8f9fa;
+    }
   `]
 })
 export class ApplicationsComponent implements OnInit {
   applications: Application[] = [];
   filterStatus = '';
   searchQuery = '';
+  selectedApplicationPdf: SafeResourceUrl | null = null;
+  selectedApplicationPdfHref: string | null = null;
+  selectedApplicationName = '';
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private sanitizer: DomSanitizer) {}
 
   ngOnInit(): void {
     this.loadApplications();
@@ -175,6 +258,22 @@ export class ApplicationsComponent implements OnInit {
       return app.application;
     }
     return null;
+  }
+
+  openApplicationPdf(app: Application): void {
+    const pdfUrl = this.getApplicationPdfUrl(app);
+    if (!pdfUrl) {
+      return;
+    }
+    this.selectedApplicationName = app.name;
+    this.selectedApplicationPdfHref = pdfUrl;
+    this.selectedApplicationPdf = this.sanitizer.bypassSecurityTrustResourceUrl(pdfUrl);
+  }
+
+  closePdfPopup(): void {
+    this.selectedApplicationPdf = null;
+    this.selectedApplicationPdfHref = null;
+    this.selectedApplicationName = '';
   }
 
   private looksLikePdfUrl(value: string): boolean {

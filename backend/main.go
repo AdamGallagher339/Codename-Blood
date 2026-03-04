@@ -37,6 +37,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Backend running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", h))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	addr := ":" + port
+
+	log.Printf("Backend running on %s", addr)
+	log.Fatal(http.ListenAndServe(addr, h))
 }

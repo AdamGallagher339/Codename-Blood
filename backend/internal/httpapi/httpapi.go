@@ -829,7 +829,15 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 			return
 		}
 
-		applicationPDF := buildApplicationPDFDataURL(req.Name, req.Phone, req.Application)
+		applicationPDF := buildApplicationPDFDataURL(
+			req.Name,
+			req.Email,
+			req.Phone,
+			req.MotorcycleExperienceYears,
+			req.AvailableFreeTimePerWeek,
+			req.HasValidRospaCertificate,
+			req.Application,
+		)
 
 		now := time.Now().UTC().Format(time.RFC3339)
 
@@ -1010,13 +1018,30 @@ func awsString(value string) *string {
 	return &value
 }
 
-func buildApplicationPDFDataURL(name, phone, application string) string {
-	pdf := buildSimpleApplicationPDF(name, phone, application)
+func buildApplicationPDFDataURL(name, email, phone string, motorcycleExperienceYears int, availableFreeTimePerWeek string, hasValidRospaCertificate bool, application string) string {
+	pdf := buildSimpleApplicationPDF(name, email, phone, motorcycleExperienceYears, availableFreeTimePerWeek, hasValidRospaCertificate, application)
 	return "data:application/pdf;base64," + base64.StdEncoding.EncodeToString(pdf)
 }
 
-func buildSimpleApplicationPDF(name, phone, application string) []byte {
-	textLines := []string{"Volunteer Application", "", "Name: " + name, "Phone: " + phone, "", "Application:"}
+func buildSimpleApplicationPDF(name, email, phone string, motorcycleExperienceYears int, availableFreeTimePerWeek string, hasValidRospaCertificate bool, application string) []byte {
+	rospaCertificate := "No"
+	if hasValidRospaCertificate {
+		rospaCertificate = "Yes"
+	}
+
+	textLines := []string{
+		"Volunteer Application",
+		"",
+		"Name: " + name,
+		"Email: " + email,
+		"Phone: " + phone,
+		fmt.Sprintf("Motorcycle Experience (years): %d", motorcycleExperienceYears),
+		"Has valid ROSPA certificate: " + rospaCertificate,
+		"",
+		"Available free time per week:",
+	}
+	textLines = append(textLines, wrapPDFText(availableFreeTimePerWeek, 90)...)
+	textLines = append(textLines, "", "Application:")
 	textLines = append(textLines, wrapPDFText(application, 90)...)
 
 	var content strings.Builder
