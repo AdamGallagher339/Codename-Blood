@@ -17,6 +17,7 @@
         "build": {
           "builder": "@angular/build:application",
           "options": {
+            "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
               "zone.js"
@@ -53,6 +54,7 @@
               "serviceWorker": "ngsw-config.json"
             },
             "development": {
+              "index": "src/index.dev.html",
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true

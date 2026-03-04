@@ -898,6 +898,19 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		for _, item := range out.Items {
 			var app PublicApplication
 			if unmarshalErr := attributevalue.UnmarshalMap(item, &app); unmarshalErr == nil {
+				if shouldAutoDeleteDeniedApplication(app) {
+					_, deleteErr := applicationsDDB.DeleteItem(r.Context(), &dynamodb.DeleteItemInput{
+						TableName: &applicationsTable,
+						Key: map[string]ddbtypes.AttributeValue{
+							"id": &ddbtypes.AttributeValueMemberS{Value: app.ID},
+						},
+					})
+					if deleteErr != nil {
+						log.Printf("op=AutoDeleteDeniedApplication id=%s err=%v", app.ID, deleteErr)
+						apps = append(apps, app)
+					}
+					continue
+				}
 				apps = append(apps, app)
 			}
 		}
@@ -930,6 +943,19 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		for _, item := range out.Items {
 			var app PublicApplication
 			if unmarshalErr := attributevalue.UnmarshalMap(item, &app); unmarshalErr == nil {
+				if shouldAutoDeleteDeniedApplication(app) {
+					_, deleteErr := applicationsDDB.DeleteItem(r.Context(), &dynamodb.DeleteItemInput{
+						TableName: &applicationsTable,
+						Key: map[string]ddbtypes.AttributeValue{
+							"id": &ddbtypes.AttributeValueMemberS{Value: app.ID},
+						},
+					})
+					if deleteErr != nil {
+						log.Printf("op=AutoDeleteDeniedApplication id=%s err=%v", app.ID, deleteErr)
+						apps = append(apps, app)
+					}
+					continue
+				}
 				apps = append(apps, app)
 			}
 		}
@@ -942,7 +968,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	})))
 
 	mux.HandleFunc("/api/applications/", withCORS(requireAuthAndRole("HR", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch {
+		if r.Method != http.MethodPatch && r.Method != http.MethodDelete {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
@@ -953,6 +979,30 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 
 		path := strings.TrimPrefix(r.URL.Path, "/api/applications/")
 		parts := strings.Split(strings.Trim(path, "/"), "/")
+
+		if r.Method == http.MethodDelete {
+			if len(parts) != 1 || parts[0] == "" {
+				http.Error(w, "invalid path", http.StatusBadRequest)
+				return
+			}
+			appID := parts[0]
+			_, deleteErr := applicationsDDB.DeleteItem(r.Context(), &dynamodb.DeleteItemInput{
+				TableName: &applicationsTable,
+				Key: map[string]ddbtypes.AttributeValue{
+					"id": &ddbtypes.AttributeValueMemberS{Value: appID},
+				},
+				ConditionExpression: awsString("attribute_exists(id)"),
+			})
+			if deleteErr != nil {
+				log.Printf("op=DeleteApplication err=%v", deleteErr)
+				http.Error(w, "failed to delete application", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": appID, "deleted": true})
+			return
+		}
+
 		if len(parts) != 2 || parts[1] != "status" || parts[0] == "" {
 			http.Error(w, "invalid path", http.StatusBadRequest)
 			return
@@ -1016,6 +1066,32 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 
 func awsString(value string) *string {
 	return &value
+}
+
+func shouldAutoDeleteDeniedApplication(app PublicApplication) bool {
+	if strings.ToLower(strings.TrimSpace(app.Status)) != "denied" {
+		return false
+	}
+	deniedAt, ok := parseApplicationTimestamp(app.UpdatedAt)
+	if !ok {
+		deniedAt, ok = parseApplicationTimestamp(app.SubmittedAt)
+		if !ok {
+			return false
+		}
+	}
+	return time.Since(deniedAt) >= 7*24*time.Hour
+}
+
+func parseApplicationTimestamp(value string) (time.Time, bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339, trimmed)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
 }
 
 func buildApplicationPDFDataURL(name, email, phone string, motorcycleExperienceYears int, availableFreeTimePerWeek string, hasValidRospaCertificate bool, application string) string {
