@@ -2,7 +2,7 @@
 .splash-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -52,6 +52,11 @@
   position: sticky;
   top: 0;
   z-index: 100;
+
+  // Hide desktop header on mobile
+  @media (max-width: 768px) {
+    display: none;
+  }
   
   .header-content {
     display: flex;
@@ -89,6 +94,103 @@
     display: flex;
     gap: var(--spacing-md);
     align-items: center;
+  }
+}
+
+// ===== MOBILE FLOATING HEADER =====
+.mobile-float-header {
+  display: none; // Hidden on desktop
+
+  @media (max-width: 768px) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10000;
+    padding: 8px 12px;
+    padding-top: calc(var(--safe-top, 0px) + 8px);
+    pointer-events: none; // Let map clicks through
+
+    > * {
+      pointer-events: auto; // Re-enable on child elements
+    }
+  }
+}
+
+.float-logo {
+  cursor: pointer;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+  transition: transform 0.15s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  .float-logo-img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    border-radius: 50%;
+    background: var(--color-white);
+    padding: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.float-center {
+  .role-dropdown-toggle {
+    background: var(--color-white);
+    color: var(--color-text-dark);
+    border: none;
+    padding: 8px 18px;
+    border-radius: 24px;
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+
+    .role-dropdown-arrow {
+      color: var(--color-dark-gray);
+    }
+  }
+
+  .role-dropdown-menu {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}
+
+.float-settings {
+  .btn-settings {
+    background: var(--color-white);
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+    padding: 0;
+
+    &:hover {
+      transform: scale(1.05);
+    }
+  }
+
+  .settings-dropdown {
+    right: 0;
+    top: calc(100% + 8px);
   }
 }
 
@@ -202,6 +304,148 @@
     font-weight: 700;
     font-size: var(--font-size-sm);
     line-height: 1.1;
+  }
+}
+
+// ===== ROLE DROPDOWN =====
+.role-dropdown-container {
+  position: relative;
+}
+
+.role-dropdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 24px;
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+}
+
+.role-dropdown-arrow {
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+.role-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--color-white);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-lg);
+  min-width: 160px;
+  z-index: 10001;
+  overflow: hidden;
+  animation: slideDown 200ms ease-out;
+}
+
+.role-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--color-text-dark);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--color-light-gray);
+    color: var(--color-red);
+  }
+
+  &.active {
+    background: rgba(220, 20, 60, 0.1);
+    color: var(--color-red);
+    font-weight: 800;
+  }
+}
+
+// ===== BOTTOM TASKBAR =====
+.bottom-taskbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: var(--color-black);
+  border-top: 2px solid var(--color-red);
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  padding: 4px 0;
+  padding-bottom: calc(4px + var(--safe-bottom, 0px));
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.taskbar-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 64px;
+  max-width: 96px;
+  padding: 6px 4px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+
+  .taskbar-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .taskbar-label {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  &.active {
+    color: var(--color-red);
+
+    .taskbar-icon {
+      transform: scale(1.15);
+    }
   }
 }
 
@@ -585,32 +829,9 @@
 // ======= LOGO ======
 .logo-img { height: 36px; width: auto; }
 
-// ===== FOOTER =====
+// ===== FOOTER (removed) =====
 .app-footer {
-  background-color: var(--color-black);
-  color: var(--color-white);
-  padding: var(--spacing-sm) var(--spacing-md);
-  text-align: center;
-  border-top: var(--border-width) solid var(--color-red);
-  margin-top: 0;
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  z-index: 1000;
-  box-shadow: 0 -6px 18px rgba(0,0,0,0.18);
-
-  // Hide copyright bar on mobile & tablet
-  @media (max-width: 768px) {
-    display: none;
-  }
-
-  p {
-    margin: 0;
-    font-size: var(--font-size-sm);
-    color: var(--color-white);
-  }
+  display: none;
 }
 
 .footer-nav {
@@ -658,31 +879,20 @@
   }
 }
 
-/* Make room for the fixed footer so content isn't hidden */
+/* Make room for the bottom taskbar so content isn't hidden */
 .app-main {
-  padding-bottom: 96px; /* footer height + spacing buffer */
+  padding-bottom: calc(80px + var(--safe-bottom, 0px));
 }
 
 // ===== RESPONSIVE DESIGN =====
 @media (max-width: 768px) {
   .app-header {
-    padding: var(--spacing-md) var(--spacing-sm);
-    
-    .logo {
-      gap: var(--spacing-sm);
-      
-      .logo-icon {
-        font-size: var(--font-size-xl);
-      }
-      
-      h1 {
-        font-size: var(--font-size-lg);
-      }
-    }
+    display: none; // Replaced by mobile floating header
   }
   
   .app-main {
-    padding: var(--spacing-md) var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-sm);
+    padding-top: calc(var(--safe-top, 0px) + 64px); // Leave room below the floating header
   }
   
   .home-page {

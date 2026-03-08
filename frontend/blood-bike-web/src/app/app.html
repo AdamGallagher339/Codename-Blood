@@ -4,7 +4,58 @@
 </div>
 
 <div class="app-container">
-  <!-- Header -->
+  <!-- Mobile Floating Header (phone/tablet only) -->
+  <div class="mobile-float-header" *ngIf="auth.isLoggedIn() && !showSplash">
+    <div class="float-logo" (click)="goHomeOrWelcome()">
+      <img src="icons/logo.png" alt="Blood Bike" class="float-logo-img">
+    </div>
+    <div class="float-center">
+      <div class="role-dropdown-container" *ngIf="auth.user() as me">
+        <button class="role-dropdown-toggle" (click)="toggleRoleDropdown()" *ngIf="me.roles?.length">
+          <span class="role-selected-name">{{ roleDisplayName }}</span>
+          <span class="role-dropdown-arrow" [class.open]="showRoleDropdown">▾</span>
+        </button>
+        <div class="role-dropdown-menu" *ngIf="showRoleDropdown">
+          <button
+            *ngFor="let r of me.roles"
+            class="role-dropdown-item"
+            [class.active]="r === selectedRole"
+            (click)="selectRole(r)"
+          >{{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r === 'HR' ? 'HR' : r }}</button>
+          <button
+            class="role-dropdown-item"
+            *ngIf="me.roles.length > 1"
+            [class.active]="!selectedRole"
+            (click)="selectRole(null)"
+          >All Roles</button>
+        </div>
+      </div>
+    </div>
+    <div class="float-settings">
+      <div class="settings-container">
+        <button class="btn-settings" (click)="toggleSettings()" title="Settings">
+          ⚙️
+        </button>
+        <div *ngIf="showSettings" class="settings-dropdown">
+          <button class="settings-item" (click)="navigateTo('settings')">
+            <span>Settings</span>
+          </button>
+          <button class="settings-item" (click)="navigateTo('profile')">
+            <span>Profile</span>
+          </button>
+          <button class="settings-item" (click)="navigateTo('help')">
+            <span>Help & Support</span>
+          </button>
+          <hr class="settings-divider">
+          <button class="settings-item logout" (click)="logout()">
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop Header (hidden on mobile) -->
   <header class="app-header">
     <div class="header-content">
         <div class="logo" (click)="goHomeOrWelcome()">
@@ -12,16 +63,24 @@
         <h1>Blood Bike</h1>
       </div>
       <div class="header-actions">
-        <div class="user-pill" *ngIf="auth.user() as me">
-          <span class="user-name">{{ me.username || me.email || me.sub }}</span>
-          <div class="role-bar" *ngIf="me.roles?.length">
+        <div class="role-dropdown-container" *ngIf="auth.user() as me">
+          <button class="role-dropdown-toggle" (click)="toggleRoleDropdown()" *ngIf="me.roles?.length">
+            <span class="role-selected-name">{{ roleDisplayName }}</span>
+            <span class="role-dropdown-arrow" [class.open]="showRoleDropdown">▾</span>
+          </button>
+          <div class="role-dropdown-menu" *ngIf="showRoleDropdown">
             <button
               *ngFor="let r of me.roles"
-              class="role-chip"
+              class="role-dropdown-item"
               [class.active]="r === selectedRole"
-              (click)="setRole(r)"
+              (click)="selectRole(r)"
             >{{ r === 'BloodBikeAdmin' ? 'Admin' : r === 'FleetManager' ? 'Fleet' : r === 'HR' ? 'HR' : r }}</button>
-            <button class="role-chip all" *ngIf="me.roles.length > 1" [class.active]="!selectedRole" (click)="setRole(null)">All</button>
+            <button
+              class="role-dropdown-item"
+              *ngIf="me.roles.length > 1"
+              [class.active]="!selectedRole"
+              (click)="selectRole(null)"
+            >All Roles</button>
           </div>
         </div>
         <!-- no guest mode: users must be created by admin -->
@@ -453,9 +512,17 @@
 
   </main>
 
-  <!-- Footer -->
-  <footer class="app-footer">
-    <p>&copy; Copyright 2026. All Rights Reserved</p>
-  </footer>
+  <!-- Bottom Navigation Taskbar -->
+  <nav class="bottom-taskbar" *ngIf="auth.isLoggedIn() && !showSplash" (click)="showRoleDropdown = false">
+    <button
+      *ngFor="let page of pages"
+      class="taskbar-tab"
+      [class.active]="currentPage === page.id"
+      (click)="navigateTo(page.id)"
+    >
+      <span class="taskbar-icon">{{ page.icon }}</span>
+      <span class="taskbar-label">{{ page.title }}</span>
+    </button>
+  </nav>
 </div>
 

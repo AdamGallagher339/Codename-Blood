@@ -21,6 +21,7 @@ export class App implements OnInit {
   showRoutedView = false;
   showSplash = true;
   splashFading = false;
+  showRoleDropdown = false;
 
   // guest mode removed — account creation handled by admin
 
@@ -110,7 +111,7 @@ export class App implements OnInit {
   ]);
 
   private enterTracking(): void {
-    // Check if user can access tracking based on their roles
+    // After login, go to the first available routed page (prefer tracking/map)
     const userRoles = this.auth.roles();
     const trackingRoles = ['Rider', 'FleetManager', 'Dispatcher'];
     const canAccessTracking = userRoles.some((role) => trackingRoles.includes(role));
@@ -120,10 +121,17 @@ export class App implements OnInit {
       this.showRoutedView = true;
       this.router.navigate(['/tracking']);
     } else {
-      // Default to home
-      this.currentPage = 'home';
-      this.showRoutedView = false;
-      this.router.navigate(['/']);
+      // Fallback: navigate to first available page from their role
+      const firstPage = this.pages[0];
+      if (firstPage && this.routedPages.has(firstPage.id)) {
+        this.currentPage = firstPage.id;
+        this.showRoutedView = true;
+        this.router.navigate([`/${firstPage.id}`]);
+      } else {
+        this.currentPage = 'home';
+        this.showRoutedView = false;
+        this.router.navigate(['/']);
+      }
     }
   }
 
@@ -167,8 +175,7 @@ export class App implements OnInit {
 
     this.auth.fetchMe().subscribe(() => {
       if (this.auth.isLoggedIn()) {
-        this.currentPage = 'home';
-        this.showRoutedView = false;
+        this.enterTracking();
       } else {
         this.currentPage = 'welcome';
         this.showRoutedView = false;
@@ -372,7 +379,7 @@ export class App implements OnInit {
 
   isOnHomePage(): boolean {
     if (!this.auth.isLoggedIn()) return this.currentPage === 'welcome';
-    return this.currentPage === 'home';
+    return this.currentPage === 'home' || this.currentPage === 'tracking';
   }
 
   goHomeOrWelcome(): void {
@@ -384,9 +391,7 @@ export class App implements OnInit {
       return;
     }
 
-    this.currentPage = 'home';
-    this.showRoutedView = false;
-    this.router.navigate(['/']);
+    this.enterTracking();
     this.showSettings = false;
   }
 
@@ -411,6 +416,25 @@ export class App implements OnInit {
       this.router.navigate(['/']);
     }
     this.showSettings = false;
+  }
+
+  toggleRoleDropdown(): void {
+    this.showRoleDropdown = !this.showRoleDropdown;
+  }
+
+  selectRole(role: string | null): void {
+    this.setRole(role);
+    this.showRoleDropdown = false;
+  }
+
+  get roleDisplayName(): string {
+    if (!this.selectedRole) return 'All Roles';
+    switch (this.selectedRole) {
+      case 'BloodBikeAdmin': return 'Admin';
+      case 'FleetManager': return 'Fleet';
+      case 'HR': return 'HR';
+      default: return this.selectedRole;
+    }
   }
 
   toggleSettings(): void {
@@ -473,11 +497,9 @@ export class App implements OnInit {
       .pipe(finalize(() => (this.busy = false)))
       .subscribe({
         next: () => {
-          // populate user information then go to home menu
+          // populate user information then go to map
           this.auth.fetchMe().subscribe({
             next: () => {
-              this.currentPage = 'home';
-              this.showRoutedView = false;
               // restore selected role if available
               const saved = localStorage.getItem('bb_selected_role');
               const roles = this.auth.roles();
@@ -488,6 +510,8 @@ export class App implements OnInit {
               }
               // Subscribe to push after login
               this.subscribeToPush();
+              // Navigate to map/tracking
+              this.enterTracking();
             },
             error: () => {
               // fetch failed — AuthService may have logged out; ensure we show login
@@ -560,12 +584,11 @@ export class App implements OnInit {
           this.challengeNewPassword = '';
           this.auth.fetchMe().subscribe({
             next: () => {
-              this.currentPage = 'home';
-              this.showRoutedView = false;
               const saved = localStorage.getItem('bb_selected_role');
               const roles = this.auth.roles();
               if (saved && roles.includes(saved)) this.selectedRole = saved;
               else if (roles.length > 0) this.selectedRole = roles[0];
+              this.enterTracking();
             },
             error: () => {
               if (!this.auth.isLoggedIn()) this.currentPage = 'login';
