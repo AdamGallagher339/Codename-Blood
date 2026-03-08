@@ -881,7 +881,7 @@
 
 /* Make room for the bottom taskbar so content isn't hidden */
 .app-main {
-  padding-bottom: calc(80px + var(--safe-bottom, 0px));
+  padding-bottom: calc(100px + var(--safe-bottom, 0px));
 }
 
 // ===== RESPONSIVE DESIGN =====
