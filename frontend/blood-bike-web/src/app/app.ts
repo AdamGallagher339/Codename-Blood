@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClientModule, HttpClient, HttpHeaders } from '@angular/common/http';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
@@ -19,6 +19,8 @@ export class App implements OnInit {
   currentPage: string = 'welcome';
   showSettings = false;
   showRoutedView = false;
+  showSplash = true;
+  splashFading = false;
 
   // guest mode removed — account creation handled by admin
 
@@ -129,12 +131,34 @@ export class App implements OnInit {
     return role.toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
+  private splashShownAt = Date.now();
+
   constructor(
     public readonly auth: AuthService,
     private readonly router: Router,
     public readonly http: HttpClient,
-    private readonly pushService: PushNotificationService
+    private readonly pushService: PushNotificationService,
+    @Inject(PLATFORM_ID) private platformId: object
   ) {}
+
+  /** Fade-out and remove the index.html splash screen */
+  private dismissSplash(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const minDisplayMs = 1800;
+    const elapsed = Date.now() - this.splashShownAt;
+    const delay = Math.max(0, minDisplayMs - elapsed);
+    setTimeout(() => {
+      this.splashFading = true;
+      // Remove the in-app splash after the fade animation
+      setTimeout(() => { this.showSplash = false; }, 600);
+      // Also remove the index.html splash if present
+      const el = document.getElementById('splash-screen');
+      if (el) {
+        el.classList.add('fade-out');
+        el.addEventListener('transitionend', () => el.remove());
+      }
+    }, delay);
+  }
 
   ngOnInit(): void {
     this.router.events
@@ -165,6 +189,9 @@ export class App implements OnInit {
       }
       // Auto-subscribe to push notifications for all logged-in users
       this.subscribeToPush();
+
+      // Dismiss the splash screen now that the app is ready
+      this.dismissSplash();
     });
   }
 

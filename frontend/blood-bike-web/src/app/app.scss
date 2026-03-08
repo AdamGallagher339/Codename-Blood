@@ -1,3 +1,32 @@
+// ===== SPLASH SCREEN =====
+.splash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dc143c;
+  transition: opacity 0.6s ease-out;
+
+  &.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .splash-logo {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    animation: splash-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes splash-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
 // App Component Styling
 .app-container {
   display: flex;
@@ -571,6 +600,11 @@
   width: 100%;
   z-index: 1000;
   box-shadow: 0 -6px 18px rgba(0,0,0,0.18);
+
+  // Hide copyright bar on mobile & tablet
+  @media (max-width: 768px) {
+    display: none;
+  }
 
   p {
     margin: 0;

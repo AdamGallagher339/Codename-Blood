@@ -24,6 +24,37 @@
   <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
+  <!-- Splash screen – shown instantly, faded out by Angular -->
+  <div id="splash-screen">
+    <img src="icons/logo.png" alt="Blood Bike" class="splash-logo">
+  </div>
+  <style>
+    #splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #dc143c;
+      transition: opacity 0.6s ease-out;
+    }
+    #splash-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .splash-logo {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      animation: splash-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes splash-pulse {
+      0%, 100% { transform: scale(1); opacity: 0.9; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+  </style>
+
   <app-root></app-root>
   <noscript>Please enable JavaScript to continue using this application.</noscript>
 </body>
