@@ -87,7 +87,7 @@ export class App implements OnInit {
     { id: 'dispatcher', title: 'Dispatcher', icon: '📞', roles: ['Dispatcher'] },
     { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager'] },
     { id: 'active-riders', title: 'Active Riders', icon: '🏍️', roles: ['BloodBikeAdmin', 'FleetManager', 'Dispatcher'] },
-    { id: 'my-availability', title: 'My Availability', icon: '🟢', roles: ['Rider'] },
+    { id: 'my-availability', title: 'Availability', icon: '🟢', roles: ['Rider'] },
     { id: 'events', title: 'Events', icon: '📆', roles: [] },
     { id: 'analytics', title: 'Analytics', icon: '📊', roles: ['Rider', 'FleetManager', 'Dispatcher', 'BloodBikeAdmin'] },
     { id: 'admin-roles', title: 'Admin: Users', icon: '🧑‍💼', roles: ['BloodBikeAdmin'] }

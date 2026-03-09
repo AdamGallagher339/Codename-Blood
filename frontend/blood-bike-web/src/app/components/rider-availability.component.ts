@@ -1,78 +1,208 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-rider-availability',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   template: `
-    <div class="page-container">
-      <h1>My Availability</h1>
-
-      <div class="status-display">
-        <span class="dot" [class.green]="currentStatus === 'available'" [class.grey]="currentStatus !== 'available'"></span>
-        <span class="status-text">{{ currentStatus === 'available' ? 'Available' : 'Offline' }}</span>
-        <span *ngIf="expiresAt" class="expires">Expires: {{ expiresAt | date:'short' }}</span>
+    <div class="avail-page">
+      <!-- Status Hero Card -->
+      <div class="status-card" [class.online]="currentStatus === 'available'">
+        <div class="status-pulse" *ngIf="currentStatus === 'available'"></div>
+        <div class="status-icon">{{ currentStatus === 'available' ? '🟢' : '⚫' }}</div>
+        <div class="status-label">{{ currentStatus === 'available' ? 'On Duty' : 'Off Duty' }}</div>
+        <div class="status-sub" *ngIf="expiresAt">Until {{ expiresAt | date:'shortTime' }}</div>
+        <div class="status-sub" *ngIf="currentStatus === 'available' && !expiresAt">Until you go offline</div>
       </div>
 
-      <section class="section">
-        <h2>Set Status</h2>
+      <!-- Toggle Switch -->
+      <div class="toggle-track" [class.on]="currentStatus === 'available'" (click)="toggleStatus()">
+        <span class="toggle-label off-label">OFF</span>
+        <span class="toggle-thumb"></span>
+        <span class="toggle-label on-label">ON</span>
+      </div>
 
-        <div class="toggle-row">
+      <!-- Duration Picker (only when offline, choosing how long to go available) -->
+      <div class="duration-section" *ngIf="currentStatus !== 'available'">
+        <div class="duration-heading">Go available for</div>
+        <div class="duration-chips">
           <button
-            (click)="setAvailable()"
-            [disabled]="busy"
-            [class.active]="currentStatus === 'available'"
-            class="toggle-btn available-btn">
-            ✅ Available
-          </button>
-          <button
-            (click)="goOffline()"
-            [disabled]="busy"
-            [class.active]="currentStatus === 'offline'"
-            class="toggle-btn offline-btn">
-            ⛔ Offline
-          </button>
+            *ngFor="let d of durations"
+            class="dur-chip"
+            [class.selected]="selectedDuration === d.value"
+            (click)="selectedDuration = d.value"
+          >{{ d.label }}</button>
         </div>
+      </div>
 
-        <div class="timer-section" *ngIf="currentStatus !== 'available'">
-          <label>Stay available for:</label>
-          <select [(ngModel)]="selectedDuration">
-            <option [ngValue]="0">No timer (until I go offline)</option>
-            <option [ngValue]="1">1 hour</option>
-            <option [ngValue]="4">4 hours</option>
-            <option [ngValue]="8">8 hours</option>
-            <option [ngValue]="12">12 hours</option>
-            <option [ngValue]="24">24 hours</option>
-          </select>
-        </div>
-
-        <p *ngIf="message" class="message" [class.error]="isError">{{ message }}</p>
-      </section>
+      <!-- Toast Message -->
+      <div *ngIf="message" class="toast" [class.error]="isError" [class.show]="message">
+        {{ message }}
+      </div>
     </div>
   `,
   styles: [`
-    .page-container { padding: 1rem; max-width: 500px; margin: auto; }
-    .status-display { display: flex; align-items: center; gap: .75rem; padding: 1rem; background: #f5f5f5; border-radius: 8px; margin-bottom: 1.5rem; }
-    .dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
-    .dot.green { background: #4caf50; }
-    .dot.grey { background: #9e9e9e; }
-    .status-text { font-size: 1.2rem; font-weight: 600; }
-    .expires { font-size: .85rem; color: #666; margin-left: auto; }
-    .toggle-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
-    .toggle-btn { flex: 1; padding: .75rem; border-radius: 8px; border: 2px solid #ccc; font-size: 1rem; cursor: pointer; background: white; }
-    .toggle-btn.active { border-color: #333; font-weight: 700; }
-    .available-btn.active { background: #e8f5e9; border-color: #4caf50; }
-    .offline-btn.active { background: #fbe9e7; border-color: #e53935; }
-    .timer-section { margin-top: 1rem; }
-    .timer-section label { display: block; margin-bottom: .5rem; font-weight: 500; }
-    .timer-section select { width: 100%; padding: .5rem; border-radius: 6px; border: 1px solid #ccc; font-size: 1rem; }
-    .section { margin-top: 1rem; }
-    .message { margin-top: .75rem; padding: .5rem; border-radius: 6px; background: #e8f5e9; }
-    .message.error { background: #fbe9e7; color: #c62828; }
+    .avail-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem 1rem 2rem;
+      max-width: 420px;
+      margin: 0 auto;
+      gap: 1.5rem;
+    }
+
+    /* ── Status Hero ── */
+    .status-card {
+      position: relative;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 2rem 1rem;
+      border-radius: 20px;
+      background: #1a1a1a;
+      color: #888;
+      transition: all 0.4s ease;
+      overflow: hidden;
+    }
+    .status-card.online {
+      background: linear-gradient(135deg, #0d3320, #14532d);
+      color: #bbf7d0;
+    }
+    .status-icon {
+      font-size: 2.5rem;
+      line-height: 1;
+    }
+    .status-label {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .status-card.online .status-label { color: #fff; }
+    .status-sub {
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+    .status-pulse {
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      border: 2px solid #4ade80;
+      animation: pulse-ring 2s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes pulse-ring {
+      0% { opacity: 0.6; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.04); }
+    }
+
+    /* ── Toggle Switch ── */
+    .toggle-track {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 200px;
+      height: 56px;
+      border-radius: 28px;
+      background: #2a2a2a;
+      cursor: pointer;
+      padding: 0 18px;
+      transition: background 0.3s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .toggle-track.on {
+      background: #16a34a;
+    }
+    .toggle-thumb {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .toggle-track.on .toggle-thumb {
+      transform: translateX(144px);
+    }
+    .toggle-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.5);
+      z-index: 1;
+    }
+    .toggle-track.on .on-label { color: #fff; }
+    .toggle-track:not(.on) .off-label { color: #fff; }
+
+    /* ── Duration Picker ── */
+    .duration-section {
+      width: 100%;
+      text-align: center;
+    }
+    .duration-heading {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.75rem;
+    }
+    .duration-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .dur-chip {
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      border: 1.5px solid #333;
+      background: #1a1a1a;
+      color: #ccc;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .dur-chip:hover { border-color: #555; }
+    .dur-chip.selected {
+      background: var(--color-red, #dc143c);
+      border-color: var(--color-red, #dc143c);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    /* ── Toast ── */
+    .toast {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      text-align: center;
+      background: #14532d;
+      color: #bbf7d0;
+      animation: toast-in 0.3s ease;
+    }
+    .toast.error {
+      background: #7f1d1d;
+      color: #fecaca;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   `]
 })
 export class RiderAvailabilityComponent implements OnInit, OnDestroy {
@@ -83,6 +213,16 @@ export class RiderAvailabilityComponent implements OnInit, OnDestroy {
   message: string | null = null;
   isError = false;
   private timer: any;
+  private messageTimer: any;
+
+  durations = [
+    { label: 'No limit', value: 0 },
+    { label: '1h', value: 1 },
+    { label: '4h', value: 4 },
+    { label: '8h', value: 8 },
+    { label: '12h', value: 12 },
+    { label: '24h', value: 24 },
+  ];
 
   constructor(private http: HttpClient, private auth: AuthService) {}
 
@@ -93,6 +233,23 @@ export class RiderAvailabilityComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearInterval(this.timer);
+    clearTimeout(this.messageTimer);
+  }
+
+  private showMessage(msg: string, error = false) {
+    this.message = msg;
+    this.isError = error;
+    clearTimeout(this.messageTimer);
+    this.messageTimer = setTimeout(() => this.message = null, 3000);
+  }
+
+  toggleStatus() {
+    if (this.busy) return;
+    if (this.currentStatus === 'available') {
+      this.goOffline();
+    } else {
+      this.setAvailable();
+    }
   }
 
   loadCurrent() {
@@ -117,13 +274,11 @@ export class RiderAvailabilityComponent implements OnInit, OnDestroy {
       next: res => {
         this.currentStatus = res.status;
         this.expiresAt = res.availableUntil || null;
-        this.message = 'You are now available';
-        this.isError = false;
+        this.showMessage('You are now on duty');
         this.busy = false;
       },
       error: () => {
-        this.message = 'Failed to update status';
-        this.isError = true;
+        this.showMessage('Failed to update status', true);
         this.busy = false;
       }
     });
@@ -140,13 +295,11 @@ export class RiderAvailabilityComponent implements OnInit, OnDestroy {
         this.currentStatus = res.status;
         this.expiresAt = null;
         this.selectedDuration = 0;
-        this.message = 'You are now offline';
-        this.isError = false;
+        this.showMessage('You are now off duty');
         this.busy = false;
       },
       error: () => {
-        this.message = 'Failed to update status';
-        this.isError = true;
+        this.showMessage('Failed to update status', true);
         this.busy = false;
       }
     });
