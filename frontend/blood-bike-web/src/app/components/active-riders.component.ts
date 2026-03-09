@@ -38,7 +38,7 @@ interface Rider {
           <span class="dot orange"></span>
           <div class="info">
             <strong>{{ r.name || r.riderId }}</strong>
-            <span class="job-id">Job: {{ r.currentJobId }}</span>
+            <span class="job-id">Job: {{ jobTitles[r.currentJobId] || r.currentJobId }}</span>
           </div>
         </div>
       </section>
@@ -78,6 +78,7 @@ export class ActiveRidersComponent implements OnInit, OnDestroy {
   available: Rider[] = [];
   onJob: Rider[] = [];
   offline: Rider[] = [];
+  jobTitles: Record<string, string> = {};
   private timer: any;
 
   constructor(private http: HttpClient) {}
@@ -93,6 +94,14 @@ export class ActiveRidersComponent implements OnInit, OnDestroy {
 
   load() {
     this.loading = true;
+    this.http.get<any[]>('/api/jobs').subscribe({
+      next: jobs => {
+        this.jobTitles = {};
+        for (const j of jobs || []) {
+          if (j.jobId && j.title) this.jobTitles[j.jobId] = j.title;
+        }
+      }
+    });
     this.http.get<Rider[]>('/api/riders/availability').subscribe({
       next: riders => {
         this.available = riders.filter(r => r.status === 'available');
