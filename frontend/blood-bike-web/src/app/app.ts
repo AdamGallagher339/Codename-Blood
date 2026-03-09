@@ -81,7 +81,6 @@ export class App implements OnInit {
     { id: 'applications', title: 'Applications', icon: '📋', roles: ['HR'] },
     { id: 'trainings', title: 'Trainings', icon: '🎓', roles: ['HR'] },
     { id: 'tracking', title: 'Map', icon: '🗺️', roles: ['Rider', 'FleetManager', 'Dispatcher'] },
-    { id: 'scan', title: 'QR Test', icon: '📱', roles: ['BloodBikeAdmin'] },
     { id: 'jobs', title: 'Jobs', icon: '📋', roles: ['Rider'] },
     { id: 'active-job', title: 'Active', icon: '🏍️', roles: ['Rider'] },
     { id: 'dispatcher', title: 'Dispatcher', icon: '📞', roles: ['Dispatcher'] },

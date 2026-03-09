@@ -21,150 +21,370 @@ interface Job {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="dispatcher">
-      <h1>Dispatcher Dashboard</h1>
-      <p class="subtitle">Create new jobs, view available riders, and manage delivery runs.</p>
+    <div class="dispatch-page">
 
-      <!-- Create Job -->
-      <section class="card">
-        <h2>Create New Job</h2>
-        <div class="form-stack">
-          <label>
-            <span>Job Title</span>
-            <input type="text" [(ngModel)]="newJob.title" placeholder="Enter job title" />
-          </label>
-          <label>
-            <span>Pickup Address</span>
-            <div class="input-with-pin">
-              <input type="text" [(ngModel)]="newJob.pickup" placeholder="Pickup location" />
-              <button type="button" class="btn-pin" (click)="togglePickupMap()">📍 {{ showPickupMap ? 'Close Map' : 'Pin' }}</button>
-            </div>
-          </label>
-          <div *ngIf="showPickupMap" id="dispatcher-pickup-map" class="job-map-picker"></div>
-          <p *ngIf="newJob.pickupLat !== null" class="pin-coords">📌 {{ newJob.pickupLat?.toFixed(5) }}, {{ newJob.pickupLng?.toFixed(5) }}
-            <button type="button" class="btn-clear-pin" (click)="clearPickupPin()">✕ clear</button>
-          </p>
-          <label>
-            <span>Delivery Address</span>
-            <div class="input-with-pin">
-              <input type="text" [(ngModel)]="newJob.dropoff" placeholder="Delivery location" />
-              <button type="button" class="btn-pin btn-pin-red" (click)="toggleDropoffMap()">📍 {{ showDropoffMap ? 'Close Map' : 'Pin' }}</button>
-            </div>
-          </label>
-          <div *ngIf="showDropoffMap" id="dispatcher-dropoff-map" class="job-map-picker"></div>
-          <p *ngIf="newJob.dropoffLat !== null" class="pin-coords pin-coords-red">📌 {{ newJob.dropoffLat?.toFixed(5) }}, {{ newJob.dropoffLng?.toFixed(5) }}
-            <button type="button" class="btn-clear-pin" (click)="clearDropoffPin()">✕ clear</button>
-          </p>
-          <button class="btn-primary" (click)="createJob()" [disabled]="busy || !newJob.title">{{ busy ? 'Creating…' : 'Create Job' }}</button>
-          <p *ngIf="message" class="msg" [class.error]="isError">{{ message }}</p>
-        </div>
-      </section>
-
-      <!-- All Jobs -->
-      <section class="card">
-        <div class="card-top">
-          <h2>All Jobs</h2>
-          <button class="btn-reload" (click)="loadJobs()" [disabled]="loading">{{ loading ? 'Loading…' : '↻ Reload' }}</button>
-        </div>
-        <div *ngIf="loading" class="loading">Loading…</div>
-
-        <!-- Desktop table -->
-        <div class="table-wrap" *ngIf="!loading">
-          <table>
-            <thead>
-              <tr>
-                <th>Title</th><th>Pickup</th><th>Delivery</th><th>Status</th>
-                <th>Created By</th><th>Accepted By</th><th>Created</th><th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngIf="jobs.length === 0"><td colspan="8">No jobs yet</td></tr>
-              <tr *ngFor="let j of jobs">
-                <td>{{ j.title }}</td>
-                <td>{{ j.pickup?.address }}</td>
-                <td>{{ j.dropoff?.address }}</td>
-                <td><span class="badge" [class]="'s-' + j.status">{{ j.status }}</span></td>
-                <td>{{ j.createdBy }}</td>
-                <td>{{ j.acceptedBy || '—' }}</td>
-                <td>{{ j.timestamps?.created | date:'short' }}</td>
-                <td><button class="btn-delete" (click)="deleteJob(j)">Delete</button></td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- Create Job Card -->
+      <div class="section-head">
+        <span class="section-title">New Job</span>
+      </div>
+      <div class="create-card">
+        <div class="field">
+          <label class="field-label">Title</label>
+          <input type="text" class="field-input" [(ngModel)]="newJob.title" placeholder="e.g. Blood sample — St James" />
         </div>
 
-        <!-- Mobile cards -->
-        <div class="job-cards" *ngIf="!loading">
-          <div *ngIf="jobs.length === 0" class="empty">No jobs yet</div>
-          <div class="job-card" *ngFor="let j of jobs">
-            <div class="job-card-top">
-              <strong>{{ j.title }}</strong>
-              <span class="badge" [class]="'s-' + j.status">{{ j.status }}</span>
-            </div>
-            <div class="job-detail"><span>Pickup:</span> {{ j.pickup?.address || '—' }}</div>
-            <div class="job-detail"><span>Delivery:</span> {{ j.dropoff?.address || '—' }}</div>
-            <div class="job-detail"><span>Created:</span> {{ j.timestamps?.created | date:'short' }}</div>
-            <div class="job-detail" *ngIf="j.acceptedBy"><span>Accepted by:</span> {{ j.acceptedBy }}</div>
-            <button class="btn-delete" (click)="deleteJob(j)">Delete</button>
+        <!-- Pickup -->
+        <div class="field">
+          <label class="field-label pickup-label">
+            <span class="dot green"></span> Pickup
+          </label>
+          <div class="input-row">
+            <input type="text" class="field-input" [(ngModel)]="newJob.pickup" placeholder="Pickup address" />
+            <button class="btn-pin" [class.active]="showPickupMap" (click)="togglePickupMap()">📍</button>
           </div>
         </div>
-      </section>
+        <div *ngIf="showPickupMap" id="dispatcher-pickup-map" class="map-embed"></div>
+        <div *ngIf="newJob.pickupLat !== null" class="pin-tag green">
+          📌 {{ newJob.pickupLat?.toFixed(5) }}, {{ newJob.pickupLng?.toFixed(5) }}
+          <button class="tag-clear" (click)="clearPickupPin()">✕</button>
+        </div>
+
+        <!-- Dropoff -->
+        <div class="field">
+          <label class="field-label dropoff-label">
+            <span class="dot red"></span> Delivery
+          </label>
+          <div class="input-row">
+            <input type="text" class="field-input" [(ngModel)]="newJob.dropoff" placeholder="Delivery address" />
+            <button class="btn-pin red" [class.active]="showDropoffMap" (click)="toggleDropoffMap()">📍</button>
+          </div>
+        </div>
+        <div *ngIf="showDropoffMap" id="dispatcher-dropoff-map" class="map-embed"></div>
+        <div *ngIf="newJob.dropoffLat !== null" class="pin-tag red">
+          📌 {{ newJob.dropoffLat?.toFixed(5) }}, {{ newJob.dropoffLng?.toFixed(5) }}
+          <button class="tag-clear" (click)="clearDropoffPin()">✕</button>
+        </div>
+
+        <button class="btn-create" (click)="createJob()" [disabled]="busy || !newJob.title">
+          {{ busy ? 'Creating…' : 'Create Job' }}
+        </button>
+
+        <div *ngIf="message" class="toast" [class.error]="isError">{{ message }}</div>
+      </div>
+
+      <!-- Jobs List -->
+      <div class="section-head">
+        <span class="section-title">All Jobs</span>
+        <button class="btn-refresh" (click)="loadJobs()" [disabled]="loading">
+          {{ loading ? '...' : '↻' }}
+        </button>
+      </div>
+
+      <div *ngIf="loading" class="loading-state">
+        <div class="loader"></div>
+      </div>
+
+      <div *ngIf="!loading && jobs.length === 0" class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-text">No jobs created yet</div>
+      </div>
+
+      <div class="job-list" *ngIf="!loading">
+        <div class="job-card" *ngFor="let j of jobs">
+          <div class="job-card-head">
+            <span class="jc-title">{{ j.title }}</span>
+            <span class="status-pill" [class]="'s-' + j.status">{{ j.status }}</span>
+          </div>
+          <div class="job-route">
+            <div class="rp pickup">
+              <span class="rp-dot"></span>
+              <span class="rp-addr">{{ j.pickup?.address || '—' }}</span>
+            </div>
+            <div class="rp-line"></div>
+            <div class="rp dropoff">
+              <span class="rp-dot"></span>
+              <span class="rp-addr">{{ j.dropoff?.address || '—' }}</span>
+            </div>
+          </div>
+          <div class="job-card-meta">
+            <div class="meta-chips">
+              <span class="meta-chip" *ngIf="j.createdBy">By {{ j.createdBy }}</span>
+              <span class="meta-chip" *ngIf="j.acceptedBy">→ {{ j.acceptedBy }}</span>
+              <span class="meta-chip">{{ j.timestamps?.created | date:'short' }}</span>
+            </div>
+            <button class="btn-del" (click)="deleteJob(j)">🗑</button>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
-    .dispatcher { padding: 1rem; max-width: 900px; margin: 0 auto; }
-    .subtitle { color: #666; margin: 0 0 1rem; }
-    .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem; }
-    .card h2 { margin: 0 0 1rem; font-size: 1.15rem; }
-    .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
-    .card-top h2 { margin: 0; }
-    .form-stack { display: flex; flex-direction: column; gap: .75rem; }
-    .form-stack label { display: flex; flex-direction: column; gap: 4px; }
-    .form-stack label span { font-weight: 600; font-size: .9rem; color: #333; }
-    .form-stack input { padding: .6rem .75rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
-    .form-stack input:focus { outline: none; border-color: #dc143c; box-shadow: 0 0 0 3px rgba(220,20,60,.12); }
-    .btn-primary { padding: .65rem 1.25rem; background: #dc143c; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; }
-    .btn-primary:hover:not(:disabled) { background: #b01030; }
-    .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
-    .btn-reload { padding: .45rem 1rem; background: #4caf50; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
-    .input-with-pin { display: flex; gap: .5rem; align-items: center; }
-    .input-with-pin input { flex: 1; }
-    .btn-pin { padding: .45rem .9rem; background: #4caf50; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap; }
-    .btn-pin:hover { background: #388e3c; }
-    .btn-pin-red { background: #dc143c; }
-    .btn-pin-red:hover { background: #b01030; }
-    .btn-clear-pin { background: none; border: none; cursor: pointer; color: #c62828; font-size: .85rem; margin-left: .5rem; }
-    .job-map-picker { height: 280px; border-radius: 8px; overflow: hidden; margin-top: .25rem; border: 1px solid #ddd; }
-    .pin-coords { margin: .25rem 0 0; font-size: .85rem; color: #2e7d32; font-weight: 600; }
-    .pin-coords-red { color: #b71c1c; }
-    .btn-delete { padding: .35rem .75rem; background: #d32f2f; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: .85rem; }
-    .msg { margin: 0; padding: .6rem .75rem; border-radius: 8px; background: #e8f5e9; color: #2e7d32; font-size: .9rem; }
-    .msg.error { background: #fbe9e7; color: #c62828; }
-    .badge { padding: 3px 10px; border-radius: 20px; font-size: .8rem; font-weight: 600; white-space: nowrap; }
-    .s-open { background: #fff3e0; color: #e65100; }
-    .s-accepted { background: #e3f2fd; color: #1565c0; }
-    .s-completed { background: #e8f5e9; color: #2e7d32; }
-    .loading { text-align: center; padding: 2rem; color: #999; }
-    .empty { text-align: center; padding: 2rem; color: #999; font-style: italic; }
-
-    /* Desktop table */
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: .6rem .75rem; text-align: left; border-bottom: 1px solid #eee; }
-    th { background: #fafafa; font-size: .85rem; color: #666; font-weight: 600; }
-
-    /* Mobile cards hidden on desktop */
-    .job-cards { display: none; }
-
-    @media (max-width: 700px) {
-      .table-wrap { display: none; }
-      .job-cards { display: flex; flex-direction: column; gap: .75rem; }
-      .job-card { background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: .75rem; }
-      .job-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
-      .job-detail { font-size: .9rem; color: #444; margin-bottom: .25rem; }
-      .job-detail span { font-weight: 600; color: #222; }
-      .job-card .btn-delete { margin-top: .5rem; width: 100%; }
+    .dispatch-page {
+      padding: 1rem;
+      max-width: 520px;
+      margin: 0 auto;
     }
+
+    /* ── Section Heads ── */
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      margin-top: 1.25rem;
+    }
+    .section-head:first-child { margin-top: 0; }
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #888;
+    }
+
+    /* ── Create Card ── */
+    .create-card {
+      background: #1a1a1a;
+      border-radius: 16px;
+      border: 1px solid #2a2a2a;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #777;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot.green { background: #4ade80; }
+    .dot.red { background: var(--color-red, #dc143c); }
+    .field-input {
+      padding: 10px 12px;
+      background: #111;
+      border: 1.5px solid #333;
+      border-radius: 10px;
+      color: #eee;
+      font-size: 0.95rem;
+      transition: border-color 0.15s;
+    }
+    .field-input::placeholder { color: #555; }
+    .field-input:focus {
+      outline: none;
+      border-color: var(--color-red, #dc143c);
+      box-shadow: 0 0 0 3px rgba(220,20,60,0.15);
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .input-row .field-input { flex: 1; }
+
+    /* ── Pin Button ── */
+    .btn-pin {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1.5px solid #333;
+      background: #111;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-pin:hover, .btn-pin.active { border-color: #4ade80; background: #0a1f14; }
+    .btn-pin.red:hover, .btn-pin.red.active { border-color: var(--color-red, #dc143c); background: #1f0a0e; }
+
+    /* ── Map Embed ── */
+    .map-embed {
+      height: 240px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #333;
+    }
+
+    /* ── Pin Tag ── */
+    .pin-tag {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .pin-tag.green { background: #0d3320; color: #bbf7d0; }
+    .pin-tag.red { background: #3b0a0a; color: #fecaca; }
+    .tag-clear {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: inherit;
+      opacity: 0.6;
+      font-size: 0.85rem;
+      margin-left: auto;
+    }
+    .tag-clear:hover { opacity: 1; }
+
+    /* ── Create Button ── */
+    .btn-create {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      background: var(--color-red, #dc143c);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-create:hover:not(:disabled) { background: #b01030; }
+    .btn-create:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    .toast {
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-align: center;
+      background: #14532d;
+      color: #bbf7d0;
+      animation: toast-in 0.3s ease;
+    }
+    .toast.error { background: #7f1d1d; color: #fecaca; }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Refresh button ── */
+    .btn-refresh {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1.5px solid #333;
+      background: #1a1a1a;
+      color: #aaa;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-refresh:hover { border-color: #555; color: #fff; }
+    .btn-refresh:disabled { opacity: 0.4; }
+
+    /* ── Loading ── */
+    .loading-state { display: flex; justify-content: center; padding: 2rem 0; }
+    .loader {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #333;
+      border-top-color: var(--color-red, #dc143c);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty State ── */
+    .empty-state { text-align: center; padding: 2rem 1rem; color: #666; }
+    .empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .empty-text { font-size: 0.9rem; }
+
+    /* ── Job Cards ── */
+    .job-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .job-card {
+      background: #1a1a1a;
+      border-radius: 14px;
+      padding: 14px 16px;
+      border: 1px solid #2a2a2a;
+    }
+    .job-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .jc-title { font-weight: 700; font-size: 1rem; color: #fff; }
+    .status-pill {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+    .s-open { background: #78350f; color: #fde68a; }
+    .s-accepted { background: #1e3a5f; color: #93c5fd; }
+    .s-picked-up { background: #713f12; color: #fde68a; }
+    .s-delivered, .s-completed { background: #14532d; color: #bbf7d0; }
+    .s-cancelled { background: #7f1d1d; color: #fecaca; }
+
+    /* ── Route Viz ── */
+    .job-route {
+      display: flex;
+      flex-direction: column;
+      padding-left: 4px;
+      margin-bottom: 10px;
+    }
+    .rp { display: flex; align-items: center; gap: 10px; }
+    .rp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .pickup .rp-dot { background: #4ade80; }
+    .dropoff .rp-dot { background: var(--color-red, #dc143c); }
+    .rp-addr { font-size: 0.85rem; color: #bbb; }
+    .rp-line { width: 2px; height: 14px; background: #333; margin-left: 4px; }
+
+    /* ── Meta ── */
+    .job-card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .meta-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .meta-chip {
+      font-size: 0.72rem;
+      color: #666;
+      background: #222;
+      padding: 2px 8px;
+      border-radius: 8px;
+    }
+    .btn-del {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-del:hover { background: #7f1d1d; border-color: #991b1b; }
   `]
 })
 export class DispatcherComponent implements OnInit, OnDestroy {
