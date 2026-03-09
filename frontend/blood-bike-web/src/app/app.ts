@@ -83,14 +83,14 @@ export class App implements OnInit {
     { id: 'tracking', title: 'Map', icon: '🗺️', roles: ['Rider', 'FleetManager', 'Dispatcher'] },
     { id: 'scan', title: 'QR Test', icon: '📱', roles: ['BloodBikeAdmin'] },
     { id: 'jobs', title: 'Jobs', icon: '📋', roles: ['Rider'] },
-    { id: 'active-job', title: 'Active Job', icon: '🏍️', roles: ['Rider'] },
+    { id: 'active-job', title: 'Active', icon: '🏍️', roles: ['Rider'] },
     { id: 'dispatcher', title: 'Dispatcher', icon: '📞', roles: ['Dispatcher'] },
     { id: 'fleet', title: 'Fleet', icon: '🛠️', roles: ['FleetManager'] },
-    { id: 'active-riders', title: 'Active Riders', icon: '🏍️', roles: ['BloodBikeAdmin', 'FleetManager', 'Dispatcher'] },
+    { id: 'active-riders', title: 'Riders', icon: '🏍️', roles: ['BloodBikeAdmin', 'FleetManager', 'Dispatcher'] },
     { id: 'my-availability', title: 'Availability', icon: '🟢', roles: ['Rider'] },
     { id: 'events', title: 'Events', icon: '📆', roles: [] },
     { id: 'analytics', title: 'Analytics', icon: '📊', roles: ['Rider', 'FleetManager', 'Dispatcher', 'BloodBikeAdmin'] },
-    { id: 'admin-roles', title: 'Admin: Users', icon: '🧑‍💼', roles: ['BloodBikeAdmin'] }
+    { id: 'admin-roles', title: 'Users', icon: '🧑‍💼', roles: ['BloodBikeAdmin'] }
   ];
 
   private readonly routedPages = new Set([
@@ -425,6 +425,11 @@ export class App implements OnInit {
   selectRole(role: string | null): void {
     this.setRole(role);
     this.showRoleDropdown = false;
+    // Navigate to the first tab for the newly selected role
+    const firstPage = this.pages[0];
+    if (firstPage) {
+      this.navigateTo(firstPage.id);
+    }
   }
 
   get roleDisplayName(): string {

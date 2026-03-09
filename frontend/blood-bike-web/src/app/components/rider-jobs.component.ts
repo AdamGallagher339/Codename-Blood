@@ -10,160 +10,334 @@ import { Job } from '../models/job.model';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="page-container">
-      <h1>Rider - Jobs</h1>
+    <div class="jobs-page">
 
-      <!-- Active job banner -->
-      <div *ngIf="jobService.myActiveJob()" class="active-job-banner" (click)="openActiveJob()">
-        <div class="banner-left">
+      <!-- Active Job Banner -->
+      <div *ngIf="jobService.myActiveJob()" class="active-banner" (click)="openActiveJob()">
+        <div class="banner-pulse"></div>
+        <div class="banner-body">
           <span class="banner-icon">🏍️</span>
-          <div>
-            <strong>{{ jobService.myActiveJob()!.title }}</strong>
+          <div class="banner-info">
+            <span class="banner-title">{{ jobService.myActiveJob()!.title }}</span>
             <span class="banner-status">{{ statusLabel(jobService.myActiveJob()!) }}</span>
           </div>
         </div>
-        <span class="banner-arrow">→</span>
+        <span class="banner-chevron">›</span>
       </div>
 
-      <section class="section">
-        <h2>Available Jobs</h2>
-        <button (click)="jobService.loadJobs()" [disabled]="jobService.loading()" class="reload-btn">
-          {{ jobService.loading() ? 'Loading…' : '↻ Reload' }}
+      <!-- Available Jobs -->
+      <div class="section-head">
+        <span class="section-title">Available</span>
+        <button class="btn-refresh" (click)="jobService.loadJobs()" [disabled]="jobService.loading()">
+          {{ jobService.loading() ? '...' : '↻' }}
         </button>
-        <div *ngIf="jobService.loading()">Loading…</div>
-        <table *ngIf="!jobService.loading()">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th class="hide-mobile">Pickup</th>
-              <th class="hide-mobile">Delivery</th>
-              <th class="hide-mobile">Created By</th>
-              <th class="hide-mobile">Created</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngIf="jobService.openJobs().length === 0">
-              <td colspan="6">No available jobs at this time</td>
-            </tr>
-            <tr *ngFor="let j of jobService.openJobs()">
-              <td>
-                {{ j.title }}
-                <div class="mobile-detail">
-                  <small>{{ j.pickup?.address }} → {{ j.dropoff?.address }}</small>
-                </div>
-              </td>
-              <td class="hide-mobile">{{ j.pickup?.address }}</td>
-              <td class="hide-mobile">{{ j.dropoff?.address }}</td>
-              <td class="hide-mobile">{{ j.createdBy }}</td>
-              <td class="hide-mobile">{{ j.timestamps?.created | date:'short' }}</td>
-              <td>
-                <button
-                  (click)="acceptJob(j)"
-                  [disabled]="!!jobService.myActiveJob()"
-                  class="accept-btn"
-                >Accept</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+      </div>
 
-      <section class="section">
-        <h2>My Jobs History</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th class="hide-mobile">Pickup</th>
-              <th class="hide-mobile">Delivery</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngIf="completedJobs.length === 0">
-              <td colspan="4">No completed jobs</td>
-            </tr>
-            <tr *ngFor="let j of completedJobs">
-              <td>{{ j.title }}</td>
-              <td class="hide-mobile">{{ j.pickup?.address }}</td>
-              <td class="hide-mobile">{{ j.dropoff?.address }}</td>
-              <td><span class="status-badge" [class]="'status-' + j.status">{{ j.status }}</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+      <div *ngIf="jobService.loading()" class="loading-state">
+        <div class="loader"></div>
+      </div>
+
+      <div *ngIf="!jobService.loading() && jobService.openJobs().length === 0" class="empty-state">
+        <div class="empty-icon">📭</div>
+        <div class="empty-text">No jobs available right now</div>
+      </div>
+
+      <div class="job-list" *ngIf="!jobService.loading()">
+        <div class="job-card" *ngFor="let j of jobService.openJobs()">
+          <div class="job-card-header">
+            <span class="job-title">{{ j.title }}</span>
+            <span class="job-time">{{ j.timestamps?.created | date:'shortTime' }}</span>
+          </div>
+          <div class="job-route">
+            <div class="route-point pickup">
+              <span class="route-dot"></span>
+              <span class="route-addr">{{ j.pickup?.address || 'No address' }}</span>
+            </div>
+            <div class="route-line"></div>
+            <div class="route-point dropoff">
+              <span class="route-dot"></span>
+              <span class="route-addr">{{ j.dropoff?.address || 'No address' }}</span>
+            </div>
+          </div>
+          <div class="job-card-footer">
+            <span class="job-meta">By {{ j.createdBy }}</span>
+            <button
+              class="btn-accept"
+              (click)="acceptJob(j)"
+              [disabled]="!!jobService.myActiveJob()"
+            >Accept</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="section-head history-head">
+        <span class="section-title">History</span>
+        <span class="history-count" *ngIf="completedJobs.length">{{ completedJobs.length }}</span>
+      </div>
+
+      <div *ngIf="completedJobs.length === 0" class="empty-state small">
+        <div class="empty-text">No completed jobs yet</div>
+      </div>
+
+      <div class="history-list">
+        <div class="history-item" *ngFor="let j of completedJobs">
+          <div class="history-left">
+            <span class="history-title">{{ j.title }}</span>
+            <span class="history-route">{{ j.pickup?.address || '?' }} → {{ j.dropoff?.address || '?' }}</span>
+          </div>
+          <span class="status-pill" [class]="'s-' + j.status">{{ j.status }}</span>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
-    .page-container {
-      padding: 16px;
-      max-width: 1200px;
+    .jobs-page {
+      padding: 1rem;
+      max-width: 500px;
       margin: 0 auto;
     }
-    .section {
-      margin: 20px 0;
-      padding: 15px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background: white;
-    }
 
-    .active-job-banner {
+    /* ── Active Banner ── */
+    .active-banner {
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 18px;
-      background: linear-gradient(135deg, #007bff, #0056b3);
-      color: white;
-      border-radius: 10px;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, #0d3320, #14532d);
+      border-radius: 16px;
       cursor: pointer;
-      margin-bottom: 16px;
-      transition: transform 0.15s;
-      box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+      margin-bottom: 1.25rem;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
     }
-    .active-job-banner:active { transform: scale(0.98); }
-    .banner-left { display: flex; align-items: center; gap: 12px; }
-    .banner-icon { font-size: 1.5em; }
-    .banner-left strong { display: block; font-size: 1.05em; }
-    .banner-status { font-size: 0.85em; opacity: 0.9; }
-    .banner-arrow { font-size: 1.3em; font-weight: bold; }
+    .active-banner:active { transform: scale(0.98); }
+    .banner-pulse {
+      position: absolute;
+      inset: 0;
+      border: 2px solid #4ade80;
+      border-radius: 16px;
+      animation: pulse-ring 2s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes pulse-ring {
+      0% { opacity: 0.6; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.03); }
+    }
+    .banner-body {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 1;
+    }
+    .banner-icon { font-size: 1.5rem; }
+    .banner-info { display: flex; flex-direction: column; }
+    .banner-title { color: #fff; font-weight: 700; font-size: 1rem; }
+    .banner-status { color: #bbf7d0; font-size: 0.8rem; }
+    .banner-chevron { color: #4ade80; font-size: 1.6rem; font-weight: 300; z-index: 1; }
 
-    .reload-btn {
-      padding: 8px 16px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 4px;
+    /* ── Section Heads ── */
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #888;
+    }
+    .btn-refresh {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1.5px solid #333;
+      background: #1a1a1a;
+      color: #aaa;
+      font-size: 1rem;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-refresh:hover { border-color: #555; color: #fff; }
+    .btn-refresh:disabled { opacity: 0.4; }
+
+    /* ── Loading ── */
+    .loading-state {
+      display: flex;
+      justify-content: center;
+      padding: 2rem 0;
+    }
+    .loader {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #333;
+      border-top-color: var(--color-red, #dc143c);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty State ── */
+    .empty-state {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: #666;
+    }
+    .empty-state.small { padding: 1rem; }
+    .empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .empty-text { font-size: 0.9rem; }
+
+    /* ── Job Cards ── */
+    .job-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .job-card {
+      background: #1a1a1a;
+      border-radius: 14px;
+      padding: 14px 16px;
+      border: 1px solid #2a2a2a;
+    }
+    .job-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
       margin-bottom: 10px;
     }
-    .accept-btn {
-      padding: 6px 14px;
-      background-color: #007bff;
-      color: white;
+    .job-title {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #fff;
+    }
+    .job-time {
+      font-size: 0.75rem;
+      color: #666;
+    }
+
+    /* ── Route Visualization ── */
+    .job-route {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 12px;
+      padding-left: 4px;
+    }
+    .route-point {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .route-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .pickup .route-dot { background: #4ade80; }
+    .dropoff .route-dot { background: var(--color-red, #dc143c); }
+    .route-addr {
+      font-size: 0.85rem;
+      color: #bbb;
+    }
+    .route-line {
+      width: 2px;
+      height: 14px;
+      background: #333;
+      margin-left: 4px;
+    }
+
+    .job-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .job-meta {
+      font-size: 0.75rem;
+      color: #666;
+    }
+    .btn-accept {
+      padding: 8px 20px;
+      border-radius: 20px;
       border: none;
-      border-radius: 4px;
+      background: var(--color-red, #dc143c);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
       cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
     }
-    .accept-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .accept-btn:hover:not(:disabled) { background-color: #0056b3; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background: #f5f5f5; }
-    .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 0.85em; font-weight: 500; }
-    .status-open { background: #fff3e0; color: #e65100; }
-    .status-accepted { background: #e3f2fd; color: #1565c0; }
-    .status-picked-up { background: #fff8e1; color: #f57f17; }
-    .status-delivered, .status-completed { background: #e8f5e9; color: #2e7d32; }
-    .status-cancelled { background: #fce4ec; color: #c62828; }
+    .btn-accept:hover:not(:disabled) { background: #b01030; }
+    .btn-accept:disabled { opacity: 0.35; cursor: not-allowed; }
 
-    .mobile-detail { display: none; }
-
-    @media (max-width: 768px) {
-      .hide-mobile { display: none; }
-      .mobile-detail { display: block; color: #777; margin-top: 4px; }
+    /* ── History ── */
+    .history-head { margin-top: 0.5rem; }
+    .history-count {
+      background: #2a2a2a;
+      color: #888;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
     }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: #1a1a1a;
+      border-radius: 10px;
+      border: 1px solid #222;
+    }
+    .history-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      flex: 1;
+    }
+    .history-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #ddd;
+    }
+    .history-route {
+      font-size: 0.75rem;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .status-pill {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+      margin-left: 10px;
+    }
+    .s-delivered, .s-completed { background: #14532d; color: #bbf7d0; }
+    .s-cancelled { background: #7f1d1d; color: #fecaca; }
+    .s-open { background: #78350f; color: #fde68a; }
+    .s-accepted { background: #1e3a5f; color: #93c5fd; }
+    .s-picked-up { background: #713f12; color: #fde68a; }
   `]
 })
 export class RiderJobsComponent implements OnInit {

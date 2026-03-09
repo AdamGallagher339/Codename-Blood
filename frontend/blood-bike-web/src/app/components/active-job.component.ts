@@ -11,115 +11,111 @@ import { Job } from '../models/job.model';
   standalone: true,
   imports: [CommonModule, ReceiptDialogComponent],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <h1>🏍️ Active Job</h1>
-        <button class="back-btn" (click)="goBack()">← Back to Jobs</button>
-      </div>
+    <div class="aj-page">
+      <!-- Back -->
+      <button class="btn-back" (click)="goBack()">‹ Jobs</button>
 
       <!-- No active job -->
-      <div *ngIf="!activeJob" class="no-job-card">
-        <div class="no-job-icon">📭</div>
-        <h2>No Active Job</h2>
-        <p>You don't have an active job right now. Go to the Jobs page to accept one.</p>
-        <button class="btn-primary" (click)="goBack()">View Available Jobs</button>
+      <div *ngIf="!activeJob" class="empty-card">
+        <div class="empty-icon">📭</div>
+        <div class="empty-title">No Active Job</div>
+        <div class="empty-sub">Accept a job from the Jobs page to get started.</div>
+        <button class="btn-primary" (click)="goBack()">View Jobs</button>
       </div>
 
-      <!-- Active job card -->
-      <div *ngIf="activeJob" class="job-card">
-        <!-- Status banner -->
-        <div class="status-banner" [class]="'status-' + activeJob.status">
-          <span class="status-icon">
+      <!-- Active job -->
+      <ng-container *ngIf="activeJob">
+        <!-- Status hero -->
+        <div class="status-hero" [class]="'hero-' + activeJob.status">
+          <span class="hero-icon">
             {{ activeJob.status === 'accepted' ? '📋' : activeJob.status === 'picked-up' ? '📦' : '✅' }}
           </span>
-          <span class="status-text">{{ statusLabel }}</span>
+          <span class="hero-label">{{ statusLabel }}</span>
         </div>
 
-        <!-- Job details -->
-        <div class="job-details">
-          <h2 class="job-title">{{ activeJob.title }}</h2>
-          <div class="detail-grid">
-            <div class="detail-item">
-              <span class="detail-label">📍 Pickup</span>
-              <span class="detail-value">{{ activeJob.pickup?.address || '—' }}</span>
+        <!-- Job title -->
+        <h2 class="aj-title">{{ activeJob.title }}</h2>
+
+        <!-- Route card -->
+        <div class="route-card">
+          <div class="route-point pickup">
+            <span class="route-dot"></span>
+            <div class="route-info">
+              <span class="route-label">Pickup</span>
+              <span class="route-addr">{{ activeJob.pickup?.address || '—' }}</span>
             </div>
-            <div class="detail-item">
-              <span class="detail-label">🏁 Delivery</span>
-              <span class="detail-value">{{ activeJob.dropoff?.address || '—' }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">👤 Dispatched By</span>
-              <span class="detail-value">{{ activeJob.createdBy }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">🕐 Created</span>
-              <span class="detail-value">{{ activeJob.timestamps?.created | date:'medium' }}</span>
-            </div>
-            <div class="detail-item" *ngIf="activeJob.timestamps?.pickedUp">
-              <span class="detail-label">📦 Picked Up</span>
-              <span class="detail-value">{{ activeJob.timestamps.pickedUp | date:'medium' }}</span>
+          </div>
+          <div class="route-line"></div>
+          <div class="route-point dropoff">
+            <span class="route-dot"></span>
+            <div class="route-info">
+              <span class="route-label">Delivery</span>
+              <span class="route-addr">{{ activeJob.dropoff?.address || '—' }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Map placeholder -->
-        <div class="map-placeholder">
-          <div class="map-icon">🗺️</div>
-          <p>Delivery route will be displayed here</p>
+        <!-- Details chips -->
+        <div class="detail-chips">
+          <div class="chip">
+            <span class="chip-label">Dispatched by</span>
+            <span class="chip-value">{{ activeJob.createdBy }}</span>
+          </div>
+          <div class="chip">
+            <span class="chip-label">Created</span>
+            <span class="chip-value">{{ activeJob.timestamps?.created | date:'shortTime' }}</span>
+          </div>
+          <div class="chip" *ngIf="activeJob.timestamps?.pickedUp">
+            <span class="chip-label">Picked up</span>
+            <span class="chip-value">{{ activeJob.timestamps!.pickedUp | date:'shortTime' }}</span>
+          </div>
         </div>
 
-        <!-- Action buttons -->
-        <div class="action-buttons">
-          <!-- Pickup button: shown when status is 'accepted' -->
-          <button
-            *ngIf="activeJob.status === 'accepted'"
-            class="action-btn pickup-btn"
-            (click)="onPickup()"
-            [disabled]="processing"
-          >
-            <span class="btn-icon">📦</span>
-            <span class="btn-label">Parcel Picked Up</span>
-            <span class="btn-hint">Confirm you have collected the parcel</span>
-          </button>
-
-          <!-- Delivered button: shown when status is 'picked-up' -->
-          <button
-            *ngIf="activeJob.status === 'picked-up'"
-            class="action-btn delivered-btn"
-            (click)="onDelivered()"
-            [disabled]="processing"
-          >
-            <span class="btn-icon">✅</span>
-            <span class="btn-label">Parcel Delivered</span>
-            <span class="btn-hint">Confirm you have delivered the parcel</span>
-          </button>
-        </div>
+        <!-- Action button -->
+        <button
+          *ngIf="activeJob.status === 'accepted'"
+          class="btn-action pickup"
+          (click)="onPickup()"
+          [disabled]="processing"
+        >
+          <span class="action-icon">📦</span>
+          <span class="action-label">Parcel Picked Up</span>
+        </button>
+        <button
+          *ngIf="activeJob.status === 'picked-up'"
+          class="btn-action deliver"
+          (click)="onDelivered()"
+          [disabled]="processing"
+        >
+          <span class="action-icon">✅</span>
+          <span class="action-label">Parcel Delivered</span>
+        </button>
 
         <!-- Timeline -->
         <div class="timeline">
-          <div class="timeline-item" [class.done]="true">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-              <strong>Job Accepted</strong>
-              <span>{{ activeJob.timestamps?.updated | date:'short' }}</span>
+          <div class="tl-step" [class.done]="true">
+            <div class="tl-dot"></div>
+            <div class="tl-body">
+              <span class="tl-title">Accepted</span>
+              <span class="tl-time">{{ activeJob.timestamps?.updated | date:'shortTime' }}</span>
             </div>
           </div>
-          <div class="timeline-item" [class.done]="activeJob.status === 'picked-up' || activeJob.status === 'delivered'">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-              <strong>Parcel Picked Up</strong>
-              <span>{{ activeJob.timestamps?.pickedUp ? (activeJob.timestamps.pickedUp | date:'short') : 'Pending' }}</span>
+          <div class="tl-step" [class.done]="activeJob.status === 'picked-up' || activeJob.status === 'delivered'">
+            <div class="tl-dot"></div>
+            <div class="tl-body">
+              <span class="tl-title">Picked Up</span>
+              <span class="tl-time">{{ activeJob.timestamps?.pickedUp ? (activeJob.timestamps.pickedUp | date:'shortTime') : 'Pending' }}</span>
             </div>
           </div>
-          <div class="timeline-item" [class.done]="activeJob.status === 'delivered'">
-            <div class="timeline-dot"></div>
-            <div class="timeline-content">
-              <strong>Parcel Delivered</strong>
-              <span>{{ activeJob.timestamps?.delivered ? (activeJob.timestamps.delivered | date:'short') : 'Pending' }}</span>
+          <div class="tl-step" [class.done]="activeJob.status === 'delivered'">
+            <div class="tl-dot"></div>
+            <div class="tl-body">
+              <span class="tl-title">Delivered</span>
+              <span class="tl-time">{{ activeJob.timestamps?.delivered ? (activeJob.timestamps.delivered | date:'shortTime') : 'Pending' }}</span>
             </div>
           </div>
         </div>
-      </div>
+      </ng-container>
 
       <!-- Receipt dialog -->
       <app-receipt-dialog
@@ -132,168 +128,185 @@ import { Job } from '../models/job.model';
     </div>
   `,
   styles: [`
-    .page-container {
-      padding: 16px;
-      max-width: 600px;
+    .aj-page {
+      padding: 1rem;
+      max-width: 500px;
       margin: 0 auto;
     }
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    .page-header h1 { margin: 0; font-size: 1.4em; }
-    .back-btn {
-      padding: 8px 16px;
-      background: #6c757d;
-      color: white;
+
+    /* ── Back ── */
+    .btn-back {
+      background: none;
       border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9em;
-    }
-    .back-btn:hover { background: #5a6268; }
-
-    .no-job-card {
-      text-align: center;
-      padding: 40px 20px;
-      background: #f8f9fa;
-      border-radius: 12px;
-      border: 2px dashed #ddd;
-    }
-    .no-job-icon { font-size: 3em; margin-bottom: 12px; }
-    .no-job-card h2 { margin: 0 0 8px; color: #555; }
-    .no-job-card p { color: #777; margin-bottom: 20px; }
-    .btn-primary {
-      padding: 12px 24px;
-      background: #dc3545;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 1em;
-      font-weight: 600;
-    }
-    .btn-primary:hover { background: #c82333; }
-
-    .job-card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-      overflow: hidden;
-    }
-
-    .status-banner {
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: white;
-      font-weight: 600;
-      font-size: 1.1em;
-    }
-    .status-accepted { background: #007bff; }
-    .status-picked-up { background: #fd7e14; }
-    .status-delivered { background: #28a745; }
-    .status-icon { font-size: 1.3em; }
-
-    .job-details { padding: 20px; }
-    .job-title { margin: 0 0 16px; font-size: 1.3em; color: #333; }
-    .detail-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-    .detail-item {
-      display: flex;
-      flex-direction: column;
-      background: #f8f9fa;
-      padding: 10px 14px;
-      border-radius: 8px;
-    }
-    .detail-label { font-size: 0.85em; color: #666; font-weight: 600; margin-bottom: 2px; }
-    .detail-value { font-size: 1em; color: #333; }
-
-    .map-placeholder {
-      margin: 0 20px;
-      padding: 30px;
-      background: #e9ecef;
-      border-radius: 8px;
-      text-align: center;
       color: #888;
-      border: 2px dashed #ccc;
-    }
-    .map-icon { font-size: 2em; margin-bottom: 8px; }
-    .map-placeholder p { margin: 0; font-size: 0.95em; }
-
-    .action-buttons {
-      padding: 20px;
-    }
-    .action-btn {
-      width: 100%;
-      padding: 18px 20px;
-      border: none;
-      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 600;
       cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.2s;
-      color: white;
+      padding: 4px 0;
+      margin-bottom: 1rem;
+      -webkit-tap-highlight-color: transparent;
     }
-    .action-btn:active { transform: scale(0.98); }
-    .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .pickup-btn { background: linear-gradient(135deg, #fd7e14, #e06900); }
-    .pickup-btn:hover:not(:disabled) { background: linear-gradient(135deg, #e06900, #c05800); }
-    .delivered-btn { background: linear-gradient(135deg, #28a745, #1e7e34); }
-    .delivered-btn:hover:not(:disabled) { background: linear-gradient(135deg, #1e7e34, #155d27); }
-    .btn-icon { font-size: 2em; }
-    .btn-label { font-size: 1.2em; font-weight: 700; }
-    .btn-hint { font-size: 0.85em; opacity: 0.9; }
+    .btn-back:hover { color: #fff; }
 
-    .timeline {
-      padding: 20px;
-      border-top: 1px solid #eee;
+    /* ── Empty State ── */
+    .empty-card {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      background: #1a1a1a;
+      border-radius: 20px;
+      border: 1px solid #2a2a2a;
     }
-    .timeline-item {
+    .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .empty-title { font-size: 1.2rem; font-weight: 700; color: #ccc; margin-bottom: 0.35rem; }
+    .empty-sub { font-size: 0.85rem; color: #666; margin-bottom: 1.25rem; }
+    .btn-primary {
+      padding: 10px 24px;
+      border-radius: 20px;
+      border: none;
+      background: var(--color-red, #dc143c);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    /* ── Status Hero ── */
+    .status-hero {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 16px;
+      margin-bottom: 1rem;
+    }
+    .hero-icon { font-size: 1.5rem; }
+    .hero-label { font-weight: 700; font-size: 1rem; color: #fff; }
+    .hero-accepted { background: linear-gradient(135deg, #1e3a5f, #1e40af); }
+    .hero-picked-up { background: linear-gradient(135deg, #713f12, #a16207); }
+    .hero-delivered { background: linear-gradient(135deg, #0d3320, #14532d); }
+
+    /* ── Title ── */
+    .aj-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 0 1rem;
+    }
+
+    /* ── Route Card ── */
+    .route-card {
+      background: #1a1a1a;
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid #2a2a2a;
+      margin-bottom: 1rem;
+    }
+    .route-point {
       display: flex;
       align-items: flex-start;
+      gap: 12px;
+    }
+    .route-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+    .pickup .route-dot { background: #4ade80; }
+    .dropoff .route-dot { background: var(--color-red, #dc143c); }
+    .route-info { display: flex; flex-direction: column; }
+    .route-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
+    .route-addr { font-size: 0.9rem; color: #ccc; }
+    .route-line {
+      width: 2px;
+      height: 16px;
+      background: #333;
+      margin-left: 5px;
+    }
+
+    /* ── Detail Chips ── */
+    .detail-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .chip {
+      display: flex;
+      flex-direction: column;
+      padding: 8px 14px;
+      background: #1a1a1a;
+      border-radius: 10px;
+      border: 1px solid #2a2a2a;
+      flex: 1;
+      min-width: 100px;
+    }
+    .chip-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #666; }
+    .chip-value { font-size: 0.85rem; color: #ccc; font-weight: 500; }
+
+    /* ── Action Buttons ── */
+    .btn-action {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 18px;
+      border: none;
+      border-radius: 16px;
+      cursor: pointer;
+      color: #fff;
+      margin-bottom: 1.25rem;
+      transition: transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-action:active:not(:disabled) { transform: scale(0.97); }
+    .btn-action:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-action.pickup { background: linear-gradient(135deg, #d97706, #b45309); }
+    .btn-action.deliver { background: linear-gradient(135deg, #16a34a, #15803d); }
+    .action-icon { font-size: 1.5rem; }
+    .action-label { font-size: 1.1rem; font-weight: 700; }
+
+    /* ── Timeline ── */
+    .timeline {
+      padding: 16px;
+      background: #1a1a1a;
+      border-radius: 14px;
+      border: 1px solid #2a2a2a;
+    }
+    .tl-step {
+      display: flex;
+      align-items: center;
       gap: 12px;
       padding: 8px 0;
       position: relative;
     }
-    .timeline-item:not(:last-child)::after {
+    .tl-step:not(:last-child) {
+      padding-bottom: 20px;
+    }
+    .tl-step:not(:last-child)::after {
       content: '';
       position: absolute;
-      left: 8px;
-      top: 28px;
-      bottom: -8px;
+      left: 7px;
+      top: 26px;
+      bottom: 0;
       width: 2px;
-      background: #ddd;
+      background: #333;
     }
-    .timeline-item.done:not(:last-child)::after { background: #28a745; }
-    .timeline-dot {
-      width: 18px;
-      height: 18px;
+    .tl-step.done:not(:last-child)::after { background: #4ade80; }
+    .tl-dot {
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
-      background: #ddd;
+      background: #333;
       flex-shrink: 0;
-      margin-top: 2px;
     }
-    .timeline-item.done .timeline-dot { background: #28a745; }
-    .timeline-content {
-      display: flex;
-      flex-direction: column;
-      font-size: 0.95em;
-    }
-    .timeline-content strong { color: #333; }
-    .timeline-content span { color: #888; font-size: 0.88em; }
-
-    @media (min-width: 500px) {
-      .detail-grid { grid-template-columns: 1fr 1fr; }
-    }
+    .tl-step.done .tl-dot { background: #4ade80; }
+    .tl-body { display: flex; flex-direction: column; }
+    .tl-title { font-size: 0.85rem; font-weight: 600; color: #ccc; }
+    .tl-time { font-size: 0.75rem; color: #666; }
+    .tl-step.done .tl-title { color: #fff; }
   `]
 })
 export class ActiveJobComponent implements OnInit, OnDestroy {
