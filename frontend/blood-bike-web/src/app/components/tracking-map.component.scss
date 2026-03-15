@@ -121,7 +121,6 @@
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid #f0f0f0;
@@ -132,31 +131,6 @@
     font-size: var(--font-size-lg);
     font-weight: 700;
     color: var(--color-text-dark);
-  }
-
-  .toggle-btn {
-    background: transparent;
-    border: none;
-    color: var(--color-text-dark);
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--border-radius-lg);
-    transition: all var(--transition-fast);
-    -webkit-tap-highlight-color: transparent;
-
-    &:hover {
-      background: var(--color-light-gray);
-    }
-
-    &:active {
-      transform: scale(0.95);
-    }
   }
 }
 
