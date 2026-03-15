@@ -1,0 +1,144 @@
+<div class="analytics-page">
+  <!-- Header with stats -->
+  <app-dashboard-page-header
+    title="📊 Analytics"
+    subtitle="Track rider performance and speed metrics"
+    [stats]="headerStats()"
+  >
+    <div headerActions class="header-actions">
+      <span class="refresh-badge" *ngIf="lastRefresh()">
+        Updated {{ lastRefresh() | date:'HH:mm:ss' }}
+      </span>
+    </div>
+  </app-dashboard-page-header>
+
+  <div class="analytics-container">
+    <!-- Rider selector (fleet managers / dispatchers only) -->
+    <div class="rider-selector" *ngIf="canViewAll()">
+      <label for="rider-select">View Rider:</label>
+      <select id="rider-select" [(ngModel)]="selectedRider" (ngModelChange)="onRiderChange()">
+        <option value="">— Select a rider —</option>
+        <option *ngFor="let r of riders()" [value]="r.id">{{ r.name }}</option>
+      </select>
+      <span class="hint" *ngIf="riders().length === 0">Loading riders…</span>
+    </div>
+
+    <!-- No rider selected state -->
+    <app-empty-state
+      *ngIf="!selectedRider && canViewAll()"
+      icon="👤"
+      title="No Rider Selected"
+      message="Choose a rider from the dropdown above to view their analytics and performance metrics">
+    </app-empty-state>
+
+    <!-- Loading state -->
+    <div class="loading" *ngIf="loading() && selectedRider">
+      <div class="spinner"></div>
+      Loading analytics…
+    </div>
+
+    <!-- Error state -->
+    <div class="error" *ngIf="error()">
+      ⚠️ {{ error() }}
+    </div>
+
+    <!-- Main analytics content -->
+    <div class="analytics-content" *ngIf="summary() && selectedRider">
+      <!-- Speed metrics cards -->
+      <app-section-card title="📊 Speed Metrics" class="metrics-section">
+        <div class="metrics-grid">
+          <div class="metric-card highlight">
+            <div class="metric-icon">⚡</div>
+            <div class="metric-value">{{ summary()!.currentSpeedKph | number:'1.0-1' }}</div>
+            <div class="metric-unit">km/h</div>
+            <div class="metric-label">Current Speed</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">🏎️</div>
+            <div class="metric-value">{{ summary()!.topSpeedKph | number:'1.0-1' }}</div>
+            <div class="metric-unit">km/h</div>
+            <div class="metric-label">Top Speed</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">📈</div>
+            <div class="metric-value">{{ summary()!.avgSpeedKph | number:'1.0-1' }}</div>
+            <div class="metric-unit">km/h</div>
+            <div class="metric-label">Average Speed</div>
+          </div>
+        </div>
+      </app-section-card>
+
+      <!-- Distance & time metrics -->
+      <app-section-card title="⏱️ Journey Metrics" class="metrics-section">
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-icon">📍</div>
+            <div class="metric-value">{{ summary()!.totalDistanceKm | number:'1.0-2' }}</div>
+            <div class="metric-unit">km</div>
+            <div class="metric-label">Total Distance</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">⏱️</div>
+            <div class="metric-value">{{ summary()!.activeTimeMinutes | number:'1.0-0' }}</div>
+            <div class="metric-unit">min</div>
+            <div class="metric-label">Active Time</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-icon">📡</div>
+            <div class="metric-value">{{ summary()!.dataPoints }}</div>
+            <div class="metric-unit">pts</div>
+            <div class="metric-label">GPS Points</div>
+          </div>
+        </div>
+      </app-section-card>
+
+      <!-- Speed over time chart -->
+      <app-section-card title="📈 Speed Over Time" class="chart-section" *ngIf="speedHistory().length > 1">
+        <div class="chart-container">
+          <svg [attr.viewBox]="'0 0 ' + chartW + ' ' + chartH" preserveAspectRatio="none" class="chart-svg">
+            <defs>
+              <linearGradient id="speedGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#dc3545" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#dc3545" stop-opacity="0.03"/>
+              </linearGradient>
+            </defs>
+            <!-- Y-axis grid lines & labels -->
+            <g *ngFor="let tick of yTicks()">
+              <line [attr.x1]="labelW" [attr.y1]="tick.y" [attr.x2]="chartW - padR" [attr.y2]="tick.y"
+                    stroke="#eee" stroke-width="1"/>
+              <text [attr.x]="labelW - 4" [attr.y]="tick.y + 4" text-anchor="end"
+                    font-size="10" fill="#999">{{ tick.label }}</text>
+            </g>
+            <!-- Area fill -->
+            <polygon [attr.points]="areaPoints()" fill="url(#speedGrad)"/>
+            <!-- Speed line -->
+            <polyline [attr.points]="linePoints()" fill="none" stroke="#dc3545" stroke-width="2"
+                      stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+          <div class="chart-x-labels">
+            <span>{{ speedHistory()[0]?.timestamp | date:'HH:mm' }}</span>
+            <span>{{ speedHistory()[speedHistory().length - 1]?.timestamp | date:'HH:mm' }}</span>
+          </div>
+        </div>
+        <div class="chart-legend">Speed progression over session time</div>
+      </app-section-card>
+
+      <!-- Empty chart state -->
+      <app-empty-state
+        *ngIf="speedHistory().length <= 1"
+        icon="📊"
+        title="Building Speed History"
+        message="Speed chart appears once the rider starts moving and accumulates tracking data">
+      </app-empty-state>
+
+      <!-- Last known position -->
+      <div class="last-position" *ngIf="summary()!.lastLat !== 0">
+        <small>
+          📌 Last position: {{ summary()!.lastLat | number:'1.4-4' }},
+          {{ summary()!.lastLng | number:'1.4-4' }}
+          &nbsp;·&nbsp; {{ summary()!.lastSeen | date:'HH:mm:ss' }}
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
