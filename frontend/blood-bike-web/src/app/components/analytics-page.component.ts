@@ -431,7 +431,167 @@ interface ChartPoint { x: number; y: number }
       padding: 0 var(--spacing-lg);
     }
 
-    /* ─────────────────────────────────────────────── Responsive Design ─────────────────────────────────────────────── */
+    /* ─────────────────────────────────────────────── Advanced Animations ─────────────────────────────────────────────── */
+
+    /* Staggered animation for metric cards */
+    .metrics-grid .metric-card {
+      @for $i from 0 through 6 {
+        &:nth-child(#{$i}) {
+          animation: slideUp 0.4s ease-out backwards;
+          animation-delay: #{$i * 50}ms;
+        }
+      }
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: -1000px 0;
+      }
+      100% {
+        background-position: 1000px 0;
+      }
+    }
+
+    /* Loading skeleton effect */
+    .skeleton {
+      background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+    }
+
+    /* Smooth hover interactions */
+    .metric-card {
+      position: relative;
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), transparent);
+        opacity: 0;
+        transition: opacity var(--transition-fast);
+        pointer-events: none;
+        border-radius: var(--border-radius-lg);
+      }
+
+      &:hover::before {
+        opacity: 1;
+      }
+    }
+
+    /* Chart line animation */
+    .chart-svg polyline {
+      animation: drawLine 0.8s ease-out forwards;
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+    }
+
+    @keyframes drawLine {
+      to {
+        stroke-dashoffset: 0;
+      }
+    }
+
+    /* Focus states for better accessibility */
+    button, select, input {
+      &:focus-visible {
+        outline: 2px solid var(--color-red);
+        outline-offset: 2px;
+        border-radius: var(--border-radius-md);
+      }
+    }
+
+    /* Smooth transitions for metric values */
+    .metric-value,
+    .metric-unit,
+    .metric-label {
+      display: block;
+    }
+
+    /* Enhanced card depth on hover */
+    .metric-card {
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+
+      &:hover {
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      }
+    }
+
+    .chart-card {
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Text selection improvements */
+    .metric-value,
+    .metric-label,
+    .refresh-badge {
+      user-select: text;
+      -webkit-user-select: text;
+    }
+
+    /* Color transitions for status indicators */
+    .metric-card.highlight {
+      border-color: var(--color-red);
+
+      &:hover {
+        border-color: #b01030;
+      }
+    }
+
+    /* Ripple effect on tap (mobile) */
+    @media (pointer: coarse) {
+      .metric-card {
+        &:active {
+          transform: scale(0.98);
+        }
+      }
+    }
+
+    /* ──────────────────────────────────────────────────────────────────────────── */
+
+    /* ─────────────────────────────────────────────── Enhanced Responsive Design ─────────────────────────────────────────────── */
+    /* ─────────────────────────────────────────────── Enhanced Responsive Design ─────────────────────────────────────────────── */
+
+    @media (max-width: 1024px) {
+      .metrics-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
     @media (max-width: 768px) {
       .analytics-header {
         padding: var(--spacing-md);
@@ -442,6 +602,11 @@ interface ChartPoint { x: number; y: number }
 
       h1 {
         font-size: var(--font-size-xl);
+        margin-bottom: 0;
+      }
+
+      .refresh-badge {
+        font-size: 10px;
       }
 
       .analytics-page > :not(.analytics-header) {
@@ -451,10 +616,11 @@ interface ChartPoint { x: number; y: number }
       .rider-selector {
         width: calc(100% - var(--spacing-md) * 2);
         padding: var(--spacing-md);
+        gap: var(--spacing-sm);
 
         select {
           flex: 1;
-          min-width: 150px;
+          min-width: 140px;
         }
       }
 
@@ -465,10 +631,31 @@ interface ChartPoint { x: number; y: number }
 
       .metric-card {
         padding: var(--spacing-md);
+
+        .metric-icon {
+          font-size: var(--font-size-xl);
+        }
+
+        .metric-value {
+          font-size: var(--font-size-xl);
+        }
+
+        .metric-unit {
+          font-size: 11px;
+        }
+
+        .metric-label {
+          font-size: 11px;
+        }
       }
 
       .chart-card {
         padding: var(--spacing-md);
+
+        h2 {
+          font-size: var(--font-size-base);
+          margin-bottom: var(--spacing-md);
+        }
       }
 
       .chart-svg {
@@ -476,22 +663,53 @@ interface ChartPoint { x: number; y: number }
       }
 
       .chart-x-labels {
-        padding: var(--spacing-sm) 0;
+        font-size: 10px;
+        padding: var(--spacing-xs) 0;
+      }
+
+      .chart-legend {
+        font-size: 11px;
+        margin-top: var(--spacing-sm);
+      }
+
+      .empty-chart {
+        padding: var(--spacing-lg) var(--spacing-md);
+      }
+
+      .empty-chart p {
+        font-size: 13px;
+      }
+
+      .last-position {
+        padding: 0 var(--spacing-md);
+        font-size: 11px;
+      }
+
+      .no-data,
+      .loading,
+      .error {
+        padding: var(--spacing-lg) var(--spacing-md);
+        font-size: 14px;
       }
     }
 
     @media (max-width: 480px) {
       .analytics-header {
         padding: var(--spacing-sm);
+        gap: 0;
+        margin-bottom: 0;
       }
 
       h1 {
         font-size: var(--font-size-lg);
+        margin-bottom: var(--spacing-xs);
       }
 
       .refresh-badge {
-        font-size: 10px;
-        padding: 1px 4px;
+        font-size: 9px;
+        padding: 1px 3px;
+        align-self: flex-start;
+        margin-top: var(--spacing-xs);
       }
 
       .analytics-page > :not(.analytics-header) {
@@ -504,16 +722,18 @@ interface ChartPoint { x: number; y: number }
         align-items: stretch;
         padding: var(--spacing-sm);
         gap: var(--spacing-xs);
+        border-radius: var(--border-radius-md);
       }
 
       .rider-selector label {
-        font-size: var(--font-size-xs);
+        font-size: 12px;
       }
 
       .rider-selector select {
         width: 100%;
-        font-size: var(--font-size-xs);
+        font-size: 13px;
         padding: var(--spacing-xs) var(--spacing-sm);
+        border-radius: var(--border-radius-sm);
       }
 
       .metrics-grid {
@@ -523,50 +743,92 @@ interface ChartPoint { x: number; y: number }
 
       .metric-card {
         padding: var(--spacing-sm);
-      }
+        border-radius: var(--border-radius-md);
 
-      .metric-icon {
-        font-size: var(--font-size-xl);
-      }
+        .metric-icon {
+          font-size: var(--font-size-lg);
+          margin-bottom: 4px;
+        }
 
-      .metric-value {
-        font-size: var(--font-size-lg);
-      }
+        .metric-value {
+          font-size: var(--font-size-lg);
+        }
 
-      .metric-unit {
-        font-size: 10px;
-      }
+        .metric-unit {
+          font-size: 9px;
+          margin-bottom: 2px;
+        }
 
-      .metric-label {
-        font-size: 9px;
+        .metric-label {
+          font-size: 10px;
+        }
       }
 
       .chart-card {
         padding: var(--spacing-sm);
+        border-radius: var(--border-radius-md);
+      }
+
+      .chart-card h2 {
+        font-size: 13px;
+        margin-bottom: var(--spacing-sm);
+      }
+
+      .chart-container {
+        padding: var(--spacing-sm);
+        border-radius: var(--border-radius-sm);
       }
 
       .chart-svg {
-        height: 140px;
+        height: 120px;
+      }
+
+      .chart-x-labels {
+        font-size: 9px;
+        padding: 2px 0;
+      }
+
+      .chart-legend {
+        font-size: 10px;
+        margin-top: var(--spacing-xs);
       }
 
       .empty-chart {
-        padding: var(--spacing-lg) var(--spacing-sm);
+        padding: var(--spacing-md) var(--spacing-sm);
+        border-radius: var(--border-radius-md);
       }
 
       .empty-chart p {
-        font-size: 11px;
+        font-size: 12px;
+        margin: 4px 0;
+
+        &.hint {
+          font-size: 10px;
+        }
       }
 
       .last-position {
         padding: 0 var(--spacing-sm);
         font-size: 9px;
       }
+
+      .no-data,
+      .loading,
+      .error {
+        padding: var(--spacing-md) var(--spacing-sm);
+        font-size: 13px;
+        border-radius: var(--border-radius-md);
+      }
     }
 
-    /* ─────────────────────────────────────────────── Touch Device Optimizations ─────────────────────────────────────────────── */
+    /* ─────────────────────────────────────────────── Touch & Accessibility ─────────────────────────────────────────────── */
+
     @media (hover: none) and (pointer: coarse) {
-      .metric-card:active {
-        opacity: 0.8;
+      .metric-card {
+        &:active {
+          opacity: 0.9;
+          transform: scale(0.98);
+        }
       }
 
       select {
@@ -574,29 +836,82 @@ interface ChartPoint { x: number; y: number }
       }
     }
 
-    /* ─────────────────────────────────────────────── Accessibility ─────────────────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
-      * {
+      *,
+      *::before,
+      *::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
       }
     }
 
-    ::-webkit-scrollbar {
-      width: 8px;
+    @media (prefers-color-scheme: dark) {
+      .analytics-page {
+        background: #1a1a1a;
+      }
+
+      .analytics-header,
+      .rider-selector,
+      .metric-card,
+      .chart-card,
+      .no-data,
+      .loading,
+      .error {
+        background: #2a2a2a;
+        border-color: #3a3a3a;
+        color: #e0e0e0;
+      }
+
+      h1 {
+        color: #fff;
+      }
+
+      .metric-value {
+        color: #fff;
+      }
+
+      .refresh-badge {
+        background: #1a1a1a;
+        color: #bbb;
+      }
+
+      .chart-container {
+        background: #1a1a1a;
+      }
+
+      .empty-chart {
+        background: #1a1a1a;
+        border-color: #3a3a3a;
+        color: #bbb;
+      }
+
+      .chart-x-labels,
+      .chart-legend,
+      .last-position,
+      .hint {
+        color: #999;
+      }
+
+      input, select {
+        background: #1a1a1a;
+        color: #e0e0e0;
+        border-color: #3a3a3a;
+
+        &:focus {
+          border-color: var(--color-red);
+        }
+      }
     }
 
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
+    /* High contrast mode support */
+    @media (prefers-contrast: more) {
+      .metric-card {
+        border-width: 2px;
+      }
 
-    ::-webkit-scrollbar-thumb {
-      background: #ddd;
-      border-radius: 4px;
-
-      &:hover {
-        background: #bbb;
+      button, select {
+        font-weight: 700;
       }
     }
   `]
