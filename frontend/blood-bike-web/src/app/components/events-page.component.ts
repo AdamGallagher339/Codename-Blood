@@ -2,13 +2,25 @@ import { Component, signal, computed, viewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CalendarComponent } from './calendar.component';
 import { EventFormComponent } from './event-form.component';
+import { DashboardPageHeaderComponent, PageStat } from './dashboard-page-header.component';
+import { SectionCardComponent } from './section-card.component';
+import { SummaryStatCardComponent } from './summary-stat-card.component';
+import { EmptyStateComponent } from './empty-state.component';
 import { EventService } from '../services/event.service';
 import { Event, CreateEventDto } from '../models/event.model';
 
 @Component({
   selector: 'app-events-page',
   standalone: true,
-  imports: [CommonModule, CalendarComponent, EventFormComponent],
+  imports: [
+    CommonModule,
+    CalendarComponent,
+    EventFormComponent,
+    DashboardPageHeaderComponent,
+    SectionCardComponent,
+    SummaryStatCardComponent,
+    EmptyStateComponent
+  ],
   templateUrl: './events-page.component.html',
   styleUrl: './events-page.component.scss'
 })
@@ -21,6 +33,48 @@ export class EventsPageComponent {
   viewMode = signal<'calendar' | 'list'>('calendar');
   
   events = this.eventService.getEvents();
+  
+  // Computed stats for header
+  totalEvents = computed(() => this.events().length);
+
+  todayEvents = computed(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return this.events().filter(e => {
+      const eventDate = new Date(e.date);
+      eventDate.setHours(0, 0, 0, 0);
+      return eventDate.getTime() === today.getTime();
+    }).length;
+  });
+
+  upcomingCount = computed(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return this.events().filter(e => new Date(e.date) >= today).length;
+  });
+
+  headerStats = computed((): PageStat[] => [
+    {
+      icon: '📅',
+      label: 'Total Events',
+      value: this.totalEvents(),
+      color: 'blue'
+    },
+    {
+      icon: '🔔',
+      label: "Today's Events",
+      value: this.todayEvents(),
+      color: 'yellow'
+    },
+    {
+      icon: '⏭️',
+      label: 'Upcoming Events',
+      value: this.upcomingCount(),
+      color: 'green'
+    }
+  ]);
   
   selectedDateEvents = computed(() => {
     const date = this.selectedDate();

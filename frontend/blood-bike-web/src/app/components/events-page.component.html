@@ -1,10 +1,11 @@
 <div class="events-page">
-  <div class="page-header">
-    <div class="header-title">
-      <h2>📅 Events</h2>
-      <p>Manage your events and schedule</p>
-    </div>
-    <div class="header-actions">
+  <!-- Dashboard Header with Stats -->
+  <app-dashboard-page-header
+    title="Events"
+    subtitle="Plan, organize, and manage your events"
+    [stats]="headerStats()"
+  >
+    <div headerActions class="header-actions">
       <button class="btn-view-toggle" (click)="toggleViewMode()">
         {{ viewMode() === 'calendar' ? '📋 List View' : '📅 Calendar View' }}
       </button>
@@ -12,147 +13,119 @@
         ➕ Create Event
       </button>
     </div>
-  </div>
+  </app-dashboard-page-header>
   
-  <!-- Happening Soon Banner -->
-  <div class="happening-soon" *ngIf="soonestEvents().length > 0">
-    <div class="soon-header">
-      <div class="soon-title">
-        <span class="soon-icon">🔔</span>
-        <span>{{ soonestEvents().length === 1 ? '1 event' : soonestEvents().length + ' events' }} happening soon</span>
-      </div>
-      <button class="btn-view-all" (click)="viewMode.set('list')">
-        View all ›
-      </button>
-    </div>
-    <div class="soon-cards">
-      <div
-        *ngFor="let event of soonestEvents()"
-        class="soon-card"
-        [class]="getPriorityClass(event.priority)"
-      >
-        <div class="soon-card-date">
-          <span class="soon-day-label">{{ daysUntil(event.date) }}</span>
-          <span class="soon-date-text">{{ formatDate(event.date) }}</span>
-        </div>
-        <div class="soon-card-body">
-          <span class="soon-card-icon">{{ getEventTypeIcon(event.type) }}</span>
-          <div class="soon-card-info">
-            <strong>{{ event.title }}</strong>
-            <span>{{ formatTime(event.startTime) }} · {{ event.location }}</span>
+  <div class="events-container">
+    <!-- Upcoming Soon Banner -->
+    <div class="upcoming-banner" *ngIf="soonestEvents().length > 0">
+      <app-section-card [title]="'🔔 Next Up'">
+        <div class="soon-events-grid">
+          <div *ngFor="let event of soonestEvents()" class="soon-event-item" [class]="getPriorityClass(event.priority)">
+            <div class="soon-event-header">
+              <span class="soon-event-icon">{{ getEventTypeIcon(event.type) }}</span>
+              <div class="soon-event-info">
+                <h4>{{ event.title }}</h4>
+                <p class="soon-event-time">{{ daysUntil(event.date) }} · {{ formatTime(event.startTime) }}</p>
+              </div>
+            </div>
+            <div class="soon-event-badge">{{ event.priority }}</div>
           </div>
-          <span class="soon-card-badge">{{ event.priority }}</span>
         </div>
-      </div>
+      </app-section-card>
     </div>
-  </div>
 
-  <div class="events-content">
-    <!-- Calendar View -->
-    <div *ngIf="viewMode() === 'calendar'" class="calendar-section">
-      <app-calendar [events]="events()" (dateSelected)="onDateSelected($event)"></app-calendar>
-      
-      <div class="selected-date-events" *ngIf="selectedDate()">
-        <h3>Events on {{ formatDate(selectedDate()!) }}</h3>
-        
-        <div *ngIf="selectedDateEvents().length === 0" class="no-events">
-          <p>No events scheduled for this day</p>
-          <button class="btn-small" (click)="openCreateEventModal()">
-            Create Event
-          </button>
+    <!-- Main Content Area -->
+    <div class="events-content">
+      <!-- Calendar View -->
+      <div *ngIf="viewMode() === 'calendar'" class="view-section">
+        <div class="calendar-wrapper">
+          <app-calendar [events]="events()" (dateSelected)="onDateSelected($event)"></app-calendar>
         </div>
-        
-        <div class="events-list" *ngIf="selectedDateEvents().length > 0">
-          <div *ngFor="let event of selectedDateEvents()" class="event-card" [class]="getPriorityClass(event.priority)">
-            <div class="event-header">
-              <span class="event-icon">{{ getEventTypeIcon(event.type) }}</span>
-              <div class="event-info">
-                <h4>{{ event.title }}</h4>
-                <p class="event-time">
-                  {{ formatTime(event.startTime) }} - {{ formatTime(event.endTime) }}
-                </p>
-              </div>
-              <button class="btn-delete" (click)="deleteEvent(event.id)" title="Delete event">
-                🗑️
+
+        <!-- Selected Date Events -->
+        <app-section-card [title]="selectedDate() ? 'Events for ' + formatDate(selectedDate()!) : 'Select a Date'">
+          <div *ngIf="!selectedDate()" class="placeholder-content">
+            <app-empty-state
+              icon="📅"
+              title="No date selected"
+              message="Click on a date in the calendar to view events"
+            ></app-empty-state>
+          </div>
+
+          <div *ngIf="selectedDate() && selectedDateEvents().length === 0" class="no-events-content">
+            <app-empty-state
+              icon="✨"
+              title="No events scheduled"
+              message="This day is free! You can create a new event if needed."
+            >
+              <button class="btn-small" (click)="openCreateEventModal()">
+                Create Event
               </button>
-            </div>
-            
-            <div class="event-body">
-              <p *ngIf="event.description" class="event-description">
-                {{ event.description }}
-              </p>
-              <p class="event-location">
-                📍 {{ event.location }}
-              </p>
-              <div class="event-meta">
-                <span class="event-badge priority-badge">
-                  {{ event.priority }}
-                </span>
-                <span class="event-badge type-badge">
-                  {{ event.type }}
-                </span>
-                <span class="event-badge status-badge">
-                  {{ event.status }}
-                </span>
+            </app-empty-state>
+          </div>
+
+          <div class="events-list" *ngIf="selectedDate() && selectedDateEvents().length > 0">
+            <div *ngFor="let event of selectedDateEvents()" class="event-card-item" [class]="getPriorityClass(event.priority)">
+              <div class="event-card-header">
+                <span class="event-card-icon">{{ getEventTypeIcon(event.type) }}</span>
+                <div class="event-card-info">
+                  <h4>{{ event.title }}</h4>
+                  <p class="event-card-time">{{ formatTime(event.startTime) }} - {{ formatTime(event.endTime) }}</p>
+                </div>
               </div>
+              <div class="event-card-body">
+                <p *ngIf="event.description" class="event-card-description">{{ event.description }}</p>
+                <p class="event-card-location">📍 {{ event.location }}</p>
+                <div class="event-card-badges">
+                  <span class="badge" [class]="'badge-' + event.priority">{{ event.priority }}</span>
+                  <span class="badge badge-type">{{ event.type }}</span>
+                  <span class="badge badge-status">{{ event.status }}</span>
+                </div>
+              </div>
+              <button class="btn-delete" (click)="deleteEvent(event.id)" title="Delete event">🗑️</button>
             </div>
           </div>
-        </div>
+        </app-section-card>
       </div>
-    </div>
-    
-    <!-- List View -->
-    <div *ngIf="viewMode() === 'list'" class="list-section">
-      <div class="upcoming-events">
-        <h3>Upcoming Events</h3>
-        
-        <div *ngIf="upcomingEvents().length === 0" class="no-events">
-          <p>No upcoming events</p>
-          <button class="btn-small" (click)="openCreateEventModal()">
-            Create Your First Event
-          </button>
-        </div>
-        
-        <div class="events-list" *ngIf="upcomingEvents().length > 0">
-          <div *ngFor="let event of upcomingEvents()" class="event-card" [class]="getPriorityClass(event.priority)">
-            <div class="event-date-label">
-              {{ formatDate(event.date) }}
-            </div>
-            
-            <div class="event-header">
-              <span class="event-icon">{{ getEventTypeIcon(event.type) }}</span>
-              <div class="event-info">
-                <h4>{{ event.title }}</h4>
-                <p class="event-time">
-                  {{ formatTime(event.startTime) }} - {{ formatTime(event.endTime) }}
-                </p>
-              </div>
-              <button class="btn-delete" (click)="deleteEvent(event.id)" title="Delete event">
-                🗑️
+
+      <!-- List View -->
+      <div *ngIf="viewMode() === 'list'" class="view-section">
+        <app-section-card title="Upcoming Events">
+          <div *ngIf="upcomingEvents().length === 0" class="no-events-content">
+            <app-empty-state
+              icon="🎯"
+              title="No upcoming events"
+              message="Great! Your schedule is clear. Create new events as needed."
+            >
+              <button class="btn-small" (click)="openCreateEventModal()">
+                Create Your First Event
               </button>
-            </div>
-            
-            <div class="event-body">
-              <p *ngIf="event.description" class="event-description">
-                {{ event.description }}
-              </p>
-              <p class="event-location">
-                📍 {{ event.location }}
-              </p>
-              <div class="event-meta">
-                <span class="event-badge priority-badge">
-                  {{ event.priority }}
-                </span>
-                <span class="event-badge type-badge">
-                  {{ event.type }}
-                </span>
-                <span class="event-badge status-badge">
-                  {{ event.status }}
-                </span>
+            </app-empty-state>
+          </div>
+
+          <div class="events-list" *ngIf="upcomingEvents().length > 0">
+            <div *ngFor="let event of upcomingEvents()" class="event-card-item" [class]="getPriorityClass(event.priority)">
+              <div class="event-card-date-label">{{ formatDate(event.date) }}</div>
+              <div class="event-card-header">
+                <span class="event-card-icon">{{ getEventTypeIcon(event.type) }}</span>
+                <div class="event-card-info">
+                  <h4>{{ event.title }}</h4>
+                  <p class="event-card-time">{{ formatTime(event.startTime) }} - {{ formatTime(event.endTime) }}</p>
+                </div>
               </div>
+              <div class="event-card-body">
+                <p *ngIf="event.description" class="event-card-description">{{ event.description }}</p>
+                <p class="event-card-location">📍 {{ event.location }}</p>
+                <div class="event-card-badges">
+                  <span class="badge" [class]="'badge-' + event.priority">{{ event.priority }}</span>
+                  <span class="badge badge-type">{{ event.type }}</span>
+                  <span class="badge badge-status">{{ event.status }}</span>
+                </div>
+              </div>
+              <button class="btn-delete" (click)="deleteEvent(event.id)" title="Delete event">🗑️</button>
             </div>
           </div>
-        </div>
+        </app-section-card>
       </div>
     </div>
   </div>
