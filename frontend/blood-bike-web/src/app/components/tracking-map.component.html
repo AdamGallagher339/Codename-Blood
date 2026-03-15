@@ -1,21 +1,30 @@
-<div class="tracking-map-container">
-  <!-- Map Container -->
-  <div id="map" class="map-view"></div>
-
-  <!-- Connection Status Banner -->
-  <div class="status-banner" [class.connected]="connectionStatus === 'connected'" 
-       [class.connecting]="connectionStatus === 'connecting'"
-       [class.disconnected]="connectionStatus === 'disconnected'">
-    <span *ngIf="connectionStatus === 'connected'">🟢 Connected</span>
-    <span *ngIf="connectionStatus === 'connecting'">🟡 Connecting...</span>
-    <span *ngIf="connectionStatus === 'disconnected'">
-      🔴 Disconnected
-      <button (click)="reconnect()" class="reconnect-btn">Reconnect</button>
-    </span>
+<div class="tracking-map-page">
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="header-top">
+      <h1 class="page-title">🗺️ Map</h1>
+      <p class="page-subtitle">Live Tracking & Route Planning</p>
+    </div>
+    <!-- Connection Status Badge in Header -->
+    <div class="status-badge" [class.connected]="connectionStatus === 'connected'" 
+         [class.connecting]="connectionStatus === 'connecting'"
+         [class.disconnected]="connectionStatus === 'disconnected'">
+      <span *ngIf="connectionStatus === 'connected'">🟢 Connected</span>
+      <span *ngIf="connectionStatus === 'connecting'">🟡 Connecting...</span>
+      <span *ngIf="connectionStatus === 'disconnected'">
+        🔴 Disconnected
+        <button (click)="reconnect()" class="reconnect-btn">Reconnect</button>
+      </span>
+    </div>
   </div>
 
-  <!-- Info Panel -->
-  <div class="info-panel" [class.collapsed]="!showInfo">
+  <!-- Map Container -->
+  <div class="map-container">
+    <div id="map" class="map-view"></div>
+  </div>
+
+  <!-- Bottom Control Panel -->
+  <div class="bottom-panel">
     <div class="panel-header">
       <h3>Live Tracking</h3>
       <button (click)="toggleInfo()" class="toggle-btn">
