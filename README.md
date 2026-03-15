@@ -1,4 +1,4 @@
-# Codename Blood
+ # Codename Blood
 
 Blood Bike fleet + events tooling with live GPS tracking.
 
@@ -14,7 +14,6 @@ Blood Bike fleet + events tooling with live GPS tracking.
 ## Prerequisites
 
 ### Required
-
 | Tool | Version | Install |
 |------|---------|---------|
 | **Go** | `1.25.4` | [go.dev/dl](https://go.dev/dl/) |

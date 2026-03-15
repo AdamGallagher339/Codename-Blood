@@ -27,12 +27,9 @@
   <div class="bottom-panel">
     <div class="panel-header">
       <h3>Live Tracking</h3>
-      <button (click)="toggleInfo()" class="toggle-btn">
-        {{ showInfo ? '−' : '+' }}
-      </button>
     </div>
 
-    <div class="panel-content" *ngIf="showInfo">
+    <div class="panel-content">
       <!-- Controls -->
       <div class="controls">
         <button (click)="fitToAllMarkers()" class="control-btn">
