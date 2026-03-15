@@ -408,30 +408,59 @@
 
 
 /* Leaflet Popup Customization */
+:host ::ng-deep .leaflet-popup-content {
+  margin: 0 !important;
+}
+
 :global(.marker-popup) {
   font-family: inherit;
 
   h4 {
-    margin: 0 0 8px 0;
-    font-size: 14px;
-    color: #007bff;
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: var(--font-size-base);
+    font-weight: 700;
+    color: var(--color-text-dark);
   }
 
   p {
-    margin: 4px 0;
-    font-size: 12px;
-    color: #333;
+    margin: var(--spacing-xs) 0;
+    font-size: var(--font-size-sm);
+    color: #555;
 
     strong {
-      color: #666;
-      font-weight: 600;
+      color: var(--color-text-dark);
+      font-weight: 700;
     }
   }
 
   .stale-warning {
-    color: #dc3545;
-    font-weight: 600;
-    margin-top: 8px;
+    color: var(--color-red);
+    font-weight: 700;
+    margin-top: var(--spacing-md);
+  }
+}
+
+.popup-directions-btn {
+  width: 100%;
+  padding: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  background: var(--color-red);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-dark-red);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 }
 
@@ -1007,4 +1036,75 @@
   &:hover {
     background: #1432a0;
   }
+}
+
+/* ─── Accessibility & Focus States ──────────────────────────────────────── */
+
+button,
+input,
+select,
+textarea {
+  outline-offset: 2px;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-red);
+  }
+}
+
+input {
+  &:focus-visible {
+    outline-offset: -2px;
+  }
+}
+
+/* Enhanced Button States */
+.control-btn,
+.toggle-btn {
+  transition: all var(--transition-normal);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  min-height: 44px;
+  min-width: 44px;
+
+  &:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+}
+
+/* Enhanced Entity Item Interactions */
+.entity-item {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+
+  &:active:not(.stale) {
+    transform: scale(0.98);
+  }
+
+  &:not(.stale):hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* Empty State Styling */
+.no-entities {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  font-weight: 500;
+}
+
+/* Smooth Transitions */
+.status-badge {
+  transition: all var(--transition-fast);
+}
+
+.directions-section {
+  transition: all var(--transition-fast);
+}
+
+.entities-section {
+  transition: all var(--transition-fast);
 }
