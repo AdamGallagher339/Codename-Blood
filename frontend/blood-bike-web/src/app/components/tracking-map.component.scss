@@ -1348,3 +1348,22 @@ button {
               border-color var(--transition-normal),
               box-shadow var(--transition-normal);
 }
+
+/* ─── Hide Leaflet Default Controls ────────────────────────────────── */
+/* Remove Leaflet's built-in zoom buttons, layers control, and attribution for a cleaner map UI */
+
+:host ::ng-deep .leaflet-control-zoom {
+  display: none !important;
+}
+
+:host ::ng-deep .leaflet-control-layers {
+  display: none !important;
+}
+
+:host ::ng-deep .leaflet-control-attribution {
+  display: none !important;
+}
+
+:host ::ng-deep .leaflet-control-container {
+  display: none !important;
+}
