@@ -517,6 +517,162 @@
   }
 }
 
+/* ─────────────────────────────────────────────── Advanced Animations & Effects ─────────────────────────────────────────────── */
+
+/* Stagger animation for event lists */
+.events-list .event-card {
+  @for $i from 0 through 10 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * 30}ms;
+    }
+  }
+}
+
+.soon-cards .soon-card {
+  @for $i from 0 through 5 {
+    &:nth-child(#{$i}) {
+      animation: fadeInUp 0.4s ease-out backwards;
+      animation-delay: #{$i * 50}ms;
+    }
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Loading state */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Button focus state for accessibility */
+button {
+  &:focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: 2px;
+    border-radius: var(--border-radius-md);
+  }
+}
+
+/* Card hover depth */
+.event-card,
+.soon-card,
+.selected-date-events,
+.upcoming-events {
+  &:focus-within {
+    box-shadow: 0 0 0 3px rgba(220, 20, 60, 0.1);
+  }
+}
+
+/* Smooth transitions for color changes */
+* {
+  transition: background-color var(--transition-fast),
+              border-color var(--transition-fast),
+              color var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+
+/* Exclude direct animations from global transition */
+.event-card,
+.soon-card,
+.btn-create,
+.btn-view-toggle,
+.btn-small,
+.btn-delete {
+  transition: all var(--transition-fast);
+}
+
+/* Badge animations */
+.event-badge,
+.soon-card-badge {
+  &:hover {
+    transform: scale(1.05);
+  }
+}
+
+/* Icon animations */
+.event-icon,
+.soon-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.soon-icon {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Date input enhancements */
+input[type="date"],
+input[type="time"],
+input[type="text"],
+select {
+  transition: border-color var(--transition-fast),
+              box-shadow var(--transition-fast),
+              background-color var(--transition-fast);
+
+  &:focus {
+    border-color: var(--color-red);
+    box-shadow: 0 0 0 3px rgba(220, 20, 60, 0.1);
+  }
+
+  &:disabled {
+    background-color: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+
 /* ─────────────────────────────────────────────── Responsive Design ─────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
