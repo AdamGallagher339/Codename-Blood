@@ -56,6 +56,12 @@ export class App implements OnInit {
   challengeNewPassword = '';
   challengeEmail = '';
 
+  // Forgot password form state
+  forgotUsername = '';
+  resetCode = '';
+  resetNewPassword = '';
+  resetMessage: string | null = null;
+
   // Admin create-user form
   adminUsername = '';
   adminEmail = '';
@@ -321,6 +327,30 @@ export class App implements OnInit {
     });
   }
 
+  resetPassword(user: any): void {
+    if (!confirm(`Send a password recovery code to "${user.riderId}"'s email?`)) {
+      return;
+    }
+
+    const token = this.auth.getIdToken() || this.auth.getAccessToken();
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    });
+
+    user.resetBusy = true;
+    this.http.post<any>('/api/auth/admin/reset-password', { username: user.riderId }, { headers }).subscribe({
+      next: (res) => {
+        user.resetBusy = false;
+        alert(res.message);
+      },
+      error: (err) => {
+        user.resetBusy = false;
+        console.error('Failed to reset password:', err);
+        alert(`Failed to reset password: ${err.error || err.message}`);
+      }
+    });
+  }
+
   // guest mode removed
 
   get pages(): Array<{ id: string; title: string; icon: string; roles: string[] }> {
@@ -488,6 +518,34 @@ export class App implements OnInit {
           this.loginUsername = this.confirmUsername.trim();
           this.currentPage = 'login';
         }
+      });
+  }
+
+  confirmForgotPassword(): void {
+    const username = this.forgotUsername.trim();
+    const code = this.resetCode.trim();
+    const newPassword = this.resetNewPassword;
+    if (!username || !code || !newPassword) {
+      this.auth.lastAuthError.set('Please fill in all fields.');
+      return;
+    }
+    this.busy = true;
+    this.resetMessage = null;
+    this.auth.confirmForgotPassword(username, code, newPassword)
+      .pipe(finalize(() => (this.busy = false)))
+      .subscribe({
+        next: (msg) => {
+          this.resetMessage = msg;
+          this.resetCode = '';
+          this.resetNewPassword = '';
+          // Auto-redirect to login after short delay
+          setTimeout(() => {
+            this.loginUsername = username;
+            this.loginPassword = '';
+            this.navigateAuth('login');
+          }, 2000);
+        },
+        error: () => {}
       });
   }
 

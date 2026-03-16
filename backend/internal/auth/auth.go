@@ -1064,6 +1064,129 @@ func (a *AuthClient) GetUserRoles(ctx context.Context) []string {
 	return []string{}
 }
 
+// AdminResetPasswordHandler triggers Cognito to send a password recovery code
+// to the user's verified email address.
+// Local mode: resets the password to a default temporary value.
+func (a *AuthClient) AdminResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		Username string `json:"username"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.Username == "" {
+		http.Error(w, "username required", http.StatusBadRequest)
+		return
+	}
+
+	if a.local {
+		a.usersMu.Lock()
+		u, ok := a.users[body.Username]
+		if !ok {
+			a.usersMu.Unlock()
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		u.Password = "TempReset123!"
+		a.users[body.Username] = u
+		a.usersMu.Unlock()
+		_ = a.saveUserToDB(u)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"message": fmt.Sprintf("Password reset for %s (local mode). Temporary password: TempReset123!", body.Username),
+		})
+		return
+	}
+
+	// Cognito: sends a verification code to the user's email.
+	_, err := a.client.AdminResetUserPassword(r.Context(), &cognito.AdminResetUserPasswordInput{
+		UserPoolId: &a.userPoolID,
+		Username:   &body.Username,
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to reset password: %s", awsErrString(err)), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message": fmt.Sprintf("Password recovery code sent to %s's email", body.Username),
+	})
+}
+
+// ConfirmForgotPasswordHandler lets a user set a new password using the
+// recovery code that was emailed by AdminResetUserPassword.
+func (a *AuthClient) ConfirmForgotPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		Username    string `json:"username"`
+		Code        string `json:"code"`
+		NewPassword string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.Username == "" || body.Code == "" || body.NewPassword == "" {
+		http.Error(w, "username, code, and newPassword are required", http.StatusBadRequest)
+		return
+	}
+
+	if a.local {
+		a.usersMu.Lock()
+		u, ok := a.users[body.Username]
+		if !ok {
+			a.usersMu.Unlock()
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		u.Password = body.NewPassword
+		a.users[body.Username] = u
+		a.usersMu.Unlock()
+		_ = a.saveUserToDB(u)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"message": "Password updated successfully",
+		})
+		return
+	}
+
+	input := &cognito.ConfirmForgotPasswordInput{
+		ClientId:         &a.clientID,
+		Username:         &body.Username,
+		ConfirmationCode: &body.Code,
+		Password:         &body.NewPassword,
+	}
+	if hash := a.computeSecretHash(body.Username); hash != "" {
+		input.SecretHash = &hash
+	}
+
+	_, err := a.client.ConfirmForgotPassword(r.Context(), input)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to confirm password: %s", awsErrString(err)), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"message": "Password updated successfully. You can now sign in with your new password.",
+	})
+}
+
 func awsErrString(err error) string {
 	// Most useful: Cognito error code + message
 	var apiErr smithy.APIError
@@ -1072,4 +1195,3 @@ func awsErrString(err error) string {
 	}
 	return err.Error()
 }
-
