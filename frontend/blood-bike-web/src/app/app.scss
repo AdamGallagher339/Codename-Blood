@@ -696,6 +696,20 @@
     padding: var(--spacing-md);
     border-radius: var(--border-radius-md);
   }
+
+  .auth-link {
+    margin-top: var(--spacing-md);
+    margin-bottom: 0;
+    text-align: center;
+    font-size: var(--font-size-sm);
+
+    a {
+      color: var(--color-red);
+      cursor: pointer;
+      text-decoration: underline;
+      &:hover { opacity: 0.8; }
+    }
+  }
 }
 
 // ===== HOME PAGE =====
@@ -1052,6 +1066,17 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: .85rem;
+}
+
+.btn-reset {
+  padding: .35rem .75rem;
+  background: #1565c0;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .85rem;
+  &:disabled { opacity: .5; cursor: not-allowed; }
 }
 
 .action-btns {

@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, signal, WritableSignal } from '@angular/core';
 import { catchError, map, of, switchMap, tap, throwError } from 'rxjs';
 
-export type AuthPage = 'welcome' | 'login' | 'apply' | 'signup' | 'confirm' | 'home';
+export type AuthPage = 'welcome' | 'login' | 'apply' | 'signup' | 'confirm' | 'home' | 'forgot-password' | 'reset-confirm';
 
 export interface MeResponse {
   sub: string;
@@ -144,6 +144,16 @@ export class AuthService {
         this._loggedIn.set(true);
       }),
       map(() => true),
+      catchError((err) => this.handleAuthError(err))
+    );
+  }
+
+  confirmForgotPassword(username: string, code: string, newPassword: string) {
+    this.lastAuthError.set(null);
+    return this.http.post<{ message: string }>('/api/auth/confirm-forgot-password', {
+      username, code, newPassword
+    }).pipe(
+      map((res) => res.message),
       catchError((err) => this.handleAuthError(err))
     );
   }

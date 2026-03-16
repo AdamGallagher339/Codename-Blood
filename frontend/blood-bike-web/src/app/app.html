@@ -166,6 +166,39 @@
             <button class="primary" [disabled]="busy" (click)="signIn()">{{ busy ? 'Signing in…' : 'Sign in' }}</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+          <p class="auth-link"><a (click)="navigateAuth('forgot-password')">Forgot your password?</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forgot Password Page -->
+    <div *ngIf="currentPage === 'forgot-password'" class="page auth-page">
+      <div class="page-header">
+        <h2>Reset Password</h2>
+      </div>
+      <div class="page-content">
+        <div class="auth-card">
+          <p class="auth-hint">
+            To reset your password, contact a <strong>Blood Bikes admin</strong> and ask them to send a recovery code to your email. Once you receive the code, enter it below along with your new password.
+          </p>
+          <label>
+            <span>Username</span>
+            <input [(ngModel)]="forgotUsername" placeholder="your username" autocomplete="username" />
+          </label>
+          <label>
+            <span>Recovery Code</span>
+            <input [(ngModel)]="resetCode" placeholder="code from your email" autocomplete="one-time-code" />
+          </label>
+          <label>
+            <span>New Password</span>
+            <input [(ngModel)]="resetNewPassword" type="password" placeholder="choose a new password" autocomplete="new-password" />
+          </label>
+          <div class="auth-actions">
+            <button class="primary" [disabled]="busy" (click)="confirmForgotPassword()">{{ busy ? 'Resetting…' : 'Reset Password' }}</button>
+            <button class="secondary" [disabled]="busy" (click)="navigateAuth('login')">Back to login</button>
+          </div>
+          <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
+          <p *ngIf="resetMessage" class="form-msg">{{ resetMessage }}</p>
         </div>
       </div>
     </div>
@@ -421,6 +454,7 @@
                     <td>
                       <div class="action-btns">
                         <button class="btn-save" (click)="saveUserRoles(u)" [disabled]="!isDirty(u)">Save</button>
+                        <button class="btn-reset" (click)="resetPassword(u)" [disabled]="u.resetBusy">{{ u.resetBusy ? 'Sending…' : '🔑 Reset Password' }}</button>
                         <button class="btn-delete" (click)="deleteUser(u)">Delete</button>
                       </div>
                     </td>
@@ -443,6 +477,7 @@
                 </div>
                 <div class="action-btns">
                   <button class="btn-save" (click)="saveUserRoles(u)" [disabled]="!isDirty(u)">Save</button>
+                  <button class="btn-reset" (click)="resetPassword(u)" [disabled]="u.resetBusy">{{ u.resetBusy ? 'Sending…' : '🔑 Reset Password' }}</button>
                   <button class="btn-delete" (click)="deleteUser(u)">Delete</button>
                 </div>
               </div>

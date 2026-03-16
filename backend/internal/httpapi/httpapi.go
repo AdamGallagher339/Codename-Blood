@@ -1055,6 +1055,8 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	mux.HandleFunc("/api/auth/signin", withCORS(authClient.SignInHandler))
 	mux.HandleFunc("/api/auth/challenge", withCORS(authClient.RespondToChallengeHandler))
 	mux.HandleFunc("/api/auth/admin/create-user", withCORS(authClient.RequireAuth(authClient.AdminCreateUserHandler)))
+	mux.HandleFunc("/api/auth/admin/reset-password", withCORS(requireAuthAndRole("BloodBikeAdmin", authClient.AdminResetPasswordHandler)))
+	mux.HandleFunc("/api/auth/confirm-forgot-password", withCORS(authClient.ConfirmForgotPasswordHandler))
 
 	// Example: protect register bike route with Cognito
 	mux.HandleFunc("/api/bike/register", withCORS(authClient.RequireAuth(fleet.RegisterBike)))
