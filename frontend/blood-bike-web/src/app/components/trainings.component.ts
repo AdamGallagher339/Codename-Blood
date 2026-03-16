@@ -20,12 +20,31 @@ interface Training {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="page-container">
-      <h1>🎓 Trainings</h1>
-      <p>Schedule and manage volunteer training sessions.</p>
+    <div class="trainings-page">
+      <header class="page-header">
+        <div>
+          <h1>Trainings</h1>
+          <p>Schedule, track, and complete volunteer training sessions.</p>
+        </div>
+        <button *ngIf="!showCreateForm" class="btn-add" (click)="showCreateForm = true">+ Schedule Training</button>
+      </header>
 
-      <!-- Create Training -->
-      <div class="create-section" *ngIf="showCreateForm">
+      <section class="stats-row">
+        <article class="stat-card upcoming">
+          <span>Upcoming</span>
+          <strong>{{ upcomingCount }}</strong>
+        </article>
+        <article class="stat-card in-progress">
+          <span>In Progress</span>
+          <strong>{{ inProgressCount }}</strong>
+        </article>
+        <article class="stat-card completed">
+          <span>Completed</span>
+          <strong>{{ completedCount }}</strong>
+        </article>
+      </section>
+
+      <section class="create-section" *ngIf="showCreateForm">
         <h2>Schedule New Training</h2>
         <form (ngSubmit)="createTraining()" class="training-form">
           <label>
@@ -38,7 +57,7 @@ interface Training {
           </label>
           <div class="form-row">
             <label>
-              <span>Date & Time</span>
+              <span>Date and Time</span>
               <input type="datetime-local" [(ngModel)]="newTraining.date" name="date" required />
             </label>
             <label>
@@ -61,14 +80,11 @@ interface Training {
             <button type="button" class="btn-cancel" (click)="showCreateForm = false">Cancel</button>
           </div>
         </form>
-      </div>
+      </section>
 
-      <button *ngIf="!showCreateForm" class="btn-add" (click)="showCreateForm = true">+ Schedule Training</button>
-
-      <!-- Filters -->
-      <div class="filters">
+      <section class="toolbar">
         <label>
-          Status:
+          Status
           <select [(ngModel)]="filterStatus">
             <option value="">All</option>
             <option value="upcoming">Upcoming</option>
@@ -77,94 +93,292 @@ interface Training {
             <option value="cancelled">Cancelled</option>
           </select>
         </label>
-      </div>
+      </section>
 
-      <!-- Trainings List -->
-      <div class="trainings-grid">
-        <div class="training-card" *ngFor="let t of filteredTrainings">
+      <section class="trainings-grid">
+        <article class="training-card" *ngFor="let t of filteredTrainings" [ngClass]="t.status">
           <div class="card-header">
             <h3>{{ t.title }}</h3>
             <span class="status-badge" [ngClass]="t.status">{{ t.status }}</span>
           </div>
           <p class="card-desc">{{ t.description }}</p>
           <div class="card-meta">
-            <div><strong>📅</strong> {{ t.date | date:'medium' }}</div>
-            <div><strong>📍</strong> {{ t.location }}</div>
-            <div><strong>👤</strong> {{ t.trainer }}</div>
-            <div><strong>👥</strong> {{ t.enrolled }}/{{ t.capacity }} enrolled</div>
+            <div><strong>Date:</strong> {{ t.date | date:'medium' }}</div>
+            <div><strong>Location:</strong> {{ t.location }}</div>
+            <div><strong>Trainer:</strong> {{ t.trainer }}</div>
+            <div><strong>Seats:</strong> {{ t.enrolled }}/{{ t.capacity }} enrolled</div>
           </div>
           <div class="card-actions">
             <button class="btn-cancel-training" *ngIf="t.status === 'upcoming'" (click)="cancelTraining(t)">Cancel</button>
             <button class="btn-complete" *ngIf="t.status === 'upcoming' || t.status === 'in-progress'" (click)="completeTraining(t)">Mark Complete</button>
           </div>
-        </div>
+        </article>
         <div class="empty" *ngIf="filteredTrainings.length === 0">No training sessions found.</div>
-      </div>
+      </section>
     </div>
   `,
   styles: [`
-    .page-container { padding: 1rem; max-width: 1200px; margin: 0 auto; }
-    h1 { margin-bottom: 0.25rem; }
-    p { color: #666; margin-bottom: 1rem; }
+    .trainings-page {
+      padding: var(--spacing-lg);
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      gap: var(--spacing-lg);
+      background: #f8f9fa;
+      min-height: 100vh;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--spacing-md);
+      background: var(--color-white);
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--spacing-lg);
+    }
+
+    .page-header h1 {
+      margin: 0 0 4px;
+      color: var(--color-text-dark);
+      font-size: var(--font-size-2xl);
+    }
+
+    .page-header p {
+      margin: 0;
+      color: #7a7a7a;
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+    }
 
     .btn-add {
-      padding: 0.5rem 1rem; background: #dc143c; color: #fff; border: none; border-radius: 8px;
-      cursor: pointer; font-weight: 600; margin-bottom: 1rem;
-      &:hover { background: #b01030; }
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      background: var(--color-red);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
     }
 
-    .create-section {
-      background: #f9f9f9; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border: 1px solid #eee;
-      h2 { margin-top: 0; margin-bottom: 0.75rem; }
+    .btn-add:hover { background: #b01030; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: var(--spacing-md);
     }
+
+    .stat-card {
+      background: var(--color-white);
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius-md);
+      box-shadow: var(--shadow-sm);
+      padding: var(--spacing-md) var(--spacing-lg);
+      display: grid;
+      gap: 3px;
+    }
+
+    .stat-card span {
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      color: #7a7a7a;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+
+    .stat-card strong {
+      font-size: var(--font-size-2xl);
+      line-height: 1.1;
+      color: var(--color-text-dark);
+    }
+
+    .stat-card.upcoming strong { color: #1d4ed8; }
+    .stat-card.in-progress strong { color: #b45309; }
+    .stat-card.completed strong { color: #2e7d32; }
+
+    .create-section,
+    .toolbar {
+      background: var(--color-white);
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--spacing-lg);
+    }
+
+    .create-section h2 {
+      margin: 0 0 var(--spacing-md);
+      font-size: var(--font-size-lg);
+      color: var(--color-text-dark);
+    }
+
     .training-form {
-      display: flex; flex-direction: column; gap: 0.75rem;
-      label { display: flex; flex-direction: column; gap: 0.25rem; font-weight: 500; }
-      input, textarea, select { padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
+      display: grid;
+      gap: var(--spacing-md);
     }
-    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; label { flex: 1; min-width: 200px; } }
-    .form-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-    .btn-create {
-      padding: 0.5rem 1.2rem; background: #28a745; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
-      &:hover { background: #218838; }
+
+    .training-form label {
+      display: grid;
+      gap: 6px;
+      font-weight: 600;
+      color: #4b5563;
+      font-size: var(--font-size-sm);
     }
+
+    .training-form input,
+    .training-form textarea,
+    .training-form select,
+    .toolbar select {
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      font-size: var(--font-size-sm);
+      background: #fff;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--spacing-md);
+    }
+
+    .form-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+      justify-content: flex-end;
+    }
+
+    .btn-create,
     .btn-cancel {
-      padding: 0.5rem 1.2rem; background: #6c757d; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
-      &:hover { background: #5a6268; }
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
     }
 
-    .filters {
-      display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;
-      label { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
-      select { padding: 0.4rem 0.6rem; border: 1px solid #ccc; border-radius: 6px; }
+    .btn-create { background: #2e7d32; color: #fff; }
+    .btn-create:hover { background: #1f6c27; }
+    .btn-cancel { background: #6b7280; color: #fff; }
+    .btn-cancel:hover { background: #4b5563; }
+
+    .toolbar label {
+      display: inline-grid;
+      gap: 6px;
+      color: #4b5563;
+      font-size: var(--font-size-sm);
+      font-weight: 600;
     }
 
-    .trainings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; }
+    .trainings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--spacing-md);
+    }
+
     .training-card {
-      background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 1rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      background: var(--color-white);
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius-md);
+      padding: var(--spacing-md);
+      box-shadow: var(--shadow-sm);
+      display: grid;
+      gap: var(--spacing-sm);
+      border-left: 4px solid #d1d5db;
     }
-    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; }
-    .card-header h3 { margin: 0; font-size: 1.1rem; }
-    .card-desc { color: #555; font-size: 0.9rem; margin-bottom: 0.75rem; }
-    .card-meta { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9rem; margin-bottom: 0.75rem; }
+
+    .training-card.upcoming { border-left-color: #3b82f6; }
+    .training-card.in-progress { border-left-color: #f59e0b; }
+    .training-card.completed { border-left-color: #22c55e; }
+    .training-card.cancelled { border-left-color: #ef4444; }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--spacing-sm);
+    }
+
+    .card-header h3 {
+      margin: 0;
+      color: #111827;
+      font-size: var(--font-size-base);
+    }
+
+    .card-desc {
+      margin: 0;
+      color: #4b5563;
+      font-size: var(--font-size-sm);
+      line-height: 1.45;
+    }
+
+    .card-meta {
+      display: grid;
+      gap: 4px;
+      font-size: var(--font-size-sm);
+      color: #374151;
+    }
 
     .status-badge {
-      padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: capitalize; white-space: nowrap;
-      &.upcoming { background: #cce5ff; color: #004085; }
-      &.in-progress { background: #fff3cd; color: #856404; }
-      &.completed { background: #d4edda; color: #155724; }
-      &.cancelled { background: #f8d7da; color: #721c24; }
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
     }
 
-    .card-actions { display: flex; gap: 0.4rem; }
+    .status-badge.upcoming { background: #dbeafe; color: #1d4ed8; }
+    .status-badge.in-progress { background: #fef3c7; color: #b45309; }
+    .status-badge.completed { background: #dcfce7; color: #166534; }
+    .status-badge.cancelled { background: #fee2e2; color: #991b1b; }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
     .card-actions button {
-      padding: 0.35rem 0.7rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 500;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
     }
-    .btn-cancel-training { background: #dc3545; color: #fff; &:hover { background: #c82333; } }
-    .btn-complete { background: #28a745; color: #fff; &:hover { background: #218838; } }
 
-    .empty { text-align: center; padding: 2rem; color: #999; grid-column: 1 / -1; }
+    .btn-cancel-training { background: #ef4444; color: #fff; }
+    .btn-cancel-training:hover { background: #dc2626; }
+    .btn-complete { background: #22c55e; color: #fff; }
+    .btn-complete:hover { background: #16a34a; }
+
+    .empty {
+      text-align: center;
+      padding: var(--spacing-xl);
+      color: #9ca3af;
+      grid-column: 1 / -1;
+      background: var(--color-white);
+      border: 1px dashed #d1d5db;
+      border-radius: var(--border-radius-md);
+    }
+
+    @media (max-width: 768px) {
+      .trainings-page {
+        padding: var(--spacing-md);
+      }
+
+      .page-header {
+        flex-direction: column;
+      }
+
+      .btn-add {
+        width: 100%;
+      }
+    }
   `]
 })
 export class TrainingsComponent implements OnInit {
@@ -203,6 +417,18 @@ export class TrainingsComponent implements OnInit {
     return this.trainings.filter(t => {
       return !this.filterStatus || t.status === this.filterStatus;
     });
+  }
+
+  get upcomingCount(): number {
+    return this.trainings.filter((t) => t.status === 'upcoming').length;
+  }
+
+  get inProgressCount(): number {
+    return this.trainings.filter((t) => t.status === 'in-progress').length;
+  }
+
+  get completedCount(): number {
+    return this.trainings.filter((t) => t.status === 'completed').length;
   }
 
   createTraining(): void {

@@ -22,14 +22,32 @@ interface Application {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="page-container">
-      <h1>📋 Applications</h1>
-      <p>Review and manage volunteer applications.</p>
+    <div class="applications-page">
+      <header class="page-header">
+        <div>
+          <h1>Applications</h1>
+          <p>Review incoming volunteer applications and move candidates forward quickly.</p>
+        </div>
+      </header>
 
-      <!-- Filters -->
-      <div class="filters">
+      <section class="stats-row">
+        <article class="stat-card pending">
+          <span>Pending</span>
+          <strong>{{ pendingCount }}</strong>
+        </article>
+        <article class="stat-card approved">
+          <span>Approved</span>
+          <strong>{{ approvedCount }}</strong>
+        </article>
+        <article class="stat-card denied">
+          <span>Denied</span>
+          <strong>{{ deniedCount }}</strong>
+        </article>
+      </section>
+
+      <section class="filters">
         <label>
-          Status:
+          <span>Status</span>
           <select [(ngModel)]="filterStatus">
             <option value="">All</option>
             <option value="pending">Pending</option>
@@ -38,50 +56,61 @@ interface Application {
           </select>
         </label>
         <label>
-          Search:
-          <input type="text" [(ngModel)]="searchQuery" placeholder="Name or email…" />
+          <span>Search</span>
+          <input type="text" [(ngModel)]="searchQuery" placeholder="Name or email" />
         </label>
-      </div>
+      </section>
 
-      <!-- Applications Table -->
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Full Application</th>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let app of filteredApplications">
-              <td>{{ app.name }}</td>
-              <td>{{ app.phone }}</td>
-              <td>
-                <button class="btn-view-pdf" type="button" *ngIf="getApplicationPdfUrl(app)" (click)="openApplicationPdf(app)">View PDF</button>
-                <span *ngIf="!getApplicationPdfUrl(app)">Not provided</span>
-              </td>
-              <td>{{ app.submittedAt | date:'short' }}</td>
-              <td>
-                <span class="status-badge" [ngClass]="app.status">{{ app.status }}</span>
-              </td>
-              <td>
-                <div class="action-btns">
-                  <button class="btn-accept" *ngIf="app.status === 'pending'" (click)="updateStatus(app, 'approved')">Approve</button>
-                  <button class="btn-reject" *ngIf="app.status === 'pending'" (click)="updateStatus(app, 'denied')">Deny</button>
-                  <button class="btn-delete" *ngIf="app.status === 'denied'" (click)="deleteApplication(app)">Delete</button>
-                </div>
-              </td>
-            </tr>
-            <tr *ngIf="filteredApplications.length === 0">
-              <td colspan="6" class="empty">No applications found.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <section class="table-shell">
+        <div class="table-header">
+          <h2>Candidate Queue</h2>
+          <span class="results-count">{{ filteredApplications.length }} shown</span>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Application</th>
+                <th>Submitted</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let app of filteredApplications">
+                <td>
+                  <div class="name-cell">
+                    <strong>{{ app.name }}</strong>
+                    <span>{{ app.email }}</span>
+                  </div>
+                </td>
+                <td>{{ app.phone }}</td>
+                <td>
+                  <button class="btn-view-pdf" type="button" *ngIf="getApplicationPdfUrl(app)" (click)="openApplicationPdf(app)">View PDF</button>
+                  <span class="muted" *ngIf="!getApplicationPdfUrl(app)">Not provided</span>
+                </td>
+                <td>{{ app.submittedAt | date:'short' }}</td>
+                <td>
+                  <span class="status-badge" [ngClass]="app.status">{{ app.status }}</span>
+                </td>
+                <td>
+                  <div class="action-btns">
+                    <button class="btn-accept" *ngIf="app.status === 'pending'" (click)="updateStatus(app, 'approved')">Approve</button>
+                    <button class="btn-reject" *ngIf="app.status === 'pending'" (click)="updateStatus(app, 'denied')">Deny</button>
+                    <button class="btn-delete" *ngIf="app.status === 'denied'" (click)="deleteApplication(app)">Delete</button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="filteredApplications.length === 0">
+                <td colspan="6" class="empty">No applications found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div class="pdf-modal-backdrop" *ngIf="selectedApplicationPdf" (click)="closePdfPopup()">
         <div class="pdf-modal" (click)="$event.stopPropagation()">
@@ -104,49 +133,219 @@ interface Application {
     </div>
   `,
   styles: [`
-    .page-container { padding: 1rem; max-width: 1200px; margin: 0 auto; }
-    h1 { margin-bottom: 0.25rem; }
-    p { color: #666; margin-bottom: 1rem; }
+    .applications-page {
+      padding: var(--spacing-lg);
+      max-width: 1240px;
+      margin: 0 auto;
+      display: grid;
+      gap: var(--spacing-lg);
+      background: #f8f9fa;
+      min-height: 100vh;
+    }
+
+    .page-header {
+      background: var(--color-white);
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--spacing-lg);
+    }
+
+    .page-header h1 {
+      margin: 0 0 4px;
+      color: var(--color-text-dark);
+      font-size: var(--font-size-2xl);
+    }
+
+    .page-header p {
+      color: #7a7a7a;
+      margin: 0;
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: var(--spacing-md);
+    }
+
+    .stat-card {
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius-md);
+      background: var(--color-white);
+      box-shadow: var(--shadow-sm);
+      padding: var(--spacing-md) var(--spacing-lg);
+      display: grid;
+      gap: 3px;
+    }
+
+    .stat-card span {
+      font-size: var(--font-size-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #7a7a7a;
+      font-weight: 700;
+    }
+
+    .stat-card strong {
+      font-size: var(--font-size-2xl);
+      line-height: 1.1;
+    }
+
+    .stat-card.pending strong { color: #b45309; }
+    .stat-card.approved strong { color: #166534; }
+    .stat-card.denied strong { color: #b91c1c; }
 
     .filters {
-      display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;
-      label { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
-      select, input { padding: 0.4rem 0.6rem; border: 1px solid #ccc; border-radius: 6px; }
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--spacing-md);
+      background: var(--color-white);
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--shadow-sm);
+      padding: var(--spacing-lg);
+    }
+
+    .filters label {
+      display: grid;
+      gap: 6px;
+      font-size: var(--font-size-sm);
+      color: #4b5563;
+      font-weight: 600;
+    }
+
+    .filters select,
+    .filters input {
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      font-size: var(--font-size-sm);
+      background: #fff;
+    }
+
+    .table-shell {
+      background: var(--color-white);
+      border: 1px solid #e5e7eb;
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-md) var(--spacing-lg);
+      border-bottom: 1px solid #eef1f4;
+    }
+
+    .table-header h2 {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      color: var(--color-text-dark);
+    }
+
+    .results-count {
+      font-size: var(--font-size-xs);
+      color: #6b7280;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .table-wrapper { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid #eee; }
-    th { background: #f5f5f5; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; }
-    .empty { text-align: center; padding: 2rem; color: #999; }
+    table { width: 100%; border-collapse: collapse; min-width: 940px; }
+
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid #f0f2f5;
+      vertical-align: top;
+    }
+
+    th {
+      background: #fafbfc;
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+    }
+
+    .name-cell {
+      display: grid;
+      gap: 2px;
+    }
+
+    .name-cell strong {
+      color: #111827;
+      font-size: var(--font-size-sm);
+    }
+
+    .name-cell span {
+      color: #6b7280;
+      font-size: var(--font-size-xs);
+    }
+
+    .muted {
+      color: #9ca3af;
+      font-size: var(--font-size-xs);
+    }
+
+    .empty {
+      text-align: center;
+      padding: var(--spacing-xl);
+      color: #9ca3af;
+    }
 
     .status-badge {
-      padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; text-transform: capitalize;
-      &.pending { background: #fff3cd; color: #856404; }
-      &.approved { background: #d4edda; color: #155724; }
-      &.denied { background: #f8d7da; color: #721c24; }
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
-    .action-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .status-badge.pending { background: #fef3c7; color: #b45309; }
+    .status-badge.approved { background: #dcfce7; color: #166534; }
+    .status-badge.denied { background: #fee2e2; color: #991b1b; }
+
+    .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
     .btn-view-pdf {
-      padding: 0.35rem 0.7rem;
+      padding: 8px 11px;
       border: 1px solid #cfd8e3;
       background: #fff;
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 700;
+      color: #374151;
     }
+
     .btn-view-pdf:hover { background: #f4f7fb; }
 
     .action-btns button {
-      padding: 0.3rem 0.6rem; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 500;
+      padding: 8px 11px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
     }
-    .btn-accept { background: #28a745; color: #fff; }
-    .btn-reject { background: #dc3545; color: #fff; }
-    .btn-delete { background: #6b7280; color: #fff; }
-    .btn-accept:hover { background: #218838; }
-    .btn-reject:hover { background: #c82333; }
+
+    .btn-accept { background: #16a34a; }
+    .btn-reject { background: #dc2626; }
+    .btn-delete { background: #6b7280; }
+    .btn-accept:hover { background: #15803d; }
+    .btn-reject:hover { background: #b91c1c; }
     .btn-delete:hover { background: #4b5563; }
 
     .pdf-modal-backdrop {
@@ -261,6 +460,15 @@ interface Application {
     }
 
     @media (max-width: 768px) {
+      .applications-page {
+        padding: var(--spacing-md);
+      }
+
+      .table-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
       .pdf-modal {
         height: 95vh;
         border-radius: 12px;
@@ -319,6 +527,18 @@ export class ApplicationsComponent implements OnInit {
       const matchesSearch = !query || app.name.toLowerCase().includes(query) || app.email.toLowerCase().includes(query);
       return matchesStatus && matchesSearch;
     });
+  }
+
+  get pendingCount(): number {
+    return this.applications.filter((a) => a.status === 'pending').length;
+  }
+
+  get approvedCount(): number {
+    return this.applications.filter((a) => a.status === 'approved').length;
+  }
+
+  get deniedCount(): number {
+    return this.applications.filter((a) => a.status === 'denied').length;
   }
 
   updateStatus(app: Application, status: Application['status']): void {
