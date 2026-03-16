@@ -671,6 +671,10 @@
     }
   }
 
+  .auth-actions.welcome-actions {
+    flex-direction: column;
+  }
+
   .auth-hint {
     margin-top: var(--spacing-md);
     margin-bottom: 0;

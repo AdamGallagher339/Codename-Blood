@@ -138,9 +138,9 @@
 
         <div class="auth-card">
           <p class="auth-hint">Sign in with your account credentials. Contact an admin if you need an account.</p>
-          <div class="auth-actions">
+          <div class="auth-actions welcome-actions">
             <button class="primary" (click)="navigateAuth('login')">Login</button>
-            <button class="secondary" (click)="navigateAuth('apply')">Apply</button>
+            <button class="secondary" (click)="navigateAuth('apply')">Apply to join BloodBikes</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
