@@ -3,8 +3,8 @@
   <header class="fleet-header">
     <div class="header-top">
       <div class="header-info">
-        <h2>🛠️ Fleet Tracker</h2>
-        <p>Register vehicles, manage status, and track service history.</p>
+        <h2>Fleet Tracker</h2>
+        <p>Register vehicles, update readiness, and maintain service records.</p>
       </div>
       <div class="header-stats">
         <div class="stat-chip">
@@ -24,7 +24,7 @@
 
     <!-- Collapsible Add Form -->
     <button class="toggle-form-btn" (click)="showAddForm.set(!showAddForm())">
-      <span>{{ showAddForm() ? '▾' : '▸' }} Add New Vehicle</span>
+      <span>{{ showAddForm() ? '▾' : '▸' }} Add Vehicle</span>
     </button>
     <div class="fleet-form" *ngIf="showAddForm()">
       <div class="form-row">
@@ -54,7 +54,7 @@
           <input [(ngModel)]="locationId" placeholder="Galway-Depot" />
         </label>
       </div>
-      <p class="form-hint">New vehicles are automatically set to <strong>Out of Service</strong> until cleared.</p>
+      <p class="form-hint">New vehicles start as <strong>Out of Service</strong> until marked ready.</p>
       <div class="form-actions">
         <button class="btn btn-primary" (click)="createBike()">
           ＋ Register Vehicle
@@ -158,7 +158,7 @@
             <div class="location-scanner-overlay">
               <div class="location-scanner-panel">
                 <div class="scanner-panel-header">
-                  <h4>📍 Scan Depot QR Code</h4>
+                  <h4>Scan Depot QR Code</h4>
                   <button class="btn btn-outline btn-sm" (click)="cancelLocationScanner()">Cancel</button>
                 </div>
                 <app-qr-scanner (scanComplete)="onLocationScanned($event)"></app-qr-scanner>
@@ -185,17 +185,17 @@
             <label>
               <span>Service type</span>
               <select [(ngModel)]="serviceType">
-                <option value="oil">🛢️ Oil</option>
-                <option value="chain">⛓️ Chain</option>
-                <option value="tyres">🛞 Tyres</option>
-                <option value="brakes">🔧 Brakes</option>
-                <option value="coolant">💧 Coolant</option>
+                <option value="oil">Oil</option>
+                <option value="chain">Chain</option>
+                <option value="tyres">Tyres</option>
+                <option value="brakes">Brakes</option>
+                <option value="coolant">Coolant</option>
               </select>
             </label>
             <label>
               <span>Service date</span>
               <input type="date" [(ngModel)]="serviceDate" />
-            </label>
+              </label>
             <label>
               <span>Performed by</span>
               <input [(ngModel)]="servicePerformedBy" placeholder="Mechanic or rider" />
@@ -220,7 +220,7 @@
                 <button class="btn-remove-entry" title="Remove entry" (click)="deleteServiceEntry(bike.bikeId, entry.serviceId)">&times;</button>
               </div>
               <p *ngIf="entry.notes" class="timeline-notes">{{ entry.notes }}</p>
-              <span *ngIf="entry.performedBy" class="timeline-meta">👤 {{ entry.performedBy }}</span>
+                <span *ngIf="entry.performedBy" class="timeline-meta">Performed by {{ entry.performedBy }}</span>
             </div>
           </div>
           <p class="empty-message" *ngIf="(serviceHistory()[bike.bikeId] || []).length === 0">
