@@ -45,6 +45,7 @@ var (
 	cJobsCompleted atomic.Int64
 	cJobsCancelled atomic.Int64
 	cBikesCreated  atomic.Int64
+	cAppsSubmitted atomic.Int64
 	cAPIErrors     atomic.Int64
 )
 
@@ -244,6 +245,15 @@ func main() {
 		}(i)
 	}
 
+	// 5 concurrent public applicants
+	for i := 1; i <= 5; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			runApplications(ctx, base, n)
+		}(i)
+	}
+
 	// stats printer every 5s
 	go func() {
 		tick := time.NewTicker(5 * time.Second)
@@ -376,7 +386,8 @@ func runIssueRider(ctx context.Context, base, username string) {
 	}
 }
 
-// runFleetManager creates bikes and toggles them in/out of service.
+// runFleetManager registers bikes via /api/bike/register and simulates
+// riders starting/ending rides (puts bikes in/out of active use).
 func runFleetManager(ctx context.Context, base, username string) {
 	var myBikes []string
 	seq := 0
@@ -390,35 +401,70 @@ func runFleetManager(ctx context.Context, base, username string) {
 			continue
 		}
 
-		// Create a new bike
+		// Register a new bike in the main BIKES_TABLE
 		seq++
-		make := bikeMakes[rand.Intn(len(bikeMakes))]
-		model := bikeModels[rand.Intn(len(bikeModels))]
-		// Registration like SIM-DSP1-3
-		reg := fmt.Sprintf("SIM-%s-%d", strings.ToUpper(username[len(username)-4:]), seq)
-		bikeID, err := createFleetBike(base, tok, make, model, reg)
-		if err == nil {
+		mk := bikeMakes[rand.Intn(len(bikeMakes))]
+		mdl := bikeModels[rand.Intn(len(bikeModels))]
+		// e.g. SIM-FLT1-003
+		suffix := username[len(username)-4:]
+		bikeID := fmt.Sprintf("SIM-%s-%03d", strings.ToUpper(suffix), seq)
+		depot := []string{"Dublin", "Cork", "Galway", "Limerick", "Waterford"}[rand.Intn(5)]
+		if err := registerBike(base, tok, bikeID, mk+" "+mdl, depot); err == nil {
 			cBikesCreated.Add(1)
 			myBikes = append(myBikes, bikeID)
 		} else {
 			cAPIErrors.Add(1)
 		}
 
-		// Randomly toggle existing bikes between ready / out_of_service
+		// Start/end rides on registered bikes to simulate in-use status
 		for _, bid := range myBikes {
-			active := "ready"
-			if rand.Intn(3) == 0 { // 33% go out of service
-				active = "out_of_service"
+			riderID := fmt.Sprintf("sim-rider-%d", rand.Intn(40)+1)
+			_ = startRide(base, tok, bid, riderID)
+			sleep(ctx, jitterMs(2000, 3000))
+			if ctx.Err() != nil {
+				return
 			}
-			_ = setFleetBikeActive(base, tok, bid, active)
-			sleep(ctx, 400*time.Millisecond)
+			_ = endRide(base, tok, bid)
+			sleep(ctx, 500*time.Millisecond)
 			if ctx.Err() != nil {
 				return
 			}
 		}
 
-		// 10–20 s between new bike creations
-		sleep(ctx, jitterMs(10000, 10000))
+		// 8–15 s between new bike registrations
+		sleep(ctx, jitterMs(8000, 7000))
+	}
+}
+
+// runApplications submits public rider applications.
+func runApplications(ctx context.Context, base string, n int) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		names := []string{"Sean Murphy", "Aoife Kelly", "Ciarán Walsh", "Niamh O'Brien",
+			"Padraig Connolly", "Siobhán Ryan", "Declan Byrne", "Orla Fitzgerald"}
+		name := names[rand.Intn(len(names))]
+		email := fmt.Sprintf("applicant-%d-%d@sim.test", n, rand.Intn(9999))
+		phone := fmt.Sprintf("+353 8%d %06d", rand.Intn(9), rand.Intn(999999))
+		body := map[string]any{
+			"name":                      name,
+			"email":                     email,
+			"phone":                     phone,
+			"motorcycleExperienceYears": rand.Intn(20) + 1,
+			"availableFreeTimePerWeek":  fmt.Sprintf("%d hours", rand.Intn(15)+5),
+			"hasValidRospaCertificate":  rand.Intn(2) == 0,
+			"application":               "I would love to volunteer as a blood bike rider.",
+		}
+		resp, err := doJSON("POST", base+"/api/applications/public", "", body)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 201 {
+				cAppsSubmitted.Add(1)
+			}
+		}
+		// one application every 20–40 s per applicant goroutine
+		sleep(ctx, jitterMs(20000, 20000))
 	}
 }
 
@@ -539,32 +585,39 @@ func updateJob(base, tok, jobID, status, acceptedBy string) error {
 	return nil
 }
 
-func createFleetBike(base, tok, make, model, reg string) (string, error) {
+func registerBike(base, tok, bikeID, model, depot string) error {
 	body := map[string]any{
-		"make":         make,
-		"model":        model,
-		"vehicleType":  "motorcycle",
-		"registration": reg,
-		"locationId":   "sim-depot",
+		"id":     bikeID,
+		"model":  model,
+		"depot":  depot,
+		"status": "Available",
 	}
-	resp, err := doJSON("POST", base+"/api/fleet/bikes", tok, body)
+	resp, err := doJSON("POST", base+"/api/bike/register", tok, body)
 	if err != nil {
-		return "", err
+		return err
 	}
-	defer resp.Body.Close()
+	resp.Body.Close()
 	if resp.StatusCode != 201 {
-		return "", fmt.Errorf("createFleetBike: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("registerBike: HTTP %d", resp.StatusCode)
 	}
-	var out struct {
-		BikeID string `json:"bikeId"`
-	}
-	_ = json.NewDecoder(resp.Body).Decode(&out)
-	return out.BikeID, nil
+	return nil
 }
 
-func setFleetBikeActive(base, tok, bikeID, active string) error {
-	body := map[string]any{"active": active}
-	resp, err := doJSON("PUT", base+"/api/fleet/bikes/"+bikeID, tok, body)
+func startRide(base, tok, bikeID, riderID string) error {
+	req, _ := http.NewRequest("POST", base+"/api/ride/start?bikeId="+bikeID+"&riderId="+riderID, nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	return nil
+}
+
+func endRide(base, tok, bikeID string) error {
+	req, _ := http.NewRequest("POST", base+"/api/ride/end?bikeId="+bikeID, nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -613,8 +666,8 @@ func sleep(ctx context.Context, d time.Duration) {
 }
 
 func printStats() {
-	log.Printf("  Jobs created: %-5d  accepted: %-5d  completed: %-5d  cancelled: %-5d  bikes: %-4d  errors: %d",
+	log.Printf("  Jobs created: %-5d  accepted: %-5d  completed: %-5d  cancelled: %-5d  bikes: %-4d  apps: %-4d  errors: %d",
 		cJobsCreated.Load(), cJobsAccepted.Load(),
 		cJobsCompleted.Load(), cJobsCancelled.Load(),
-		cBikesCreated.Load(), cAPIErrors.Load())
+		cBikesCreated.Load(), cAppsSubmitted.Load(), cAPIErrors.Load())
 }
