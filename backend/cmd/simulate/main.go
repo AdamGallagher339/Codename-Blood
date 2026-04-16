@@ -183,10 +183,8 @@ func main() {
 				return
 			}
 			setToken(u.username, tok)
-			// Register a DynamoDB user profile for riders
-			if containsStr(u.roles, "Rider") {
-				_ = registerUser(base, tok, u.username, u.roles)
-			}
+			// Register all users in DynamoDB so they appear on the dashboard
+			_ = registerUser(base, tok, u.username, u.roles)
 		}(u)
 	}
 	setupWg.Wait()
