@@ -7,11 +7,12 @@ backend/.env
 
 # Built binaries
 backend/backend
+backend/dashboard
 
 # Local dev auth store
 data/users.db
-data/users.db
 data/push.db
+backend/internal/data/
 
 # AWS CLI distribution (installed at runtime, not source code)
 aws/dist/
