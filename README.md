@@ -149,6 +149,7 @@ Or configure them using the AWS CLI (`aws configure`).
 |---------|-----|---------|
 | **Backend** | `http://localhost:8080` | Go API server |
 | **Frontend** | `http://localhost:4200` | Serves UI, proxies `/api` → backend |
+| **Dashboard** | `http://localhost:9090` | Production stats dashboard |
 
 ### 1) Start the backend
 
@@ -192,7 +193,30 @@ npm run start
 
 > **Proxy check:** `curl http://localhost:4200/api/health` — should return the same response as the backend directly.
 
-### 3) Test the Live Tracking Map
+### 3) Start the dashboard (optional)
+
+The dashboard is a standalone server that scans your DynamoDB tables and displays real-time production stats — total users, active riders, jobs by status, bikes, events, and applications.
+
+```bash
+cd backend
+go build -o dashboard ./cmd/dashboard
+./dashboard
+```
+
+It listens on port `9090` by default. Override with `DASHBOARD_PORT`:
+
+```bash
+DASHBOARD_PORT=3000 ./dashboard
+```
+
+| Endpoint | Description |
+|----------|-------------|
+| `http://localhost:9090/` | HTML dashboard (auto-refreshes every 30s) |
+| `http://localhost:9090/api/stats` | JSON stats for programmatic access |
+
+> **Note:** The dashboard requires AWS credentials and DynamoDB table env vars (`USERS_TABLE`, `JOBS_TABLE`, `BIKES_TABLE`, `EVENTS_TABLE`, `APPLICATIONS_TABLE`) to be set. It reads the same `.env` and `APP_CONFIG_TABLE` as the main backend.
+
+### 4) Test the Live Tracking Map
 
 The tracking map is accessible at `http://localhost:4200/tracking` (or click "Map" in the navigation).
 
@@ -237,6 +261,8 @@ For complete API documentation, see [docs/TRACKING_MAP.md](docs/TRACKING_MAP.md)
 
 ```
 ├── backend/              # Go backend API
+│   ├── cmd/
+│   │   └── dashboard/   # Standalone production stats dashboard
 │   ├── internal/
 │   │   ├── auth/        # Authentication (Cognito + local dev mode)
 │   │   ├── events/      # Event management
