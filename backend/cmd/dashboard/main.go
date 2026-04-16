@@ -229,7 +229,7 @@ var dashboardTmpl = template.Must(template.New("dashboard").Parse(`<!DOCTYPE htm
 <body>
 <header>
   <h1>Blood Bike Ireland — Production Dashboard</h1>
-  <p>Last refreshed: {{.GeneratedAt}} &nbsp;·&nbsp; Auto-refreshes every 30s</p>
+  <p>Last refreshed: {{.GeneratedAt}} &nbsp;·&nbsp; Auto-refreshes every 10s</p>
 </header>
 
 <h2 class="section-title">Riders</h2>
@@ -267,7 +267,7 @@ var dashboardTmpl = template.Must(template.New("dashboard").Parse(`<!DOCTYPE htm
 
 <footer>Blood Bike Ireland &mdash; Internal Dashboard</footer>
 
-<script>setTimeout(()=>location.reload(), 30000);</script>
+<script>setTimeout(()=>location.reload(), 10000);</script>
 </body>
 </html>
 `))
