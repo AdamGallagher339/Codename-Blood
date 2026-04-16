@@ -211,7 +211,7 @@ DASHBOARD_PORT=3000 ./dashboard
 
 | Endpoint | Description |
 |----------|-------------|
-| `http://localhost:9090/` | HTML dashboard (auto-refreshes every 30s) |
+| `http://localhost:9090/` | HTML dashboard (auto-refreshes every 10s) |
 | `http://localhost:9090/api/stats` | JSON stats for programmatic access |
 
 > **Note:** The dashboard requires AWS credentials and DynamoDB table env vars (`USERS_TABLE`, `JOBS_TABLE`, `BIKES_TABLE`, `EVENTS_TABLE`, `APPLICATIONS_TABLE`) to be set. It reads the same `.env` and `APP_CONFIG_TABLE` as the main backend.
@@ -232,6 +232,57 @@ ENTITY_ID=bike-002 ENTITY_TYPE=bike ./simulate-tracking.sh
 ```
 
 See [docs/TRACKING_MAP.md](docs/TRACKING_MAP.md) for detailed documentation.
+
+---
+
+## Load Simulation (Admin)
+
+The simulation tool generates realistic load against a running backend — useful for demos, dashboard recordings, and stress testing. It creates 90 synthetic users and drives them concurrently through the full job lifecycle.
+
+> See [docs/SIMULATION.md](docs/SIMULATION.md) for full details on how it works.
+
+### Quick start
+
+**Step 1 — Start the backend in local auth mode** (bypasses Cognito, no AWS auth calls):
+
+```bash
+cd backend
+go build -o backend .
+APP_CONFIG_ENABLED=false LOCAL_AUTH=1 ./backend
+```
+
+**Step 2 — Start the dashboard** (optional, to watch stats update live):
+
+```bash
+cd backend
+go build -o dashboard ./cmd/dashboard && ./dashboard
+```
+
+**Step 3 — Run the simulation** in a separate terminal:
+
+```bash
+cd backend
+go run ./cmd/simulate --duration 5m
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url` | `http://localhost:8080` | Backend base URL |
+| `--duration` | `5m` | How long to run |
+| `--dispatchers` | `30` | Dispatcher goroutines creating jobs |
+| `--riders` | `40` | Active riders completing jobs |
+| `--issue-riders` | `10` | Riders who cancel mid-job |
+| `--fleet` | `10` | Fleet managers registering bikes |
+
+### Example — 2-minute quick demo
+
+```bash
+go run ./cmd/simulate --duration 2m --dispatchers 10 --riders 15 --issue-riders 5 --fleet 5
+```
+
+> **Important:** Use `APP_CONFIG_ENABLED=false LOCAL_AUTH=1` when starting the backend for simulation. This prevents DynamoDB AppConfig from overriding the local auth flag, meaning no Cognito calls are made and **no AWS charges** are incurred for auth.
 
 ---
 
@@ -262,7 +313,8 @@ For complete API documentation, see [docs/TRACKING_MAP.md](docs/TRACKING_MAP.md)
 ```
 ├── backend/              # Go backend API
 │   ├── cmd/
-│   │   └── dashboard/   # Standalone production stats dashboard
+│   │   ├── dashboard/   # Standalone production stats dashboard
+│   │   └── simulate/    # Load simulation tool
 │   ├── internal/
 │   │   ├── auth/        # Authentication (Cognito + local dev mode)
 │   │   ├── events/      # Event management
