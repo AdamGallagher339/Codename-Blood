@@ -15,6 +15,8 @@ import { RiderAvailabilityComponent } from './components/rider-availability.comp
 import { ApplicationsComponent } from './components/applications.component';
 import { TrainingsComponent } from './components/trainings.component';
 import { AnalyticsPageComponent } from './components/analytics-page.component';
+import { RideSessionsComponent } from './components/ride-sessions.component';
+import { IssueReportsComponent } from './components/issue-reports.component';
 
 export const routes: Routes = [
   // Dashboard / Maps (available to Rider, Fleet Manager, Dispatcher)
@@ -49,6 +51,12 @@ export const routes: Routes = [
 
   // Events (available to all authenticated users)
   { path: 'events', component: EventsPageComponent },
+
+  // Ride Sessions – riders and fleet managers
+  { path: 'ride-sessions', component: RideSessionsComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider', 'FleetManager', 'Dispatcher', 'BloodBikeAdmin'] } },
+
+  // Issue Reports – riders and fleet managers
+  { path: 'issue-reports', component: IssueReportsComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider', 'FleetManager', 'Dispatcher', 'BloodBikeAdmin'] } },
 
   // Analytics – riders see own data; fleet managers/dispatchers see all
   { path: 'analytics', component: AnalyticsPageComponent, canActivate: [hasRoleGuard], data: { roles: ['Rider', 'FleetManager', 'Dispatcher', 'BloodBikeAdmin'] } },
