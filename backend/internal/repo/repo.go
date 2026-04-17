@@ -106,3 +106,43 @@ type EventsRepository interface {
 	Put(ctx context.Context, e *Event) error
 	Delete(ctx context.Context, eventID string) (bool, error)
 }
+
+// ── Ride Sessions ───────────────────────────────────────────────────────
+
+type RideSession struct {
+	SessionID  string    `json:"sessionId"  dynamodbav:"SessionID"`
+	BikeID     string    `json:"bikeId"     dynamodbav:"BikeID"`
+	RiderID    string    `json:"riderId"    dynamodbav:"RiderID"`
+	Depot      string    `json:"depot"      dynamodbav:"Depot"`
+	StartTime  time.Time `json:"startTime"  dynamodbav:"StartTime"`
+	EndTime    time.Time `json:"endTime"    dynamodbav:"EndTime"`
+	StartMiles int       `json:"startMiles" dynamodbav:"StartMiles"`
+	EndMiles   int       `json:"endMiles"   dynamodbav:"EndMiles"`
+}
+
+type RideSessionsRepository interface {
+	List(ctx context.Context) ([]RideSession, error)
+	Get(ctx context.Context, sessionID string) (*RideSession, bool, error)
+	Put(ctx context.Context, s *RideSession) error
+	Delete(ctx context.Context, sessionID string) (bool, error)
+	ListByBike(ctx context.Context, bikeID string) ([]RideSession, error)
+}
+
+// ── Issue Reports ───────────────────────────────────────────────────────
+
+type IssueReport struct {
+	IssueID     string    `json:"issueId"     dynamodbav:"IssueID"`
+	BikeID      string    `json:"bikeId"      dynamodbav:"BikeID"`
+	RiderID     string    `json:"riderId"     dynamodbav:"RiderID"`
+	Type        string    `json:"type"        dynamodbav:"Type"`
+	Description string    `json:"description" dynamodbav:"Description"`
+	Timestamp   time.Time `json:"timestamp"   dynamodbav:"Timestamp"`
+	Resolved    bool      `json:"resolved"    dynamodbav:"Resolved"`
+}
+
+type IssueReportsRepository interface {
+	List(ctx context.Context) ([]IssueReport, error)
+	Get(ctx context.Context, issueID string) (*IssueReport, bool, error)
+	Put(ctx context.Context, r *IssueReport) error
+	Delete(ctx context.Context, issueID string) (bool, error)
+}
