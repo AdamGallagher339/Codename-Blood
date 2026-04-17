@@ -1195,3 +1195,153 @@ func awsErrString(err error) string {
 	}
 	return err.Error()
 }
+
+// ChangePasswordHandler lets an authenticated user change their own password.
+// Expects JSON: { "previousPassword": "old", "proposedPassword": "new" }
+func (a *AuthClient) ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		PreviousPassword string `json:"previousPassword"`
+		ProposedPassword string `json:"proposedPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if body.PreviousPassword == "" || body.ProposedPassword == "" {
+		http.Error(w, "previousPassword and proposedPassword are required", http.StatusBadRequest)
+		return
+	}
+
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	username := ""
+	if u, ok := claims["cognito:username"].(string); ok {
+		username = u
+	} else if u, ok := claims["username"].(string); ok {
+		username = u
+	}
+
+	if a.local {
+		a.usersMu.Lock()
+		u, ok := a.users[username]
+		if !ok {
+			a.usersMu.Unlock()
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		if u.Password != body.PreviousPassword {
+			a.usersMu.Unlock()
+			http.Error(w, "incorrect current password", http.StatusBadRequest)
+			return
+		}
+		u.Password = body.ProposedPassword
+		a.users[username] = u
+		a.usersMu.Unlock()
+		_ = a.saveUserToDB(u)
+		writeJSON(w, http.StatusOK, map[string]string{"message": "Password changed successfully"})
+		return
+	}
+
+	// Cognito ChangePassword requires the user's access token, not an admin call.
+	// Re-extract the raw Bearer token from the request.
+	accessToken, err := extractBearer(r)
+	if err != nil {
+		http.Error(w, "missing access token", http.StatusUnauthorized)
+		return
+	}
+
+	_, err = a.client.ChangePassword(r.Context(), &cognito.ChangePasswordInput{
+		AccessToken:      &accessToken,
+		PreviousPassword: &body.PreviousPassword,
+		ProposedPassword: &body.ProposedPassword,
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("password change failed: %s", awsErrString(err)), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Password changed successfully"})
+}
+
+// UpdateEmailHandler lets an authenticated user update their own email address.
+// Expects JSON: { "email": "new@example.com" }
+func (a *AuthClient) UpdateEmailHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	body.Email = strings.TrimSpace(body.Email)
+	if body.Email == "" || !strings.Contains(body.Email, "@") {
+		http.Error(w, "a valid email address is required", http.StatusBadRequest)
+		return
+	}
+
+	claims := ClaimsFromContext(r.Context())
+	if claims == nil {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	username := ""
+	if u, ok := claims["cognito:username"].(string); ok {
+		username = u
+	} else if u, ok := claims["username"].(string); ok {
+		username = u
+	}
+
+	if a.local {
+		a.usersMu.Lock()
+		u, ok := a.users[username]
+		if !ok {
+			a.usersMu.Unlock()
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		u.Email = body.Email
+		a.users[username] = u
+		a.usersMu.Unlock()
+		_ = a.saveUserToDB(u)
+		writeJSON(w, http.StatusOK, map[string]string{"message": "Email updated successfully"})
+		return
+	}
+
+	_, err := a.client.AdminUpdateUserAttributes(r.Context(), &cognito.AdminUpdateUserAttributesInput{
+		UserPoolId: &a.userPoolID,
+		Username:   &username,
+		UserAttributes: []types.AttributeType{
+			{Name: awsString("email"), Value: &body.Email},
+			{Name: awsString("email_verified"), Value: awsString("true")},
+		},
+	})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("email update failed: %s", awsErrString(err)), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Email updated successfully"})
+}

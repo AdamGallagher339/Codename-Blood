@@ -23,3 +23,16 @@ node_modules/
 
 # Angular build output
 frontend/blood-bike-web/dist/
+
+# Generated documentation
+API_SPECIFICATION.md
+DOMAIN_MODELS.md
+DATABASE_DESIGN.md
+SYSTEM_ARCHITECTURE_FLOW.md
+CONFIGURATION.md
+CONCURRENCY_MODEL.md
+ERROR_HANDLING.md
+DEPLOYMENT_ARCHITECTURE.md
+LOGGING_AND_OBSERVABILITY.md
+SYSTEM_DIAGRAMS.md
+backend/simulate
