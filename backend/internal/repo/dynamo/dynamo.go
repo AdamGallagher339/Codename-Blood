@@ -11,30 +11,36 @@ import (
 )
 
 type Repositories struct {
-	Users  repo.UsersRepository
-	Bikes  repo.BikesRepository
-	Depots repo.DepotsRepository
-	Jobs   repo.JobsRepository
-	Events repo.EventsRepository
+	Users        repo.UsersRepository
+	Bikes        repo.BikesRepository
+	Depots       repo.DepotsRepository
+	Jobs         repo.JobsRepository
+	Events       repo.EventsRepository
+	RideSessions repo.RideSessionsRepository
+	IssueReports repo.IssueReportsRepository
 }
 
 type Config struct {
-	Region      string
-	UsersTable  string
-	BikesTable  string
-	DepotsTable string
-	JobsTable   string
-	EventsTable string
+	Region            string
+	UsersTable        string
+	BikesTable        string
+	DepotsTable       string
+	JobsTable         string
+	EventsTable       string
+	RideSessionsTable string
+	IssueReportsTable string
 }
 
 func ConfigFromEnv() Config {
 	return Config{
-		Region:      os.Getenv("AWS_REGION"),
-		UsersTable:  os.Getenv("USERS_TABLE"),
-		BikesTable:  os.Getenv("BIKES_TABLE"),
-		DepotsTable: os.Getenv("DEPOTS_TABLE"),
-		JobsTable:   os.Getenv("JOBS_TABLE"),
-		EventsTable: os.Getenv("EVENTS_TABLE"),
+		Region:            os.Getenv("AWS_REGION"),
+		UsersTable:        os.Getenv("USERS_TABLE"),
+		BikesTable:        os.Getenv("BIKES_TABLE"),
+		DepotsTable:       os.Getenv("DEPOTS_TABLE"),
+		JobsTable:         os.Getenv("JOBS_TABLE"),
+		EventsTable:       os.Getenv("EVENTS_TABLE"),
+		RideSessionsTable: os.Getenv("RIDE_SESSIONS_TABLE"),
+		IssueReportsTable: os.Getenv("ISSUE_REPORTS_TABLE"),
 	}
 }
 
@@ -67,6 +73,12 @@ func New(ctx context.Context, cfg Config) (*Repositories, error) {
 	}
 	if cfg.EventsTable != "" {
 		repos.Events = newEventsRepo(ddb, cfg.EventsTable)
+	}
+	if cfg.RideSessionsTable != "" {
+		repos.RideSessions = newRideSessionsRepo(ddb, cfg.RideSessionsTable)
+	}
+	if cfg.IssueReportsTable != "" {
+		repos.IssueReports = newIssueReportsRepo(ddb, cfg.IssueReportsTable)
 	}
 
 	return repos, nil
