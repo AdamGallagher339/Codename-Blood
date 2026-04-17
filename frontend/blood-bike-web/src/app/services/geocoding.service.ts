@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map, catchError, of } from 'rxjs';
+import { NotificationService } from './notification.service';
 
 export interface GeocodedLocation {
   name: string;
@@ -18,6 +19,7 @@ interface NominatimResult {
 @Injectable({ providedIn: 'root' })
 export class GeocodingService {
   private http = inject(HttpClient);
+  private notifications = inject(NotificationService);
 
   /**
    * Geocode a place name or address to lat/lng.
@@ -41,6 +43,7 @@ export class GeocodingService {
         }),
         catchError(err => {
           console.warn(`Geocoding failed for "${query}":`, err);
+          this.notifications.warning('Location lookup is temporarily unavailable.', 'geocode:lookup');
           return of(null);
         })
       );

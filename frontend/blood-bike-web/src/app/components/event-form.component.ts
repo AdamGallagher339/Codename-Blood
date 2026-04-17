@@ -175,7 +175,6 @@ export class EventFormComponent implements OnDestroy {
     };
 
     this.eventCreated.emit(eventDto);
-    this.close();
   }
   
   isFormValid(): boolean {

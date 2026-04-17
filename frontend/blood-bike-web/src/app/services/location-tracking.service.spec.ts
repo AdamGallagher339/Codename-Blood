@@ -165,6 +165,23 @@ describe('LocationTrackingService', () => {
     discardPeriodicTasks();
   }));
 
+  it('startRidersPolling marks the connection disconnected on request failure', fakeAsync(() => {
+    let status: string | undefined;
+    service.getConnectionStatus().subscribe(s => (status = s));
+
+    service.startRidersPolling(5000);
+    http.expectOne('/api/tracking/riders').flush('err', {
+      status: 500,
+      statusText: 'Server Error',
+    });
+    tick();
+
+    expect(status).toBe('disconnected');
+
+    service.stopRidersPolling();
+    discardPeriodicTasks();
+  }));
+
   it('disconnectWebSocket stops polling and sets disconnected', fakeAsync(() => {
     let status: string | undefined;
     service.getConnectionStatus().subscribe(s => (status = s));

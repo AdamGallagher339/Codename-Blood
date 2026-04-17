@@ -123,12 +123,16 @@ export class EventsPageComponent {
   }
   
   createEvent(eventDto: CreateEventDto): void {
-    this.eventService.createEvent(eventDto);
+    this.eventService.createEvent(eventDto).subscribe((created) => {
+      if (created) {
+        this.eventForm().close();
+      }
+    });
   }
   
   deleteEvent(eventId: string): void {
     if (confirm('Are you sure you want to delete this event?')) {
-      this.eventService.deleteEvent(eventId);
+      this.eventService.deleteEvent(eventId).subscribe();
     }
   }
   

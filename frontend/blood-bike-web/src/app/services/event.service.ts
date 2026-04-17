@@ -1,7 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { catchError, map, of } from 'rxjs';
+import { Observable, catchError, map, of, tap } from 'rxjs';
 import { Event, CreateEventDto } from '../models/event.model';
+import { NotificationService } from './notification.service';
 
 type ApiEvent = Omit<Event, 'date' | 'createdAt' | 'updatedAt'> & {
   date: string;
@@ -15,7 +16,8 @@ type ApiEvent = Omit<Event, 'date' | 'createdAt' | 'updatedAt'> & {
 export class EventService {
   private events = signal<Event[]>([]);
   private loaded = false;
-  
+  private notifications = inject(NotificationService);
+
   constructor(private http: HttpClient) {}
 
   getEvents() {
@@ -39,53 +41,57 @@ export class EventService {
     });
   }
 
-  createEvent(eventDto: CreateEventDto): void {
-    this.http
+  createEvent(eventDto: CreateEventDto): Observable<boolean> {
+    return this.http
       .post<ApiEvent>('/api/events', eventDto)
       .pipe(
         map((e) => this.fromApiEvent(e)),
+        tap((created) => {
+          this.events.update((events) => [...events, created]);
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to create event', err);
-          return of(null);
+          this.notifications.error('Could not create the event. Please try again.', 'events:create');
+          return of(false);
         })
-      )
-      .subscribe((created) => {
-        if (!created) return;
-        this.events.update((events) => [...events, created]);
-      });
+      );
   }
 
-  updateEvent(id: string, updates: Partial<Event>): void {
+  updateEvent(id: string, updates: Partial<Event>): Observable<boolean> {
     // backend expects PATCH-like semantics
-    this.http
+    return this.http
       .patch<ApiEvent>(`/api/events/${id}`, updates)
       .pipe(
         map((e) => this.fromApiEvent(e)),
+        tap((updated) => {
+          this.events.update((events) =>
+            events.map((event) => (event.id === id ? updated : event))
+          );
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to update event', err);
-          return of(null);
+          this.notifications.error('Could not update the event.', 'events:update');
+          return of(false);
         })
-      )
-      .subscribe((updated) => {
-        if (!updated) return;
-        this.events.update((events) =>
-          events.map((event) => (event.id === id ? updated : event))
-        );
-      });
+      );
   }
 
-  deleteEvent(id: string): void {
-    this.http
+  deleteEvent(id: string): Observable<boolean> {
+    return this.http
       .delete(`/api/events/${id}`)
       .pipe(
+        tap(() => {
+          this.events.update((events) => events.filter((event) => event.id !== id));
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to delete event', err);
-          return of(null);
+          this.notifications.error('Could not delete the event.', 'events:delete');
+          return of(false);
         })
-      )
-      .subscribe(() => {
-        this.events.update((events) => events.filter((event) => event.id !== id));
-      });
+      );
   }
 
   private isSameDay(date1: Date, date2: Date): boolean {
@@ -101,10 +107,14 @@ export class EventService {
         map((events) => events.map((e) => this.fromApiEvent(e))),
         catchError((err) => {
           console.error('Failed to load events', err);
-          return of([] as Event[]);
+          this.notifications.warning('Event data could not be refreshed.', 'events:load');
+          return of(null);
         })
       )
-      .subscribe((events) => this.events.set(events));
+      .subscribe((events) => {
+        if (!events) return;
+        this.events.set(events);
+      });
   }
 
   private fromApiEvent(e: ApiEvent): Event {

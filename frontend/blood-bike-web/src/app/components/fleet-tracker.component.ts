@@ -101,14 +101,16 @@ export class FleetTrackerComponent {
       registration: this.registration().trim(),
       locationId: this.locationId().trim(),
       active: 'out_of_service'
-    });
+    }).subscribe((created) => {
+      if (!created) return;
 
-    this.make.set('');
-    this.model.set('');
-    this.vehicleType.set('motorcycle');
-    this.registration.set('');
-    this.locationId.set('');
-    this.showAddForm.set(false);
+      this.make.set('');
+      this.model.set('');
+      this.vehicleType.set('motorcycle');
+      this.registration.set('');
+      this.locationId.set('');
+      this.showAddForm.set(false);
+    });
   }
 
   saveBike(): void {
@@ -117,7 +119,7 @@ export class FleetTrackerComponent {
 
     this.fleetService.updateBike(bike.bikeId, {
       active: this.editActiveMode(),
-    });
+    }).subscribe();
   }
 
   addServiceEntry(): void {
@@ -129,14 +131,16 @@ export class FleetTrackerComponent {
       serviceDate: new Date(this.serviceDate()),
       notes: this.serviceNotes().trim() || undefined,
       performedBy: this.servicePerformedBy().trim() || undefined,
-    });
+    }).subscribe((saved) => {
+      if (!saved) return;
 
-    this.serviceNotes.set('');
-    this.servicePerformedBy.set(this.authService.username());
+      this.serviceNotes.set('');
+      this.servicePerformedBy.set(this.authService.username());
+    });
   }
 
   deleteServiceEntry(bikeId: string, serviceId: string): void {
-    this.fleetService.deleteServiceEntry(bikeId, serviceId);
+    this.fleetService.deleteServiceEntry(bikeId, serviceId).subscribe();
   }
 
   deleteBike(): void {
@@ -144,9 +148,11 @@ export class FleetTrackerComponent {
     if (!bike) return;
     if (!this.deleteMatchesRegistration()) return;
 
-    this.fleetService.deleteBike(bike.bikeId);
-    this.selectedBikeId.set(null);
-    this.deleteConfirm.set('');
+    this.fleetService.deleteBike(bike.bikeId).subscribe((deleted) => {
+      if (!deleted) return;
+      this.selectedBikeId.set(null);
+      this.deleteConfirm.set('');
+    });
   }
 
   openLocationScanner(): void {
@@ -157,9 +163,11 @@ export class FleetTrackerComponent {
     const bike = this.selectedBike();
     if (!bike) return;
 
-    this.fleetService.changeLocation(bike.bikeId, locationId);
-    this.editLocationId.set(locationId);
-    this.showLocationScanner.set(false);
+    this.fleetService.changeLocation(bike.bikeId, locationId).subscribe((updated) => {
+      if (!updated) return;
+      this.editLocationId.set(locationId);
+      this.showLocationScanner.set(false);
+    });
   }
 
   cancelLocationScanner(): void {

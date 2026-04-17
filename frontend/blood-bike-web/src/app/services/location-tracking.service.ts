@@ -3,12 +3,14 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, Subject, BehaviorSubject, Subscription, interval, of } from 'rxjs';
 import { catchError, startWith, switchMap } from 'rxjs/operators';
 import { LocationUpdate, TrackedEntity } from '../models/location.model';
+import { NotificationService } from './notification.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class LocationTrackingService {
   private http = inject(HttpClient);
+  private notifications = inject(NotificationService);
 
   // API endpoints - uses proxy.conf.json in development
   private readonly API_BASE = '/api/tracking';
@@ -25,6 +27,8 @@ export class LocationTrackingService {
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 5;
   private readonly reconnectDelay = 3_000;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private riderRequestFailed = false;
 
   // ---------------------------------------------------------------------------
   // Page Visibility API — pauses polling when the tab is backgrounded so
@@ -71,8 +75,13 @@ export class LocationTrackingService {
   }
 
   getRiders(): Observable<any[]> {
+    this.riderRequestFailed = false;
     return this.http.get<any[]>(`${this.API_BASE}/riders`).pipe(
-      catchError(() => of([]))
+      catchError((err) => {
+        console.error('Failed to load riders:', err);
+        this.riderRequestFailed = true;
+        return of([]);
+      })
     );
   }
 
@@ -104,8 +113,8 @@ export class LocationTrackingService {
   startRidersPolling(pollMs = this.defaultPollMs): void {
     this.stopPolling();
     this.pollingMode = 'riders';
+    this.connectionStatus$.next('connecting');
     this.startPollingRiders(pollMs);
-    this.connectionStatus$.next('connected');
     this.ensureVisibilityListener();
   }
 
@@ -139,7 +148,12 @@ export class LocationTrackingService {
     this.lastPublishedLat = lat ?? null;
     this.lastPublishedLng = lng ?? null;
     this.updateLocation(update).subscribe({
-      error: (err) => console.error('Failed to send location update:', err),
+      next: () => this.connectionStatus$.next('connected'),
+      error: (err) => {
+        console.error('Failed to send location update:', err);
+        this.connectionStatus$.next('disconnected');
+        this.notifications.error('Could not send the latest location update.', 'tracking:send-location');
+      },
     });
   }
 
@@ -179,6 +193,7 @@ export class LocationTrackingService {
               this.connectionStatus$.next('disconnected');
               this.stopPolling();
               this.scheduleReconnect();
+              this.notifications.warning('Live location updates were interrupted. Reconnecting…', 'tracking:locations-polling');
               return of<LocationUpdate[] | null>(null);
             })
           )
@@ -198,6 +213,14 @@ export class LocationTrackingService {
         switchMap(() => this.getRiders())
       )
       .subscribe((riders) => {
+        if (this.riderRequestFailed) {
+          this.connectionStatus$.next('disconnected');
+          this.stopPolling();
+          this.scheduleReconnect();
+          this.notifications.warning('Live rider updates were interrupted. Reconnecting…', 'tracking:riders-polling');
+          return;
+        }
+
         this.connectionStatus$.next('connected');
         this.applyPolledLocations(riders);
       });
@@ -206,6 +229,10 @@ export class LocationTrackingService {
   private stopPolling(): void {
     this.pollingSub?.unsubscribe();
     this.pollingSub = null;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
   }
 
   private resumePolling(): void {
@@ -218,10 +245,13 @@ export class LocationTrackingService {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts || this.reconnectTimer) return;
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    setTimeout(() => this.resumePolling(), delay);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.resumePolling();
+    }, delay);
   }
 
   private applyPolledLocations(locations: LocationUpdate[]): void {

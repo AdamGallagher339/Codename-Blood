@@ -8,6 +8,7 @@ import { FleetTrackerComponent } from './components/fleet-tracker.component';
 import { finalize, filter } from 'rxjs';
 import { AuthService, AuthPage } from './services/auth.service';
 import { PushNotificationService } from './services/push-notification.service';
+import { NotificationService } from './services/notification.service';
 
 @Component({
   selector: 'app-root',
@@ -151,6 +152,7 @@ export class App implements OnInit {
     private readonly router: Router,
     public readonly http: HttpClient,
     private readonly pushService: PushNotificationService,
+    public readonly notifications: NotificationService,
     @Inject(PLATFORM_ID) private platformId: object
   ) {}
 

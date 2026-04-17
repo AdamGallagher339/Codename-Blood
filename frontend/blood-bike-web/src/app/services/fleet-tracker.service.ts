@@ -1,6 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { catchError, map, of } from 'rxjs';
+import { Observable, catchError, map, of, tap } from 'rxjs';
 import {
   FleetBike,
   ServiceEntry,
@@ -8,6 +8,7 @@ import {
   UpdateFleetBikeDto,
   CreateServiceEntryDto,
 } from '../models/fleet-bike.model';
+import { NotificationService } from './notification.service';
 
 type ApiFleetBike = Omit<FleetBike, 'createdAt' | 'updatedAt'> & {
   createdAt: string;
@@ -24,6 +25,7 @@ export class FleetTrackerService {
   private bikes = signal<FleetBike[]>([]);
   private loaded = false;
   private serviceHistory = signal<Record<string, ServiceEntry[]>>({});
+  private notifications = inject(NotificationService);
 
   constructor(private http: HttpClient) {}
 
@@ -46,126 +48,134 @@ export class FleetTrackerService {
         map((entries) => entries.map((e) => this.fromApiServiceEntry(e))),
         catchError((err) => {
           console.error('Failed to load service history', err);
-          return of([] as ServiceEntry[]);
+          this.notifications.warning('Service history could not be refreshed.', 'fleet:history');
+          return of(null);
         })
       )
       .subscribe((entries) => {
+        if (!entries) return;
         this.serviceHistory.update((current) => ({ ...current, [bikeId]: entries }));
       });
   }
 
-  createBike(dto: CreateFleetBikeDto): void {
-    this.http
+  createBike(dto: CreateFleetBikeDto): Observable<boolean> {
+    return this.http
       .post<ApiFleetBike>('/api/fleet/bikes', dto)
       .pipe(
         map((bike) => this.fromApiBike(bike)),
+        tap((bike) => {
+          this.bikes.update((bikes) => [...bikes, bike]);
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to create bike', err);
-          return of(null);
+          this.notifications.error('Could not add the vehicle.', 'fleet:create-bike');
+          return of(false);
         })
-      )
-      .subscribe((bike) => {
-        if (!bike) return;
-        this.bikes.update((bikes) => [...bikes, bike]);
-      });
+      );
   }
 
-  updateBike(bikeId: string, dto: UpdateFleetBikeDto): void {
-    this.http
+  updateBike(bikeId: string, dto: UpdateFleetBikeDto): Observable<boolean> {
+    return this.http
       .patch<ApiFleetBike>(`/api/fleet/bikes/${bikeId}`, dto)
       .pipe(
         map((bike) => this.fromApiBike(bike)),
+        tap((bike) => {
+          this.bikes.update((bikes) =>
+            bikes.map((item) => (item.bikeId === bikeId ? bike : item))
+          );
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to update bike', err);
-          return of(null);
+          this.notifications.error('Could not update the vehicle status.', 'fleet:update-bike');
+          return of(false);
         })
-      )
-      .subscribe((bike) => {
-        if (!bike) return;
-        this.bikes.update((bikes) =>
-          bikes.map((item) => (item.bikeId === bikeId ? bike : item))
-        );
-      });
+      );
   }
 
-  addServiceEntry(bikeId: string, dto: CreateServiceEntryDto): void {
+  addServiceEntry(bikeId: string, dto: CreateServiceEntryDto): Observable<boolean> {
     const payload = {
       ...dto,
       serviceDate: dto.serviceDate ? dto.serviceDate.toISOString() : undefined,
     };
 
-    this.http
+    return this.http
       .post<ApiServiceEntry>(`/api/fleet/bikes/${bikeId}/service`, payload)
       .pipe(
         map((entry) => this.fromApiServiceEntry(entry)),
+        tap((entry) => {
+          this.serviceHistory.update((current) => {
+            const existing = current[bikeId] ?? [];
+            return { ...current, [bikeId]: [entry, ...existing] };
+          });
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to add service entry', err);
-          return of(null);
+          this.notifications.error('Could not save the service record.', 'fleet:add-service');
+          return of(false);
         })
-      )
-      .subscribe((entry) => {
-        if (!entry) return;
-        this.serviceHistory.update((current) => {
-          const existing = current[bikeId] ?? [];
-          return { ...current, [bikeId]: [entry, ...existing] };
-        });
-      });
+      );
   }
 
-  deleteServiceEntry(bikeId: string, serviceId: string): void {
-    this.http
+  deleteServiceEntry(bikeId: string, serviceId: string): Observable<boolean> {
+    return this.http
       .post(`/api/fleet/bikes/${bikeId}/service-delete`, { serviceId })
       .pipe(
+        tap(() => {
+          this.serviceHistory.update((current) => {
+            const entries = current[bikeId] ?? [];
+            return { ...current, [bikeId]: entries.filter((e) => e.serviceId !== serviceId) };
+          });
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to delete service entry', err);
-          return of(null);
+          this.notifications.error('Could not delete the service record.', 'fleet:delete-service');
+          return of(false);
         })
-      )
-      .subscribe((result) => {
-        if (result === null) return;
-        this.serviceHistory.update((current) => {
-          const entries = current[bikeId] ?? [];
-          return { ...current, [bikeId]: entries.filter((e) => e.serviceId !== serviceId) };
-        });
-      });
+      );
   }
 
-  deleteBike(bikeId: string): void {
-    this.http
+  deleteBike(bikeId: string): Observable<boolean> {
+    return this.http
       .post(`/api/fleet/bikes/${bikeId}/delete`, {})
       .pipe(
+        tap(() => {
+          this.bikes.update((bikes) => bikes.filter((bike) => bike.bikeId !== bikeId));
+          this.serviceHistory.update((current) => {
+            const next = { ...current };
+            delete next[bikeId];
+            return next;
+          });
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to delete bike', err);
-          return of(null);
+          this.notifications.error('Could not delete the vehicle.', 'fleet:delete-bike');
+          return of(false);
         })
-      )
-      .subscribe((result) => {
-        if (result === null) return;
-        this.bikes.update((bikes) => bikes.filter((bike) => bike.bikeId !== bikeId));
-        this.serviceHistory.update((current) => {
-          const next = { ...current };
-          delete next[bikeId];
-          return next;
-        });
-      });
+      );
   }
 
-  changeLocation(bikeId: string, locationId: string): void {
-    this.http
+  changeLocation(bikeId: string, locationId: string): Observable<boolean> {
+    return this.http
       .post<ApiFleetBike>(`/api/fleet/bikes/${bikeId}/change-location`, { locationId })
       .pipe(
         map((bike) => this.fromApiBike(bike)),
+        tap((bike) => {
+          this.bikes.update((bikes) =>
+            bikes.map((item) => (item.bikeId === bikeId ? bike : item))
+          );
+        }),
+        map(() => true),
         catchError((err) => {
           console.error('Failed to change location', err);
-          return of(null);
+          this.notifications.error('Could not change the vehicle location.', 'fleet:change-location');
+          return of(false);
         })
-      )
-      .subscribe((bike) => {
-        if (!bike) return;
-        this.bikes.update((bikes) =>
-          bikes.map((item) => (item.bikeId === bikeId ? bike : item))
-        );
-      });
+      );
   }
 
   private loadBikes(): void {
@@ -175,10 +185,14 @@ export class FleetTrackerService {
         map((bikes) => bikes.map((bike) => this.fromApiBike(bike))),
         catchError((err) => {
           console.error('Failed to load bikes', err);
-          return of([] as FleetBike[]);
+          this.notifications.warning('Fleet data could not be refreshed.', 'fleet:load');
+          return of(null);
         })
       )
-      .subscribe((bikes) => this.bikes.set(bikes));
+      .subscribe((bikes) => {
+        if (!bikes) return;
+        this.bikes.set(bikes);
+      });
   }
 
   private fromApiBike(bike: ApiFleetBike): FleetBike {

@@ -4,6 +4,16 @@
 </div>
 
 <div class="app-container">
+  <div
+    *ngIf="notifications.notification() as notice"
+    class="global-toast"
+    [class.error]="notice.level === 'error'"
+    [class.warning]="notice.level === 'warning'"
+    [class.success]="notice.level === 'success'"
+  >
+    <span>{{ notice.message }}</span>
+    <button type="button" class="global-toast-close" (click)="notifications.dismiss()">×</button>
+  </div>
   <!-- Mobile Floating Header (phone/tablet only) -->
   <div class="mobile-float-header" *ngIf="auth.isLoggedIn() && !showSplash">
     <div class="float-logo" (click)="goHomeOrWelcome()">
