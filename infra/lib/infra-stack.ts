@@ -208,6 +208,10 @@ export class InfraStack extends Stack {
           // DynamoDB tables (fleet tracker)
           FLEET_BIKES_TABLE: fleetBikesTable.tableName,
           FLEET_SERVICE_TABLE: fleetServiceTable.tableName,
+
+          // DynamoDB tables (ride sessions & issue reports)
+          RIDE_SESSIONS_TABLE: rideSessionsTable.tableName,
+          ISSUE_REPORTS_TABLE: issueReportsTable.tableName,
         },
       });
 
@@ -217,6 +221,8 @@ export class InfraStack extends Stack {
       jobsTable.grantReadWriteData(backendApiLambda);
       fleetBikesTable.grantReadWriteData(backendApiLambda);
       fleetServiceTable.grantReadWriteData(backendApiLambda);
+      rideSessionsTable.grantReadWriteData(backendApiLambda);
+      issueReportsTable.grantReadWriteData(backendApiLambda);
 
       // Allow syncing roles to Cognito groups (Admin* APIs).
       backendApiLambda.addToRolePolicy(

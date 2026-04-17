@@ -26,10 +26,12 @@ import (
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/auth"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/events"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/fleet"
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/issuereports"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/push"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo/dynamo"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/repo/memory"
+	"github.com/AdamGallagher339/Codename-Blood/backend/internal/ridesessions"
 	"github.com/AdamGallagher339/Codename-Blood/backend/internal/tracking"
 	"github.com/google/uuid"
 )
@@ -128,6 +130,22 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	if dynamoRepos.Events != nil {
 		events.SetGlobalEventsRepository(dynamoRepos.Events)
 	}
+
+	// Set ride sessions repository
+	var rideSessions repo.RideSessionsRepository = dynamoRepos.RideSessions
+	if rideSessions == nil {
+		log.Println("RIDE_SESSIONS_TABLE not set – using in-memory ride sessions repo")
+		rideSessions = memory.NewRideSessionsRepo()
+	}
+	ridesessions.SetRepository(rideSessions)
+
+	// Set issue reports repository
+	var issueReportsRepo repo.IssueReportsRepository = dynamoRepos.IssueReports
+	if issueReportsRepo == nil {
+		log.Println("ISSUE_REPORTS_TABLE not set – using in-memory issue reports repo")
+		issueReportsRepo = memory.NewIssueReportsRepo()
+	}
+	issuereports.SetRepository(issueReportsRepo)
 
 	// Start background ticker that deletes events once their end time has passed.
 	events.StartCleanupTicker(ctx)
@@ -239,6 +257,14 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	// --- Events Routes ---
 	mux.HandleFunc("/api/events", withCORS(authClient.RequireAuth(events.ListOrCreate)))
 	mux.HandleFunc("/api/events/", withCORS(authClient.RequireAuth(events.GetUpdateOrDelete)))
+
+	// --- Ride Sessions Routes ---
+	mux.HandleFunc("/api/ride-sessions", withCORS(authClient.RequireAuth(ridesessions.ListOrCreate)))
+	mux.HandleFunc("/api/ride-sessions/", withCORS(authClient.RequireAuth(ridesessions.Detail)))
+
+	// --- Issue Reports Routes ---
+	mux.HandleFunc("/api/issue-reports", withCORS(authClient.RequireAuth(issuereports.ListOrCreate)))
+	mux.HandleFunc("/api/issue-reports/", withCORS(authClient.RequireAuth(issuereports.Detail)))
 
 	// --- Push Notification Store ---
 	var pushStore *push.Store
