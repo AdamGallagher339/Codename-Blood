@@ -37,8 +37,18 @@ npm --version     # 11.x or later
 
 ---
 
-## Setup
+## Running the Project
 
+Due to the use of AWS services (Cognito, DynamoDB, etc.), full functionality requires appropriate environment configuration and credentials.
+
+For demonstration purposes, the system can be run in local development mode without AWS by using:
+
+APP_CONFIG_ENABLED=false LOCAL_AUTH=1 ./backend
+
+A full walkthrough of the system is provided in the screencast below.
+
+
+## Setup
 ### 1) Clone the repo
 
 ```bash
