@@ -1,6 +1,7 @@
  # Codename Blood
 
-Blood Bike fleet + events tooling with live GPS tracking.
+A web-based coordination platform for Blood Bike West, designed to manage medical deliveries, riders, and fleet operations.
+
 
 ## Features
 
