@@ -5,12 +5,12 @@ A web-based coordination platform for Blood Bike West, designed to manage medica
 
 ## Features
 
-- 🗺️ **Live Tracking Map**: Real-time GPS location tracking for bikes and riders
-- 📅 **Event Management**: Schedule and coordinate blood delivery events
-- 🚲 **Fleet Management**: Track bikes, riders, and assignments
-- 📱 **QR Scanner**: Quick bike registration and ride management
-- 🔒 **Authentication**: Secure user authentication with AWS Cognito
-- 📡 **WebSocket Support**: Real-time updates via WebSocket connections
+-  **Live Tracking Map**: Real-time GPS location tracking for bikes and riders
+-  **Event Management**: Schedule and coordinate blood delivery events
+-  **Fleet Management**: Track bikes, riders, and assignments
+-  **QR Scanner**: Quick bike registration and ride management
+-  **Authentication**: Secure user authentication with AWS Cognito
+-  **WebSocket Support**: Real-time updates via WebSocket connections
 
 ## Prerequisites
 
