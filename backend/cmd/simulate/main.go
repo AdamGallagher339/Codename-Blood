@@ -29,6 +29,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -48,6 +49,51 @@ var (
 	cAppsSubmitted atomic.Int64
 	cAPIErrors     atomic.Int64
 )
+
+// --- latency tracking ---
+
+var latencyStore = struct {
+	mu      sync.Mutex
+	samples map[string][]int64
+}{samples: make(map[string][]int64)}
+
+func recordLatency(label string, ms int64) {
+	latencyStore.mu.Lock()
+	latencyStore.samples[label] = append(latencyStore.samples[label], ms)
+	latencyStore.mu.Unlock()
+}
+
+func printLatencyTable() {
+	latencyStore.mu.Lock()
+	defer latencyStore.mu.Unlock()
+
+	type row struct {
+		endpoint string
+		avgMs    float64
+		count    int
+	}
+	var rows []row
+	for ep, samps := range latencyStore.samples {
+		if len(samps) == 0 {
+			continue
+		}
+		var sum int64
+		for _, ms := range samps {
+			sum += ms
+		}
+		rows = append(rows, row{ep, float64(sum) / float64(len(samps)), len(samps)})
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].endpoint < rows[j].endpoint })
+
+	log.Println("")
+	log.Println("  ┌────────────────────────────────────────────┬──────────┬───────────┐")
+	log.Println("  │ Endpoint                                   │  Avg ms  │  Samples  │")
+	log.Println("  ├────────────────────────────────────────────┼──────────┼───────────┤")
+	for _, r := range rows {
+		log.Printf("  │ %-42s │ %8.1f │ %9d │", r.endpoint, r.avgMs, r.count)
+	}
+	log.Println("  └────────────────────────────────────────────┴──────────┴───────────┘")
+}
 
 // --- token store ---
 
@@ -129,6 +175,7 @@ func main() {
 	nRiderFlag := flag.Int("riders", 40, "Number of active rider goroutines")
 	nIssueFlag := flag.Int("issue-riders", 10, "Number of cancel/issue rider goroutines")
 	nFleetFlag := flag.Int("fleet", 10, "Number of fleet manager goroutines")
+	cleanupFlag := flag.Bool("cleanup", true, "Delete sim-created jobs before and after the run")
 	flag.Parse()
 
 	base := *urlFlag
@@ -149,6 +196,18 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), *durFlag)
 	defer cancel()
+
+	// ── Phase 0: clean up any leftover sim jobs from a previous run ─────────
+	if *cleanupFlag {
+		cleanupUser := "sim-cleanup-admin"
+		_ = signup(base, cleanupUser, []string{"Dispatcher"})
+		if tok, err := signin(base, cleanupUser); err == nil {
+			n := cleanupSimJobs(base, tok)
+			if n > 0 {
+				log.Printf("[cleanup] Deleted %d leftover sim jobs from previous runs", n)
+			}
+		}
+	}
 
 	// ── Phase 1: create + sign-in every user ────────────────────────────────
 	log.Printf("[setup] Creating %d simulation users …", total)
@@ -272,7 +331,20 @@ func main() {
 	log.Println("══════════════════ Final Stats ══════════════════")
 	printStats()
 	log.Println("═════════════════════════════════════════════════")
+	log.Println("")
+	log.Println("══════════════ Avg Response Times (ms) ══════════")
+	printLatencyTable()
+	log.Println("═════════════════════════════════════════════════")
 	log.Println("Simulation complete.")
+
+	// ── Phase 5: cleanup sim jobs from this run ──────────────────────────────
+	if *cleanupFlag {
+		cleanupUser := "sim-cleanup-admin"
+		if tok, err := signin(base, cleanupUser); err == nil {
+			n := cleanupSimJobs(base, tok)
+			log.Printf("[cleanup] Deleted %d sim jobs from this run", n)
+		}
+	}
 }
 
 // ── goroutine workers ────────────────────────────────────────────────────────
@@ -454,7 +526,7 @@ func runApplications(ctx context.Context, base string, n int) {
 			"hasValidRospaCertificate":  rand.Intn(2) == 0,
 			"application":               "I would love to volunteer as a blood bike rider.",
 		}
-		resp, err := doJSON("POST", base+"/api/applications/public", "", body)
+		resp, err := doJSON("POST", base+"/api/applications/public", "POST /api/applications/public", "", body)
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == 201 {
@@ -475,7 +547,7 @@ func signup(base, username string, roles []string) error {
 		"email":    username + "@sim.bloodbike.test",
 		"roles":    roles,
 	}
-	resp, err := doJSON("POST", base+"/api/auth/signup", "", body)
+	resp, err := doJSON("POST", base+"/api/auth/signup", "POST /api/auth/signup", "", body)
 	if err != nil {
 		return err
 	}
@@ -488,7 +560,7 @@ func signup(base, username string, roles []string) error {
 
 func signin(base, username string) (string, error) {
 	body := map[string]any{"username": username, "password": simPassword}
-	resp, err := doJSON("POST", base+"/api/auth/signin", "", body)
+	resp, err := doJSON("POST", base+"/api/auth/signin", "POST /api/auth/signin", "", body)
 	if err != nil {
 		return "", err
 	}
@@ -507,7 +579,7 @@ func signin(base, username string) (string, error) {
 
 func registerUser(base, tok, username string, roles []string) error {
 	body := map[string]any{"riderId": username, "name": username, "tags": roles}
-	resp, err := doJSON("POST", base+"/api/user/register", tok, body)
+	resp, err := doJSON("POST", base+"/api/user/register", "POST /api/user/register", tok, body)
 	if err != nil {
 		return err
 	}
@@ -517,7 +589,7 @@ func registerUser(base, tok, username string, roles []string) error {
 
 func setAvailability(base, tok, status string, hours int) error {
 	body := map[string]any{"status": status, "duration": hours}
-	resp, err := doJSON("PUT", base+"/api/riders/availability/me", tok, body)
+	resp, err := doJSON("PUT", base+"/api/riders/availability/me", "PUT /api/riders/availability/me", tok, body)
 	if err != nil {
 		return err
 	}
@@ -526,18 +598,54 @@ func setAvailability(base, tok, status string, hours int) error {
 }
 
 type jobItem struct {
-	JobID  string `json:"jobId"`
-	Status string `json:"status"`
+	JobID     string `json:"jobId"`
+	Status    string `json:"status"`
+	CreatedBy string `json:"createdBy"`
+}
+
+// cleanupSimJobs deletes every job whose createdBy field starts with "sim-".
+func cleanupSimJobs(base, tok string) int {
+	req, _ := http.NewRequest("GET", base+"/api/jobs", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return 0
+	}
+	var jobs []jobItem
+	if err := json.NewDecoder(resp.Body).Decode(&jobs); err != nil {
+		return 0
+	}
+	deleted := 0
+	for _, j := range jobs {
+		if !strings.HasPrefix(j.CreatedBy, "sim-") {
+			continue
+		}
+		dreq, _ := http.NewRequest("DELETE", base+"/api/jobs/"+j.JobID, nil)
+		dreq.Header.Set("Authorization", "Bearer "+tok)
+		if dr, err := httpClient.Do(dreq); err == nil {
+			dr.Body.Close()
+			if dr.StatusCode == http.StatusNoContent {
+				deleted++
+			}
+		}
+	}
+	return deleted
 }
 
 func findOpenJob(base, tok string) *jobItem {
 	req, _ := http.NewRequest("GET", base+"/api/jobs", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
+	start := time.Now()
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		cAPIErrors.Add(1)
 		return nil
 	}
+	recordLatency("GET /api/jobs", time.Since(start).Milliseconds())
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return nil
@@ -558,7 +666,7 @@ func findOpenJob(base, tok string) *jobItem {
 
 func createJob(base, tok, title, pickup, dropoff string) error {
 	body := map[string]any{"title": title, "pickup": pickup, "dropoff": dropoff}
-	resp, err := doJSON("POST", base+"/api/jobs", tok, body)
+	resp, err := doJSON("POST", base+"/api/jobs", "POST /api/jobs", tok, body)
 	if err != nil {
 		return err
 	}
@@ -571,7 +679,7 @@ func createJob(base, tok, title, pickup, dropoff string) error {
 
 func updateJob(base, tok, jobID, status, acceptedBy string) error {
 	body := map[string]any{"status": status, "acceptedBy": acceptedBy}
-	resp, err := doJSON("PUT", base+"/api/jobs/"+jobID, tok, body)
+	resp, err := doJSON("PUT", base+"/api/jobs/"+jobID, "PUT /api/jobs/{id}", tok, body)
 	if err != nil {
 		return err
 	}
@@ -590,7 +698,7 @@ func registerBike(base, tok, bikeID, model, depot string) error {
 		"depot":  depot,
 		"status": "Available",
 	}
-	resp, err := doJSON("POST", base+"/api/bike/register", tok, body)
+	resp, err := doJSON("POST", base+"/api/bike/register", "POST /api/bike/register", tok, body)
 	if err != nil {
 		return err
 	}
@@ -604,10 +712,12 @@ func registerBike(base, tok, bikeID, model, depot string) error {
 func startRide(base, tok, bikeID, riderID string) error {
 	req, _ := http.NewRequest("POST", base+"/api/ride/start?bikeId="+bikeID+"&riderId="+riderID, nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
+	start := time.Now()
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
+	recordLatency("POST /api/ride/start", time.Since(start).Milliseconds())
 	resp.Body.Close()
 	return nil
 }
@@ -615,17 +725,19 @@ func startRide(base, tok, bikeID, riderID string) error {
 func endRide(base, tok, bikeID string) error {
 	req, _ := http.NewRequest("POST", base+"/api/ride/end?bikeId="+bikeID, nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
+	start := time.Now()
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
+	recordLatency("POST /api/ride/end", time.Since(start).Milliseconds())
 	resp.Body.Close()
 	return nil
 }
 
 // ── HTTP util ────────────────────────────────────────────────────────────────
 
-func doJSON(method, url, token string, body any) (*http.Response, error) {
+func doJSON(method, url, label, token string, body any) (*http.Response, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -638,7 +750,12 @@ func doJSON(method, url, token string, body any) (*http.Response, error) {
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	return httpClient.Do(req)
+	start := time.Now()
+	resp, err := httpClient.Do(req)
+	if err == nil {
+		recordLatency(label, time.Since(start).Milliseconds())
+	}
+	return resp, err
 }
 
 // ── misc helpers ─────────────────────────────────────────────────────────────

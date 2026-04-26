@@ -111,16 +111,39 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		return nil, fmt.Errorf("dynamo repos not initialized: %w", err)
 	}
 
+	// When LOCAL_AUTH=1 the server is in local dev / simulation mode.
+	// Force all repos to in-memory so no real DynamoDB writes occur during
+	// development or load testing, regardless of what *_TABLE env vars are set.
+	localAuthFlag := strings.ToLower(strings.TrimSpace(os.Getenv("LOCAL_AUTH")))
+	forceMemory := localAuthFlag == "1" || localAuthFlag == "true" || localAuthFlag == "yes"
+
 	// Fall back to in-memory repos when DynamoDB tables are not configured (local dev).
 	var users repo.UsersRepository = dynamoRepos.Users
 	var bikes repo.BikesRepository = dynamoRepos.Bikes
-	if users == nil {
-		log.Println("USERS_TABLE not set – using in-memory users repo")
+	var jobsRepo repo.JobsRepository = dynamoRepos.Jobs
+	if users == nil || forceMemory {
+		if forceMemory {
+			log.Println("LOCAL_AUTH=1 – using in-memory users repo (DynamoDB bypassed)")
+		} else {
+			log.Println("USERS_TABLE not set – using in-memory users repo")
+		}
 		users = memory.NewUsersRepo()
 	}
-	if bikes == nil {
-		log.Println("BIKES_TABLE not set – using in-memory bikes repo")
+	if bikes == nil || forceMemory {
+		if forceMemory {
+			log.Println("LOCAL_AUTH=1 – using in-memory bikes repo (DynamoDB bypassed)")
+		} else {
+			log.Println("BIKES_TABLE not set – using in-memory bikes repo")
+		}
 		bikes = memory.NewBikesRepo()
+	}
+	if jobsRepo == nil || forceMemory {
+		if forceMemory {
+			log.Println("LOCAL_AUTH=1 – using in-memory jobs repo (DynamoDB bypassed)")
+		} else {
+			log.Println("JOBS_TABLE not set – using in-memory jobs repo")
+		}
+		jobsRepo = memory.NewJobsRepo()
 	}
 
 	fleet.SetRepositories(users, bikes)
@@ -277,13 +300,9 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 
 	// --- Jobs Routes ---
 	listOrCreateJobs := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
-		if dynamoRepos.Jobs == nil {
-			http.Error(w, "JOBS_TABLE not configured", http.StatusNotImplemented)
-			return
-		}
 		switch r.Method {
 		case http.MethodGet:
-			jobs, err := dynamoRepos.Jobs.List(r.Context())
+			jobs, err := jobsRepo.List(r.Context())
 			if err != nil {
 				log.Printf("op=ListJobs err=%v", err)
 				http.Error(w, "failed to list jobs", http.StatusInternalServerError)
@@ -344,7 +363,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 				Dropoff:    dropoff,
 				Timestamps: map[string]any{"created": now},
 			}
-			if err := dynamoRepos.Jobs.Put(r.Context(), job); err != nil {
+			if err := jobsRepo.Put(r.Context(), job); err != nil {
 				log.Printf("op=CreateJob err=%v", err)
 				http.Error(w, "failed to create job", http.StatusInternalServerError)
 				return
@@ -369,10 +388,6 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 	})
 
 	jobDetail := authClient.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
-		if dynamoRepos.Jobs == nil {
-			http.Error(w, "JOBS_TABLE not configured", http.StatusNotImplemented)
-			return
-		}
 		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/jobs/"), "/")
 		jobID := parts[0]
 		if jobID == "" {
@@ -381,7 +396,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 		}
 		switch r.Method {
 		case http.MethodGet:
-			job, found, err := dynamoRepos.Jobs.Get(r.Context(), jobID)
+			job, found, err := jobsRepo.Get(r.Context(), jobID)
 			if err != nil {
 				log.Printf("op=GetJob err=%v", err)
 				http.Error(w, "failed to get job", http.StatusInternalServerError)
@@ -404,7 +419,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 				http.Error(w, "invalid JSON", http.StatusBadRequest)
 				return
 			}
-			job, found, err := dynamoRepos.Jobs.Get(r.Context(), jobID)
+			job, found, err := jobsRepo.Get(r.Context(), jobID)
 			if err != nil {
 				log.Printf("op=UpdateJob err=%v", err)
 				http.Error(w, "failed to get job", http.StatusInternalServerError)
@@ -448,7 +463,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 				}
 			}
 
-			if err := dynamoRepos.Jobs.Put(r.Context(), job); err != nil {
+			if err := jobsRepo.Put(r.Context(), job); err != nil {
 				log.Printf("op=UpdateJob err=%v", err)
 				http.Error(w, "failed to update job", http.StatusInternalServerError)
 				return
@@ -501,7 +516,7 @@ func NewHandler(ctx context.Context) (http.Handler, error) {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(job)
 		case http.MethodDelete:
-			deleted, err := dynamoRepos.Jobs.Delete(r.Context(), jobID)
+			deleted, err := jobsRepo.Delete(r.Context(), jobID)
 			if err != nil {
 				log.Printf("op=DeleteJob err=%v", err)
 				http.Error(w, "failed to delete job", http.StatusInternalServerError)

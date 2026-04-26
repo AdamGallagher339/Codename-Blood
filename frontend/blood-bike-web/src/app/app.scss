@@ -560,6 +560,8 @@
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 // ===== PAGE STYLING =====
@@ -596,17 +598,16 @@
 
 // ===== AUTH PAGES =====
 .auth-page {
-  background: #f8f9fa;
-  border-radius: var(--border-radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 80px);
+  background: transparent;
 
   .page-header {
     max-width: 760px;
-    margin: 0 auto var(--spacing-lg);
-    background: var(--color-white);
-    border: 1px solid #e5e7eb;
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-sm);
-    padding: var(--spacing-lg);
+    margin: 0 auto var(--spacing-md);
+    padding: var(--spacing-sm) 0;
 
     h2 {
       margin: 0;
@@ -647,8 +648,25 @@
     }
   }
 
+  .auth-title {
+    margin: 0 0 6px;
+    font-size: var(--font-size-2xl);
+    color: var(--color-text-dark);
+  }
+
+  .auth-subtitle {
+    margin: 0 0 var(--spacing-lg);
+    color: #6b7280;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    line-height: 1.5;
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid #e5e7eb;
+  }
+
   .auth-card {
-    max-width: 760px;
+    max-width: 480px;
+    width: 100%;
     margin: 0 auto;
     background: var(--color-white);
     border: 1px solid #e5e7eb;

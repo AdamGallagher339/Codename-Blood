@@ -3,6 +3,7 @@
 .vscode/
 
 # Local env (do not commit secrets)
+.env
 backend/.env
 
 # Built binaries
@@ -24,7 +25,7 @@ node_modules/
 # Angular build output
 frontend/blood-bike-web/dist/
 
-# Generated documentation
+# Generated documentation / planning files
 API_SPECIFICATION.md
 DOMAIN_MODELS.md
 DATABASE_DESIGN.md
@@ -35,4 +36,13 @@ ERROR_HANDLING.md
 DEPLOYMENT_ARCHITECTURE.md
 LOGGING_AND_OBSERVABILITY.md
 SYSTEM_DIAGRAMS.md
+BACKEND_INFRASTRUCTURE.md
+FEATURE_INVENTORY.md
+FRONTEND_ARCHITECTURE.md
+FULL_SYSTEM_OVERVIEW.md
+REPO_STRUCTURE.md
+CONTRIBUTORS.md
+*.docx
+
+# Go simulate binary
 backend/simulate

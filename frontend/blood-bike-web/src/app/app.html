@@ -140,13 +140,9 @@
     <div *ngIf="!showRoutedView">
     <!-- Welcome / Auth Landing -->
     <div *ngIf="currentPage === 'welcome'" class="page auth-page">
-      <div class="page-content">
-        <div class="hero-section">
-          <h2>Welcome</h2>
-          <p>Sign in to coordinate blood deliveries, or apply to join BloodBikes.</p>
-        </div>
-
-        <div class="auth-card">
+      <div class="auth-card">
+          <h2 class="auth-title">Welcome</h2>
+          <p class="auth-subtitle">Sign in to coordinate blood deliveries, or apply to join BloodBikes.</p>
           <p class="auth-hint">Sign in with your account credentials. Contact an admin if you need an account.</p>
           <div class="auth-actions welcome-actions">
             <button class="primary" (click)="navigateAuth('login')">Login</button>
@@ -154,16 +150,12 @@
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
         </div>
-      </div>
     </div>
 
     <!-- Login Page -->
     <div *ngIf="currentPage === 'login'" class="page auth-page">
-      <div class="page-header">
-        <h2>Login</h2>
-      </div>
-      <div class="page-content">
-        <div class="auth-card">
+      <div class="auth-card">
+        <h2 class="auth-title">Login</h2>
           <label>
             <span>Username</span>
             <input [(ngModel)]="loginUsername" placeholder="your username" autocomplete="username" />
@@ -177,17 +169,13 @@
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
           <p class="auth-link"><a (click)="navigateAuth('forgot-password')">Forgot your password?</a></p>
-        </div>
       </div>
     </div>
 
     <!-- Forgot Password Page -->
     <div *ngIf="currentPage === 'forgot-password'" class="page auth-page">
-      <div class="page-header">
-        <h2>Reset Password</h2>
-      </div>
-      <div class="page-content">
-        <div class="auth-card">
+      <div class="auth-card">
+        <h2 class="auth-title">Reset Password</h2>
           <p class="auth-hint">
             To reset your password, contact a <strong>Blood Bikes admin</strong> and ask them to send a recovery code to your email. Once you receive the code, enter it below along with your new password.
           </p>
@@ -209,17 +197,13 @@
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
           <p *ngIf="resetMessage" class="form-msg">{{ resetMessage }}</p>
-        </div>
       </div>
     </div>
 
     <!-- Public Apply Page -->
     <div *ngIf="currentPage === 'apply'" class="page auth-page">
-      <div class="page-header">
-        <h2>Apply to Join BloodBikes</h2>
-      </div>
-      <div class="page-content">
-        <div class="auth-card">
+      <div class="auth-card">
+        <h2 class="auth-title">Apply to Join BloodBikes</h2>
           <p class="auth-hint">Tell us about your riding experience and availability. We review every application.</p>
           <label>
             <span>Name</span>
@@ -264,17 +248,13 @@
           </div>
           <p *ngIf="applyMessage" class="auth-success">{{ applyMessage }}</p>
           <p *ngIf="applyError" class="auth-error">{{ applyError }}</p>
-        </div>
       </div>
     </div>
 
     <!-- Challenge Page (e.g. NEW_PASSWORD_REQUIRED) -->
     <div *ngIf="currentPage === 'challenge'" class="page auth-page">
-      <div class="page-header">
-        <h2>Set New Password</h2>
-      </div>
-      <div class="page-content">
-        <div class="auth-card">
+      <div class="auth-card">
+        <h2 class="auth-title">Set New Password</h2>
           <p class="auth-hint">Your account requires a new password before you can sign in.</p>
           <label>
             <span>New Password</span>
@@ -284,17 +264,13 @@
             <button class="primary" [disabled]="busy" (click)="submitChallenge()">{{ busy ? 'Setting password…' : 'Set Password & Sign In' }}</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
-        </div>
       </div>
     </div>
 
     <!-- Signup Page -->
     <div *ngIf="currentPage === 'signup'" class="page auth-page">
-      <div class="page-header">
-        <h2>Sign up</h2>
-      </div>
-      <div class="page-content">
-        <div class="auth-card">
+      <div class="auth-card">
+        <h2 class="auth-title">Sign up</h2>
           <label>
             <span>Email</span>
             <input [(ngModel)]="signupEmail" type="email" placeholder="you@example.com" autocomplete="email" />
@@ -313,17 +289,13 @@
           </div>
           <p class="auth-hint">You’ll get an email verification code from Cognito.</p>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
-        </div>
       </div>
     </div>
 
     <!-- Confirm Email Page -->
     <div *ngIf="currentPage === 'confirm'" class="page auth-page">
-      <div class="page-header">
-        <h2>Confirm email</h2>
-      </div>
-      <div class="page-content">
-        <div class="auth-card">
+      <div class="auth-card">
+        <h2 class="auth-title">Confirm email</h2>
           <label>
             <span>Username</span>
             <input [(ngModel)]="confirmUsername" placeholder="username" autocomplete="username" />
@@ -337,7 +309,6 @@
             <button class="secondary" [disabled]="busy" (click)="navigateAuth('login')">Back to login</button>
           </div>
           <p *ngIf="auth.lastAuthError()" class="auth-error">{{ auth.lastAuthError() }}</p>
-        </div>
       </div>
     </div>
 
